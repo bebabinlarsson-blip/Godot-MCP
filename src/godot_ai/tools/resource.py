@@ -1,0 +1,110 @@
+"""MCP tool for resource search, inspection, assignment, and creation.
+
+Absorbs single-verb domains: ``curve``, ``environment``, ``physics_shape``,
+and ``texture`` (gradient/noise procedural textures). All Resource-class
+operations live here.
+"""
+
+from __future__ import annotations
+
+from fastmcp import FastMCP
+
+from godot_ai.handlers import curve as curve_handlers
+from godot_ai.handlers import environment as environment_handlers
+from godot_ai.handlers import physics_shape as physics_shape_handlers
+from godot_ai.handlers import resource as resource_handlers
+from godot_ai.handlers import texture as texture_handlers
+from godot_ai.tools._meta_tool import register_manage_tool
+
+_DESCRIPTION = """\
+Resource (asset) search, inspection, assignment, and creation. Covers
+generic Resource subclasses plus specialized authoring (Curve, Environment,
+physics shapes, gradient/noise textures).
+
+Ops:
+  • search(type="", path="", offset=0, limit=100)
+        Search for resources by type or path. Type matching includes
+        subclasses. At least one filter required. Paginated.
+  • load(path)
+        Inspect a .tres / .res — returns type and editor-visible properties.
+  • assign(path, property, resource_path)
+        Load and assign a resource to a node property. Undoable.
+  • get_info(type)
+        Introspect a Resource class — properties, parent, abstract flag,
+        concrete_subclasses (for abstract bases). Read-only.
+  • create(type, properties=None, path="", property="", resource_path="",
+            overwrite=False)
+        Instantiate a Resource subclass. Either path+property (assign to a
+        node, undoable) or resource_path (save to .tres). For specific
+        families (Curve, Environment, etc.) prefer the dedicated ops.
+  • curve_set_points(points, path="", property="", resource_path="")
+        Replace all points on a Curve / Curve2D / Curve3D. Auto-creates
+        the curve resource if the slot is empty (curve_created flag).
+  • environment_create(path="", preset="default", properties=None,
+                        sky=None, resource_path="", overwrite=False)
+        Build Environment + Sky chain. Presets: default | clear | sunset
+        | night | fog. sky may be bool or a procedural sky dict such as
+        {"sky_material": "procedural", "sky_top_color": "#0f172a"}.
+        Either assign to a WorldEnvironment node or save .tres.
+  • physics_shape_autofit(path, source_path="", shape_type="")
+        Size a CollisionShape2D/3D to a nearby visual's bounds. Searches
+        direct siblings then parent-siblings (handles nested
+        Body→Collision layouts). Ambiguous matches return candidate paths
+        in error.data.candidates. Auto-creates the concrete Shape subclass
+        if needed. shape_type accepts either the short form ("box",
+        "sphere", "capsule", "cylinder" for 3D; "rectangle", "circle",
+        "capsule" for 2D) or the matching Godot class name ("BoxShape3D",
+        "RectangleShape2D", etc.).
+  • physics_shape_generate(paths, shape_type="box", body_type="static",
+                           scene_file="")
+        Generate a StaticBody3D or Area3D sibling (named <Mesh>Collider) with
+        a CollisionShape3D for every MeshInstance3D path. Shapes are fitted in
+        body-local space; a mesh that already has a collider sibling, a
+        duplicate path, or a scene-root mesh is refused before anything is
+        written. shape_type: box | sphere | capsule | cylinder (or the class
+        name); a sphere/capsule/cylinder under a non-uniformly scaled parent
+        is refused. body_type: static | area. scene_file pins the request to
+        that edited scene. Up to 1024 paths are processed in bounded work
+        across editor frames; inside batch_execute at most 16. The bulk
+        write is one undo action.
+        Returns: {created: [{mesh_path, body_path, shape_path, shape_type,
+                  body_type}], undoable: true}.
+  • gradient_texture_create(stops, width=256, height=1, fill="linear",
+                              path="", property="", resource_path="",
+                              overwrite=False)
+        Build GradientTexture2D from color stops. fill: linear | radial | square.
+  • noise_texture_create(noise_type="simplex_smooth", width=512, height=512,
+                          frequency=0.01, seed=0, fractal_octaves=0,
+                          path="", property="", resource_path="",
+                          overwrite=False)
+        Build NoiseTexture2D wrapping FastNoiseLite. Noise types: simplex |
+        simplex_smooth | perlin | cellular | value | value_cubic.
+"""
+
+
+def register_resource_tools(mcp: FastMCP) -> None:
+    register_manage_tool(
+        mcp,
+        tool_name="resource_manage",
+        description=_DESCRIPTION,
+        ops={
+            "search": resource_handlers.resource_search,
+            "load": resource_handlers.resource_load,
+            "assign": resource_handlers.resource_assign,
+            "get_info": resource_handlers.resource_get_info,
+            "create": resource_handlers.resource_create,
+            "curve_set_points": curve_handlers.curve_set_points,
+            "environment_create": environment_handlers.environment_create,
+            "physics_shape_autofit": physics_shape_handlers.physics_shape_autofit,
+            "physics_shape_generate": physics_shape_handlers.physics_shape_generate,
+            "gradient_texture_create": texture_handlers.gradient_texture_create,
+            "noise_texture_create": texture_handlers.noise_texture_create,
+        },
+        read_resource_forms={
+            ## search/load/get_info take per-call queries or paths; no aggregate
+            ## resource fits the URI shape.
+            "search": None,
+            "load": None,
+            "get_info": None,
+        },
+    )

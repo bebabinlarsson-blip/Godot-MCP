@@ -1,0 +1,130 @@
+"""MCP tools for scene authoring.
+
+Top-level: ``scene_get_hierarchy`` (core read), ``scene_open``, ``scene_save``.
+Everything else (create, save_as, get_roots) collapses into ``scene_manage``.
+"""
+
+from __future__ import annotations
+
+from fastmcp import Context, FastMCP
+
+from godot_ai.handlers import scene as scene_handlers
+from godot_ai.runtime.direct import DirectRuntime
+from godot_ai.tools import DEFER_META
+from godot_ai.tools._meta_tool import register_manage_tool
+
+_DESCRIPTION = """\
+Scene authoring (create, save_as, list open roots).
+
+Resource form: ``godot://scene/current`` and ``godot://scene/hierarchy``
+— prefer for active-session reads.
+
+Ops:
+  • create(path, root_type="Node3D", root_name="")
+        Create the initial .tscn with the given root and open it. root_name
+        defaults to filename basename when empty. This initial root is written
+        immediately, but later node_create/node_set_property mutations remain
+        in editor memory until scene_save or save_as is called.
+  • save_as(path)
+        Save the currently edited scene to a new file path.
+  • get_roots()
+        List scenes currently open in the editor; flag the edited one.
+"""
+
+
+def register_scene_tools(mcp: FastMCP, *, include_non_core: bool = True) -> None:
+    """Register scene-domain MCP tools and resources."""
+    @mcp.tool()
+    async def scene_get_hierarchy(
+        ctx: Context,
+        depth: int = 10,
+        offset: int = 0,
+        limit: int = 100,
+        session_id: str = "",
+    ) -> dict:
+        """Get the scene tree hierarchy from the open scene.
+
+        Returns a paginated flat list of nodes with name, type, path, and
+        child count. Walks up to the specified depth.
+
+        Resource form: ``godot://scene/hierarchy`` — prefer for active-session
+        reads.
+
+        Args:
+            depth: Maximum walk depth. Default 10.
+            offset: Number of nodes to skip. Default 0.
+            limit: Max number of nodes to return. Default 100.
+            session_id: Optional Godot session to target. Empty = active session.
+        """
+        runtime = DirectRuntime.from_context(ctx, session_id=session_id or None)
+        return await scene_handlers.scene_get_hierarchy(
+            runtime,
+            depth=depth,
+            offset=offset,
+            limit=limit,
+        )
+
+    if not include_non_core:
+        return
+
+    @mcp.tool(meta=DEFER_META)
+    async def scene_open(
+        ctx: Context,
+        path: str,
+        force_reload: bool = False,
+        session_id: str = "",
+    ) -> dict:
+        """Open an existing scene file (.tscn) in the editor.
+
+        If ``path`` is already the currently edited scene this is a no-op
+        — the in-memory state (including any unsaved MCP mutations) is
+        preserved. Pass ``force_reload=True`` when the file on disk is the
+        authority and the editor should discard the open in-memory copy and
+        re-read the scene from disk.
+
+        The reply is sent only after the editor has actually switched to the
+        requested scene (``switched: true``), so follow-up writes are safe
+        immediately. ``switched: false`` with ``settle: "timeout"`` means the
+        switch had not landed within the wait window. In synchronous contexts
+        (e.g. inside ``batch_execute``) the reply returns immediately with
+        ``switched: false`` and ``settle: "not_waited"``. In both of those
+        cases, re-check ``editor_state`` before issuing follow-up writes.
+
+        Args:
+            path: File path of the scene to open (e.g. "res://main.tscn").
+            force_reload: Re-read the scene from disk even when it is already
+                open. This discards unsaved in-memory edits to that scene.
+            session_id: Optional Godot session to target. Empty = active session.
+        """
+        runtime = DirectRuntime.from_context(ctx, session_id=session_id or None)
+        return await scene_handlers.scene_open(runtime, path=path, force_reload=force_reload)
+
+    @mcp.tool(meta=DEFER_META)
+    async def scene_save(ctx: Context, session_id: str = "") -> dict:
+        """Save the currently edited scene to disk.
+
+        Node and property mutation tools change the editor's in-memory scene;
+        call this explicitly to persist those mutations to the existing path.
+
+        Args:
+            session_id: Optional Godot session to target. Empty = active session.
+        """
+        runtime = DirectRuntime.from_context(ctx, session_id=session_id or None)
+        return await scene_handlers.scene_save(runtime)
+
+    register_manage_tool(
+        mcp,
+        tool_name="scene_manage",
+        description=_DESCRIPTION,
+        ops={
+            "create": scene_handlers.scene_create,
+            "save_as": scene_handlers.scene_save_as,
+            "get_roots": scene_handlers.scene_get_roots,
+        },
+        read_resource_forms={
+            ## get_roots lists root nodes of every open scene; the
+            ## `godot://scene/current` resource only exposes the active scene
+            ## tree, so it isn't a substitute. No aggregate resource fits.
+            "get_roots": None,
+        },
+    )

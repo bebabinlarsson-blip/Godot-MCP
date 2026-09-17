@@ -1,0 +1,73 @@
+"""Shared handlers for input map tools."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from godot_ai.handlers._readiness import require_writable_async
+from godot_ai.runtime.direct import DirectRuntime
+
+
+async def input_map_list(runtime: DirectRuntime, include_builtin: bool = False) -> dict:
+    params: dict[str, Any] = {}
+    if include_builtin:
+        params["include_builtin"] = True
+    return await runtime.send_command("list_actions", params)
+
+
+async def input_map_add_action(
+    runtime: DirectRuntime,
+    action: str,
+    deadzone: float = 0.5,
+) -> dict:
+    await require_writable_async(runtime)
+    return await runtime.send_command(
+        "add_action",
+        {"action": action, "deadzone": deadzone},
+    )
+
+
+async def input_map_ensure_action(
+    runtime: DirectRuntime,
+    action: str,
+    deadzone: float = 0.5,
+) -> dict:
+    await require_writable_async(runtime)
+    return await runtime.send_command(
+        "ensure_action",
+        {"action": action, "deadzone": deadzone},
+    )
+
+
+async def input_map_remove_action(runtime: DirectRuntime, action: str) -> dict:
+    await require_writable_async(runtime)
+    return await runtime.send_command("remove_action", {"action": action})
+
+
+async def input_map_bind_event(
+    runtime: DirectRuntime,
+    action: str,
+    event_type: str,
+    **kwargs: Any,
+) -> dict:
+    await require_writable_async(runtime)
+    params: dict[str, Any] = {"action": action, "event_type": event_type}
+    params.update(kwargs)
+    return await runtime.send_command("bind_event", params)
+
+
+async def input_map_ensure_binding(
+    runtime: DirectRuntime,
+    action: str,
+    event_type: str,
+    deadzone: float = 0.5,
+    **kwargs: Any,
+) -> dict:
+    await require_writable_async(runtime)
+    params: dict[str, Any] = {
+        "action": action,
+        "event_type": event_type,
+        "deadzone": deadzone,
+    }
+    params.update(kwargs)
+    return await runtime.send_command("ensure_binding", params)

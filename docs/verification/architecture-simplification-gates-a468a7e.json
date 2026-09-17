@@ -1,0 +1,459 @@
+{
+  "gates": {
+    "active_lifecycle_episode_variants": {
+      "comparison": "exact",
+      "definition": "retained fields capable of representing independent lifecycle episode variants",
+      "fields": [
+        {
+          "line": 34,
+          "name": "_server_state",
+          "static": false
+        },
+        {
+          "line": 122,
+          "name": "_recovery_in_flight",
+          "static": false
+        },
+        {
+          "line": 138,
+          "name": "_startup_path",
+          "static": false
+        },
+        {
+          "line": 164,
+          "name": "_start_in_flight",
+          "static": false
+        }
+      ],
+      "path": "plugin/addons/godot_ai/utils/server_lifecycle.gd",
+      "target": 1,
+      "unit": "lifecycle_variant_fields",
+      "value": 4
+    },
+    "detached_runner_owner_node_references": {
+      "definition": "detached update-runner fields retaining an owner/Node instead of values",
+      "fields": [
+        {
+          "line": 56,
+          "name": "_detached_dock",
+          "static": false
+        }
+      ],
+      "path": "plugin/addons/godot_ai/update_reload_runner.gd",
+      "target": 0,
+      "unit": "retained_owner_fields",
+      "value": 1
+    },
+    "dock_client_worker_static_stores": {
+      "definition": "Dock fields holding client worker, phase, generation, cancellation, timing, or orphan state",
+      "fields": [
+        {
+          "line": 178,
+          "name": "_client_status_refresh_thread",
+          "static": false
+        },
+        {
+          "line": 183,
+          "name": "_refresh_state",
+          "static": false
+        },
+        {
+          "line": 191,
+          "name": "_client_status_refresh_pending",
+          "static": false
+        },
+        {
+          "line": 192,
+          "name": "_client_status_refresh_pending_force",
+          "static": false
+        },
+        {
+          "line": 193,
+          "name": "_client_status_refresh_pending_initial",
+          "static": false
+        },
+        {
+          "line": 194,
+          "name": "_last_client_status_refresh_completed_msec",
+          "static": false
+        },
+        {
+          "line": 195,
+          "name": "_client_status_refresh_started_msec",
+          "static": false
+        },
+        {
+          "line": 196,
+          "name": "_client_status_refresh_generation",
+          "static": false
+        },
+        {
+          "line": 201,
+          "name": "_orphaned_client_status_refresh_threads",
+          "static": true
+        },
+        {
+          "line": 216,
+          "name": "_client_action_threads",
+          "static": false
+        },
+        {
+          "line": 217,
+          "name": "_client_action_generations",
+          "static": false
+        },
+        {
+          "line": 218,
+          "name": "_client_action_started_msec",
+          "static": false
+        },
+        {
+          "line": 219,
+          "name": "_client_action_names",
+          "static": false
+        },
+        {
+          "line": 222,
+          "name": "_orphaned_client_action_threads",
+          "static": true
+        },
+        {
+          "line": 232,
+          "name": "_orphaned_client_action_owners",
+          "static": true
+        },
+        {
+          "line": 236,
+          "name": "_client_action_cancel_mutex",
+          "static": true
+        },
+        {
+          "line": 237,
+          "name": "_client_action_cancelled_clients",
+          "static": true
+        },
+        {
+          "line": 2324,
+          "name": "_client_action_phase_mutex",
+          "static": false
+        },
+        {
+          "line": 2325,
+          "name": "_client_action_phases",
+          "static": false
+        },
+        {
+          "line": 2328,
+          "name": "_client_action_phase_shown",
+          "static": false
+        }
+      ],
+      "path": "plugin/addons/godot_ai/mcp_dock.gd",
+      "static_store_count": 5,
+      "target": 0,
+      "unit": "dock_owned_fields",
+      "value": 20
+    },
+    "external_mutable_session_assignments": {
+      "definition": "direct assignments or in-place container mutations of public Session fields outside Session",
+      "mutations": [
+        {
+          "field": "pending_new_errors",
+          "line": 252,
+          "operation": "assign",
+          "path": "src/godot_ai/godot_client/client.py"
+        },
+        {
+          "field": "pending_new_warnings",
+          "line": 253,
+          "operation": "assign",
+          "path": "src/godot_ai/godot_client/client.py"
+        },
+        {
+          "field": "pending_new_errors",
+          "line": 264,
+          "operation": "assign",
+          "path": "src/godot_ai/godot_client/client.py"
+        },
+        {
+          "field": "pending_new_warnings",
+          "line": 270,
+          "operation": "assign",
+          "path": "src/godot_ai/godot_client/client.py"
+        },
+        {
+          "field": "readiness",
+          "line": 94,
+          "operation": "assign",
+          "path": "src/godot_ai/handlers/_readiness.py"
+        },
+        {
+          "field": "current_scene",
+          "line": 456,
+          "operation": "assign",
+          "path": "src/godot_ai/transport/websocket.py"
+        },
+        {
+          "field": "play_state",
+          "line": 462,
+          "operation": "assign",
+          "path": "src/godot_ai/transport/websocket.py"
+        },
+        {
+          "field": "readiness",
+          "line": 497,
+          "operation": "assign",
+          "path": "src/godot_ai/transport/websocket.py"
+        },
+        {
+          "field": "error_watermark",
+          "line": 675,
+          "operation": "method_update",
+          "path": "src/godot_ai/transport/websocket.py"
+        },
+        {
+          "field": "pending_new_errors",
+          "line": 676,
+          "operation": "augmented_assign",
+          "path": "src/godot_ai/transport/websocket.py"
+        },
+        {
+          "field": "pending_new_warnings",
+          "line": 677,
+          "operation": "augmented_assign",
+          "path": "src/godot_ai/transport/websocket.py"
+        }
+      ],
+      "target": 0,
+      "unit": "external_mutation_sites",
+      "value": 11
+    },
+    "legacy_tokenless_transport_branches": {
+      "definition": "named v3 handshake parser, tokenless retry, and missing-token acceptance paths",
+      "paths": [
+        {
+          "id": "legacy_handshake_model",
+          "line": 74,
+          "path": "src/godot_ai/protocol/envelope.py"
+        },
+        {
+          "id": "plugin_tokenless_retry",
+          "line": 479,
+          "path": "plugin/addons/godot_ai/connection.gd"
+        },
+        {
+          "id": "server_missing_token_bypass",
+          "line": 197,
+          "path": "src/godot_ai/transport/websocket.py"
+        }
+      ],
+      "target": 0,
+      "unit": "legacy_or_tokenless_paths",
+      "value": 3
+    },
+    "lifecycle_generic_host_dependencies": {
+      "definition": "unique member names accessed through server_lifecycle.gd `_host.*`",
+      "members": [
+        "SERVER_COLD_START_WATCH_MS",
+        "SERVER_WATCH_MS",
+        "SPAWN_GRACE_MS",
+        "SPAWN_HANDOFF_MS",
+        "_build_server_flags",
+        "_clear_managed_server_record",
+        "_clear_pid_file",
+        "_connection",
+        "_evaluate_recovery_port_occupant_proof",
+        "_evaluate_strong_port_occupant_proof",
+        "_finalize_stop_if_port_free",
+        "_find_all_pids_on_port",
+        "_find_managed_pid",
+        "_finish_startup_trace_after_walk",
+        "_is_port_in_use",
+        "_kill_processes_and_windows_spawn_children",
+        "_log_buffer",
+        "_pid_alive_for_proof",
+        "_pid_cmdline_is_godot_ai_for_proof",
+        "_prewarm_server_package",
+        "_probe_live_server_status_for_port",
+        "_read_managed_server_record",
+        "_read_pid_file_for_proof",
+        "_refresh_dock_client_statuses",
+        "_resolve_ws_port",
+        "_resolved_ws_port",
+        "_server_started_this_session",
+        "_set_resolved_ws_port",
+        "_set_ws_auth_token",
+        "_should_retry_with_refresh",
+        "_start_server_watch",
+        "_startup_trace_count",
+        "_stop_server_watch",
+        "_update_process_enabled",
+        "_verified_status_version",
+        "_verified_status_ws_port",
+        "_wait_for_port_free",
+        "_write_managed_server_record",
+        "has_method",
+        "recover_incompatible_server"
+      ],
+      "path": "plugin/addons/godot_ai/utils/server_lifecycle.gd",
+      "target": 0,
+      "unit": "unique_host_members",
+      "value": 40
+    },
+    "non_owner_client_thread_spawns": {
+      "definition": "client-work Thread creation outside the one ClientJobOwner",
+      "spawns": [
+        {
+          "line": 2185,
+          "path": "plugin/addons/godot_ai/mcp_dock.gd"
+        },
+        {
+          "line": 3273,
+          "path": "plugin/addons/godot_ai/mcp_dock.gd"
+        },
+        {
+          "line": 3393,
+          "path": "plugin/addons/godot_ai/mcp_dock.gd"
+        },
+        {
+          "line": 99,
+          "path": "plugin/addons/godot_ai/handlers/client_handler.gd"
+        }
+      ],
+      "target": 0,
+      "unit": "non_owner_thread_spawns",
+      "value": 4
+    },
+    "owner_dependency_cycles": {
+      "definition": "forbidden retained reverse edges in the approved changed-owner graph",
+      "edges": [
+        {
+          "line": 68,
+          "name": "_plugin",
+          "path": "plugin/addons/godot_ai/mcp_dock.gd",
+          "static": false
+        },
+        {
+          "line": 19,
+          "name": "_host",
+          "path": "plugin/addons/godot_ai/utils/server_lifecycle.gd",
+          "static": false
+        },
+        {
+          "line": 108,
+          "name": "_plugin",
+          "path": "plugin/addons/godot_ai/utils/update_manager.gd",
+          "static": false
+        },
+        {
+          "line": 109,
+          "name": "_dock",
+          "path": "plugin/addons/godot_ai/utils/update_manager.gd",
+          "static": false
+        }
+      ],
+      "target": 0,
+      "unit": "owner_cycle_edges",
+      "value": 4
+    },
+    "production_python_gdscript_loc": {
+      "definition": "physical newline count for .py/.gd files under src/ and plugin/",
+      "informational": true,
+      "languages": {
+        "gdscript": {
+          "files": 132,
+          "lines": 45359
+        },
+        "python": {
+          "files": 118,
+          "lines": 14500
+        }
+      },
+      "unit": "physical_lines",
+      "value": 59859
+    },
+    "python_session_peer_membership_maps": {
+      "definition": "session/peer membership dictionaries on the two current Python owners",
+      "maps": [
+        {
+          "class": "SessionRegistry",
+          "field": "_sessions",
+          "line": 120,
+          "path": "src/godot_ai/sessions/registry.py"
+        },
+        {
+          "class": "GodotWebSocketServer",
+          "field": "_connections",
+          "line": 145,
+          "path": "src/godot_ai/transport/websocket.py"
+        }
+      ],
+      "target": 1,
+      "unit": "membership_maps",
+      "value": 2
+    },
+    "update_manager_plugin_dock_references": {
+      "definition": "UpdateManager fields that retain the plugin or Dock owner",
+      "fields": [
+        {
+          "line": 108,
+          "name": "_plugin",
+          "static": false
+        },
+        {
+          "line": 109,
+          "name": "_dock",
+          "static": false
+        }
+      ],
+      "path": "plugin/addons/godot_ai/utils/update_manager.gd",
+      "target": 0,
+      "unit": "retained_owner_fields",
+      "value": 2
+    },
+    "v4_release_plugin_zip_shapes": {
+      "comparison": "exact",
+      "definition": "distinct v4 plugin release ZIP name/root contracts (canonical contract is mandatory)",
+      "expected": {
+        "asset": "godot-ai-v4-plugin.zip",
+        "prefix": "addons/godot_ai/"
+      },
+      "literals": [
+        {
+          "line": 132,
+          "path": ".github/workflows/release.yml",
+          "value": "godot-ai-plugin.zip"
+        },
+        {
+          "line": 133,
+          "path": ".github/workflows/release.yml",
+          "value": "godot-ai-plugin-store.zip"
+        }
+      ],
+      "shapes": [
+        {
+          "asset": "godot-ai-plugin-store.zip",
+          "prefix": "addons/godot_ai/"
+        },
+        {
+          "asset": "godot-ai-plugin.zip",
+          "prefix": "addons/godot_ai/ plus root license"
+        }
+      ],
+      "target": 1,
+      "unit": "release_zip_shapes",
+      "value": 2
+    }
+  },
+  "report": "godot-ai-v4-architecture-simplification-gates",
+  "schema_version": 1,
+  "source": {
+    "commit": "a468a7eedd7dcbbeb0221a297f7e7c50f5ab2b4e",
+    "production_dirty": false,
+    "production_roots": [
+      "plugin",
+      "src"
+    ],
+    "tree": "508149f3ca1f79fa1b60c23cc922e7ff7caa0c9b"
+  }
+}

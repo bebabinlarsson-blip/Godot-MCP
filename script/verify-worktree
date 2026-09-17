@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+# Verify a worktree (or main checkout) is safe to edit plugin/ code in, and
+# ensure test_project/addons/godot_ai points to this worktree's plugin/.
+#
+# Invariants enforced:
+#   1. plugin/addons/godot_ai/plugin.gd exists (plugin/ is populated).
+#   2. test_project/addons/godot_ai resolves to this worktree's
+#      plugin/addons/godot_ai via symlink or (on Windows) directory junction.
+#
+# The link is NOT tracked in git (see .gitignore) — this script builds it
+# locally from scratch on fresh clones and `git worktree add`, and repairs
+# it if something mangled it. It's idempotent and safe to run anytime.
+#
+# Exit codes:
+#   0  link OK (already valid or just created/repaired)
+#   1  plugin/ missing or sparse — cannot auto-fix, abort
+#   2  link creation failed (permission / FS error)
+
+set -euo pipefail
+cd "$(dirname "$0")/.."
+repo_root="$(pwd)"
+
+red()    { printf '\033[31m%s\033[0m\n' "$*"; }
+yellow() { printf '\033[33m%s\033[0m\n' "$*"; }
+green()  { printf '\033[32m%s\033[0m\n' "$*"; }
+
+# --- Invariant 1: plugin/ is populated -----------------------------------
+if [ ! -f plugin/addons/godot_ai/plugin.gd ]; then
+    red "[FAIL] plugin/addons/godot_ai/plugin.gd is missing."
+    echo "       This worktree has a broken plugin/ directory. Editing plugin code"
+    echo "       here will stage phantom deletions on commit. Abort and either:"
+    echo "         - git restore plugin/      (re-hydrate from index)"
+    echo "         - remove this worktree and recreate with: git worktree add ..."
+    exit 1
+fi
+
+# --- Invariant 2: link points into this worktree's plugin/ ---------------
+link="test_project/addons/godot_ai"
+expected_target_abs="$repo_root/plugin/addons/godot_ai"
+
+# Are we on Windows? Junctions appear as plain directories to bash, so the
+# "is it a directory?" fallback below is only meaningful there. On macOS/Linux
+# a non-symlink directory at $link is a stale real copy (e.g. left by a
+# self-update smoke test or botched checkout) holding OUTDATED plugin code —
+# it must be treated as broken and replaced with the symlink, never accepted.
+is_windows=0
+case "${OS:-}${OSTYPE:-}" in
+    *Windows_NT*|*msys*|*cygwin*) is_windows=1 ;;
+esac
+
+# Windows only: shared junction policy (accept/repair/move-aside) — see
+# script/_plugin_junction.ps1. Paths are converted to Windows form because
+# PowerShell resolves them; MSYS path conversion is left on since no argument
+# begins with a slash.
+_junction_ps() {
+    local link_win target_win
+    link_win="$(cygpath -w "$repo_root/$link" 2>/dev/null || echo "$repo_root\\test_project\\addons\\godot_ai")"
+    target_win="$(cygpath -w "$expected_target_abs" 2>/dev/null || echo "$expected_target_abs")"
+    powershell.exe -NoProfile -ExecutionPolicy Bypass \
+        -File "$(cygpath -w "$repo_root/script/_plugin_junction.ps1" 2>/dev/null || echo "$repo_root/script/_plugin_junction.ps1")" \
+        -LinkPath "$link_win" -TargetPath "$target_win" "$@"
+}
+
+link_ok=0
+if [ -L "$link" ]; then
+    # POSIX symlink — resolve and compare
+    resolved="$(cd "$(dirname "$link")" && cd "$(readlink "$(basename "$link")")" 2>/dev/null && pwd || true)"
+    if [ "$resolved" = "$expected_target_abs" ]; then
+        link_ok=1
+    fi
+elif [ "$is_windows" = "1" ]; then
+    # On Windows, directory junctions appear as plain directories to bash, so
+    # `-L`/`-d` cannot tell a junction from a stale real copy. Ask PowerShell,
+    # which reads the reparse target and compares it to this worktree's
+    # plugin/ (#935). A real directory here is a stale copy holding possibly
+    # uncommitted edits and must never be accepted — nor deleted (see below).
+    if _junction_ps -CheckOnly >/dev/null 2>&1; then
+        link_ok=1
+    fi
+fi
+
+if [ "$link_ok" = "1" ]; then
+    green "[ok] $link -> plugin/addons/godot_ai"
+    exit 0
+fi
+
+# Missing, broken, or pointing elsewhere — (re)create it.
+mkdir -p "$(dirname "$link")"
+
+case "${OS:-}${OSTYPE:-}" in
+    *Windows_NT*|*msys*|*cygwin*)
+        # Delegate to the shared policy (#935): a wrong/dangling junction is
+        # removed with rmdir (pointer only) and recreated; a REAL directory is
+        # moved to test_project/addons/godot_ai.stale.<timestamp> — never
+        # rm -rf'd — because it may hold uncommitted plugin edits. mklink /J
+        # needs no admin rights or Developer Mode.
+        if _junction_ps; then
+            green "[ok] $link -> plugin/addons/godot_ai (junction verified)"
+            exit 0
+        else
+            red "[FAIL] Could not establish the junction. Run manually from PowerShell:"
+            echo "       .\\script\\_plugin_junction.ps1 -LinkPath test_project\\addons\\godot_ai -TargetPath plugin\\addons\\godot_ai"
+            exit 2
+        fi
+        ;;
+    *)
+        # Move a real (non-symlink) directory aside instead of deleting it —
+        # the post-checkout hook runs this automatically, and a user's local
+        # plugin edits in a plain-copy addons dir must not be silently
+        # destroyed (#716 audit note). A dangling/wrong symlink is still
+        # just removed.
+        if [ -d "$link" ] && [ ! -L "$link" ]; then
+            stale="$link.stale.$(date +%Y%m%d%H%M%S)"
+            yellow "[warn] $link was a real directory, not a symlink — moved to $stale (delete it once you've confirmed nothing in it matters)."
+            mv "$link" "$stale"
+        else
+            rm -rf "$link" 2>/dev/null || true
+        fi
+        if ln -s "../../plugin/addons/godot_ai" "$link"; then
+            green "[ok] Created $link as a symlink."
+            exit 0
+        else
+            red "[FAIL] Could not create symlink at $link."
+            exit 2
+        fi
+        ;;
+esac

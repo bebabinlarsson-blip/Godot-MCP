@@ -1,0 +1,1051 @@
+#!/usr/bin/env python3
+"""Build, sign, verify, or install the Godot AI v4 release artifacts.
+
+The migration verifier is this CLI plus its exact sibling
+``src/godot_ai/release_verify.py`` from one reviewed source commit.  The pair
+is not its own bootstrap trust anchor: migration instructions must pin their
+source commit/file digests and the verifier's exported SPKI fingerprint.
+"""
+
+from __future__ import annotations
+
+import argparse
+import contextlib
+import hashlib
+import importlib.util
+import json
+import os
+import re
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+import tomllib
+import zipfile
+from collections.abc import Callable
+from pathlib import Path
+
+_VERIFY_PATH = Path(__file__).resolve().parents[1] / "src/godot_ai/release_verify.py"
+_SPEC = importlib.util.spec_from_file_location("godot_ai_release_verify", _VERIFY_PATH)
+if _SPEC is None or _SPEC.loader is None:  # pragma: no cover
+    raise RuntimeError(f"cannot load {_VERIFY_PATH}")
+_verify = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(_verify)
+
+ASSET_NAME = _verify.ASSET_NAME
+FIXED_MODE = _verify.FIXED_MODE
+FIXED_TIME = _verify.FIXED_TIME
+MANIFEST_NAME = _verify.MANIFEST_NAME
+MAX_ARCHIVE_SIZE = _verify.MAX_ARCHIVE_SIZE
+MAX_FILE_SIZE = _verify.MAX_FILE_SIZE
+MAX_MANIFEST_SIZE = _verify.MAX_MANIFEST_SIZE
+MAX_TREE_SIZE = _verify.MAX_TREE_SIZE
+PLUGIN_CONFIG = _verify.PLUGIN_CONFIG
+PLUGIN_PREFIX = _verify.PLUGIN_PREFIX
+PUBLIC_KEY_PEM = _verify.PUBLIC_KEY_PEM
+PUBLIC_KEY_SPKI_SHA256 = _verify.PUBLIC_KEY_SPKI_SHA256
+REPOSITORY = _verify.REPOSITORY
+SIGNATURE_NAME = _verify.SIGNATURE_NAME
+SIGNATURE_SIZE = _verify.SIGNATURE_SIZE
+LEGACY_ASSET_NAME = "godot-ai-plugin.zip"
+LEGACY_CHECKSUM_NAME = f"{LEGACY_ASSET_NAME}.sha256"
+LEGACY_SIGNATURE_NAME = f"{LEGACY_CHECKSUM_NAME}.sig"
+LEGACY_MAX_ARCHIVE_SIZE = 66 * 1024 * 1024
+LEGACY_MAX_CHECKSUM_SIZE = 1024
+MIGRATION_BRIDGE_SOURCE = "migration_bridge"
+## The final v3 add-on rides inside the capsule so a pre-v4 install on a Godot
+## below v4's floor gets its working plugin back instead of a dead tree. It
+## leaves with the capsule once the fleet is on v4.
+FINAL_V3_REF = "v3.2.5"
+V3_FALLBACK_NAME = "godot-ai-v3-plugin.zip"
+V3_FALLBACK_SOURCE = "plugin/addons/godot_ai"
+MIGRATION_PAYLOAD_PREFIX = f"{PLUGIN_PREFIX}migration_payload/"
+# The bridge runs the same verifier and installer the v4 tree ships, and reads
+# the process fingerprint for the update lock from the v4 port resolver (the
+# final v3 copy of that file predates the method). Every script is read from
+# the immutable source commit, together with whatever it preloads.
+MIGRATION_INSTALLER_SCRIPTS = (
+    "utils/release_verifier.gd",
+    "utils/update_installer.gd",
+    "utils/update_activation_runner.gd",
+    "utils/port_resolver.gd",
+)
+MIGRATION_INSTALLER_MAX_FILES = 32
+_GDSCRIPT_DEPENDENCY = re.compile(rb'(?:pre)?load\(\s*"res://addons/godot_ai/([^"\\]+\.gd)"\s*\)')
+ReleaseError = _verify.ReleaseError
+_canonical = _verify._canonical
+_extract_verified_archive = _verify._extract_verified_archive
+_fail = _verify._fail
+_hash_file = _verify._hash_file
+_identity = _verify._identity
+_plugin_version = _verify._plugin_version
+_read_bounded = _verify._read_bounded
+_safe_directory = _verify._safe_directory
+_strict_json = _verify._strict_json
+_sync_directory = _verify._sync_directory
+_sync_staged_directories = _verify._sync_staged_directories
+_validate_manifest = _verify._validate_manifest
+_validate_paths = _verify._validate_paths
+_verify_archive = _verify._verify_archive
+_verify_installed_tree = _verify._verify_installed_tree
+_verify_signature = _verify._verify_signature
+
+UPDATE_MANAGER = f"{PLUGIN_PREFIX}utils/update_manager.gd"
+UV_RESOLUTION_POLICY = f"{PLUGIN_PREFIX}utils/uv_resolution_policy.gd"
+UPDATE_DIRECTORY = ".godot_ai_update"
+UPDATE_LOCK_NAME = "lock.json"
+UPDATE_MARKER_NAME = "pending.json"
+UPDATE_IGNORE_FILES = (".gdignore", ".gitignore")
+SAFE_VERSION = re.compile(r"^[0-9A-Za-z][0-9A-Za-z._-]{0,63}$")
+SUPPORTED_PYTHON_MIN = (3, 11)
+SUPPORTED_PYTHON_MAX_EXCLUSIVE = (3, 15)
+
+
+def _require_supported_python(version: tuple[int, int] | None = None) -> None:
+    """Reject an unqualified verifier runtime before parsing any command."""
+    current = tuple(sys.version_info[:2]) if version is None else version
+    if not SUPPORTED_PYTHON_MIN <= current < SUPPORTED_PYTHON_MAX_EXCLUSIVE:
+        _fail(
+            "python runtime",
+            "v4 release verification requires Python 3.11 through 3.14",
+        )
+
+
+@contextlib.contextmanager
+def _pinned_key():
+    """Run the verifier with this CLI's key, which tests replace explicitly."""
+    previous = _verify.PUBLIC_KEY_PEM
+    _verify.PUBLIC_KEY_PEM = PUBLIC_KEY_PEM
+    try:
+        yield
+    finally:
+        _verify.PUBLIC_KEY_PEM = previous
+
+
+def verify_release(archive: Path, manifest: Path, signature: Path, expected: tuple[str, ...]):
+    with _pinned_key():
+        return _verify.verify_release(archive, manifest, signature, expected)
+
+
+def _snapshot_tree(plugin_root: Path, version: str) -> list[tuple[str, bytes]]:
+    if plugin_root.is_symlink() or not plugin_root.is_dir():
+        _fail("plugin tree", "root must be a real directory")
+    snapshot: list[tuple[str, bytes]] = []
+    total = 0
+    try:
+        for current, directories, files in os.walk(
+            plugin_root, onerror=lambda error: _fail("plugin tree", str(error))
+        ):
+            parent = Path(current)
+            for name in directories:
+                if not stat.S_ISDIR((parent / name).lstat().st_mode):
+                    _fail("plugin tree", f"non-directory or link: {parent / name}")
+            for name in files:
+                source = parent / name
+                if not stat.S_ISREG(source.lstat().st_mode):
+                    _fail("plugin tree", f"non-regular file or link: {source}")
+                path = f"{PLUGIN_PREFIX}{source.relative_to(plugin_root).as_posix()}"
+                data = _read_bounded(source, MAX_FILE_SIZE, allow_empty=True)
+                total += len(data)
+                if total > MAX_TREE_SIZE:
+                    _fail("plugin tree", "expanded tree exceeds release bound")
+                snapshot.append((path, data))
+    except OSError as exc:
+        raise ReleaseError(f"plugin tree: cannot snapshot: {exc}") from exc
+    snapshot.sort(key=lambda item: item[0])
+    _validate_paths([path for path, _data in snapshot], "plugin tree")
+    configs = [data for path, data in snapshot if path == PLUGIN_CONFIG]
+    if len(configs) != 1 or _plugin_version(configs[0]) != version:
+        _fail("plugin.cfg", "version does not match the release identity")
+    return snapshot
+
+
+def _snapshot_commit(repo: Path, source: str, version: str) -> list[tuple[str, bytes]]:
+    """Read only immutable Git blobs bound to ``source``; never the worktree."""
+    snapshot = _snapshot_git_directory(
+        repo,
+        source,
+        f"plugin/{PLUGIN_PREFIX}".rstrip("/"),
+        PLUGIN_PREFIX,
+        "source tree",
+    )
+    configs = [data for path, data in snapshot if path == PLUGIN_CONFIG]
+    if len(configs) != 1 or _plugin_version(configs[0]) != version:
+        _fail("plugin.cfg", "version does not match the release identity")
+    return snapshot
+
+
+def _snapshot_git_directory(
+    repo: Path,
+    source: str,
+    source_prefix: str,
+    destination_prefix: str,
+    context: str,
+) -> list[tuple[str, bytes]]:
+    """Map one immutable Git directory to deterministic archive paths."""
+    listing = _run(
+        ["git", "-C", str(repo), "ls-tree", "-r", "-z", source, "--", source_prefix],
+        context,
+    )
+    snapshot: list[tuple[str, bytes]] = []
+    total = 0
+    for raw in listing.split(b"\0"):
+        if not raw:
+            continue
+        try:
+            header, source_path = raw.decode("utf-8").split("\t", 1)
+            mode, kind, object_id = header.split(" ")
+        except (UnicodeDecodeError, ValueError) as exc:
+            raise ReleaseError(f"{context}: malformed or non-UTF-8 Git entry") from exc
+        if mode not in {"100644", "100755"} or kind != "blob":
+            _fail(context, f"non-regular Git entry: {source_path}")
+        try:
+            size = int(
+                _run(["git", "-C", str(repo), "cat-file", "-s", object_id], "blob size")
+            )
+        except ValueError as exc:
+            raise ReleaseError(f"{context}: malformed Git blob size") from exc
+        if not 0 <= size <= MAX_FILE_SIZE or total + size > MAX_TREE_SIZE:
+            _fail(context, "Git blob or expanded tree exceeds release bound")
+        data = _run(["git", "-C", str(repo), "cat-file", "blob", object_id], "source blob")
+        if len(data) != size:
+            _fail(context, "Git blob size changed while reading")
+        total += size
+        relative = source_path.removeprefix(f"{source_prefix}/")
+        if relative == source_path or not relative:
+            _fail(context, f"entry escaped source directory: {source_path}")
+        snapshot.append((f"{destination_prefix}{relative}", data))
+    snapshot.sort(key=lambda item: item[0])
+    _validate_paths([path for path, _data in snapshot], context)
+    return snapshot
+
+
+def _git_blob(repo: Path, source: str, path: str, context: str) -> bytes | None:
+    """Read one immutable Git blob bound to ``source``; None when the path is absent."""
+    listing = _run(["git", "-C", str(repo), "ls-tree", "-z", source, "--", path], context)
+    entries = [raw for raw in listing.split(b"\0") if raw]
+    if not entries:
+        return None
+    if len(entries) != 1:
+        _fail(context, f"ambiguous Git entry: {path}")
+    try:
+        header, listed = entries[0].decode("utf-8").split("\t", 1)
+        mode, kind, object_id = header.split(" ")
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise ReleaseError(f"{context}: malformed or non-UTF-8 Git entry") from exc
+    if listed != path or mode not in {"100644", "100755"} or kind != "blob":
+        _fail(context, f"non-regular Git entry: {path}")
+    data = _run(["git", "-C", str(repo), "cat-file", "blob", object_id], "source blob")
+    if not 0 < len(data) <= MAX_FILE_SIZE:
+        _fail(context, f"Git blob is empty or exceeds release bound: {path}")
+    return data
+
+
+def _snapshot_installer_scripts(
+    repo: Path, source: str, carried: set[str]
+) -> list[tuple[str, bytes]]:
+    """Embed the v4 installer scripts, and everything they preload, beside the bridge."""
+    context = "migration installer"
+    pending = list(MIGRATION_INSTALLER_SCRIPTS)
+    seen: set[str] = set()
+    snapshot: list[tuple[str, bytes]] = []
+    while pending:
+        archive_path = f"{PLUGIN_PREFIX}{pending.pop(0)}"
+        if archive_path in seen or archive_path in carried:
+            continue
+        seen.add(archive_path)
+        if len(seen) > MIGRATION_INSTALLER_MAX_FILES:
+            _fail(context, "script dependency closure exceeds the capsule bound")
+        data = _git_blob(repo, source, f"plugin/{archive_path}", context)
+        if data is None:
+            _fail(context, f"required script is missing from the source commit: {archive_path}")
+        snapshot.append((archive_path, data))
+        sidecar = _git_blob(repo, source, f"plugin/{archive_path}.uid", context)
+        if sidecar is not None:
+            snapshot.append((f"{archive_path}.uid", sidecar))
+        pending.extend(
+            match.group(1).decode("utf-8") for match in _GDSCRIPT_DEPENDENCY.finditer(data)
+        )
+    return snapshot
+
+
+def _run(command: list[str], context: str, *, input_bytes: bytes | None = None) -> bytes:
+    process = subprocess.run(command, capture_output=True, input=input_bytes)
+    if process.returncode:
+        detail = process.stderr.decode("utf-8", "replace").strip()
+        raise ReleaseError(f"{context} failed ({process.returncode}): {detail}")
+    return process.stdout
+
+
+def _openssl(*args: str, input_bytes: bytes | None = None) -> bytes:
+    return _run(["openssl", "dgst", "-sha256", *args], "openssl", input_bytes=input_bytes)
+
+
+def _validate_embedded_public_key(data: bytes) -> None:
+    try:
+        text = data.decode("utf-8").replace("\r\n", "\n")
+    except UnicodeDecodeError as exc:
+        raise ReleaseError("public key: updater source is not UTF-8") from exc
+    if "\r" in text:
+        _fail("public key", "updater source contains unsupported line endings")
+    begin, end = "-----BEGIN PUBLIC KEY-----", "-----END PUBLIC KEY-----"
+    if text.count(begin) != 1 or text.count(end) != 1:
+        _fail("public key", "expected exactly one embedded PEM")
+    pem = text[text.index(begin) : text.index(end) + len(end)] + "\n"
+    if pem != PUBLIC_KEY_PEM:
+        _fail("public key", "embedded updater key differs from the standalone trust anchor")
+
+
+def _validate_uv_resolution_policy(data: bytes) -> None:
+    """Keep the signed plugin's Python trust root explicit at package time."""
+    try:
+        source = data.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ReleaseError("uv resolver policy: source is not UTF-8") from exc
+    required = (
+        'const PUBLIC_INDEX := "https://pypi.org/simple"',
+        'const PUBLIC_FLAT_INDEX := "https://pypi.org/simple/godot-ai/"',
+        'const QUALIFICATION_INDEX_ENV := "GODOT_AI_QUALIFICATION_PYTHON_INDEX"',
+        '"--isolated"',
+        '"--no-config"',
+        '"--no-env-file"',
+        '"--no-sources"',
+        '"--no-build"',
+        '"--index-strategy"',
+        '"--keyring-provider"',
+        "if not qualification_authorized():",
+        "static func isolate_environment() -> Dictionary:",
+        "static func restore_environment(previous: Dictionary) -> void:",
+    )
+    missing = [token for token in required if token not in source]
+    if missing:
+        _fail("uv resolver policy", f"missing production boundary token {missing[0]!r}")
+
+
+def _source_project_version(repo: Path, source: str) -> str:
+    """Read ``[project].version`` from one bounded regular blob at ``source``."""
+    listing = _run(
+        ["git", "-C", str(repo), "ls-tree", "-z", source, "--", "pyproject.toml"],
+        "source pyproject.toml",
+    )
+    entries = [entry for entry in listing.split(b"\0") if entry]
+    if len(entries) != 1:
+        _fail("source pyproject.toml", "expected one regular file in the exact source commit")
+    try:
+        header, path = entries[0].decode("utf-8").split("\t", 1)
+        mode, kind, object_id = header.split(" ")
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise ReleaseError("source pyproject.toml: malformed Git entry") from exc
+    if path != "pyproject.toml" or mode not in {"100644", "100755"} or kind != "blob":
+        _fail("source pyproject.toml", "must be one regular file")
+    try:
+        size = int(
+            _run(["git", "-C", str(repo), "cat-file", "-s", object_id], "source metadata")
+        )
+    except ValueError as exc:
+        raise ReleaseError("source pyproject.toml: malformed Git blob size") from exc
+    if not 0 < size <= MAX_MANIFEST_SIZE:
+        _fail("source pyproject.toml", f"expected 1..{MAX_MANIFEST_SIZE} bytes")
+    raw = _run(["git", "-C", str(repo), "cat-file", "blob", object_id], "source metadata")
+    if len(raw) != size:
+        _fail("source pyproject.toml", "Git blob size changed while reading")
+    try:
+        document = tomllib.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
+        raise ReleaseError(f"source pyproject.toml: invalid TOML: {exc}") from exc
+    project = document.get("project")
+    version = project.get("version") if type(project) is dict else None
+    if type(version) is not str or not version:
+        _fail("source pyproject.toml", "expected a non-empty [project].version string")
+    return version
+
+
+def _validate_source(repo: Path, tag: str, source: str, version: str) -> None:
+    try:
+        head = (
+            _run(
+                ["git", "-C", str(repo), "rev-parse", "--verify", "HEAD^{commit}"],
+                "source HEAD",
+            )
+            .decode("ascii")
+            .strip()
+        )
+        tagged = (
+            _run(
+                ["git", "-C", str(repo), "rev-parse", "--verify", f"{tag}^{{commit}}"],
+                "source tag",
+            )
+            .decode("ascii")
+            .strip()
+        )
+    except UnicodeDecodeError as exc:
+        raise ReleaseError("source identity: git returned non-ASCII identity") from exc
+    if head != source or tagged != source:
+        _fail("source identity", "HEAD, tag, and explicit source commit must match")
+    project_version = _source_project_version(repo, source)
+    if project_version != version:
+        _fail(
+            "source pyproject.toml",
+            f"[project].version {project_version!r} does not match release version {version!r}",
+        )
+
+
+def _write_zip(path: Path, snapshot: list[tuple[str, bytes]]) -> None:
+    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_STORED, allowZip64=False) as archive:
+        for name, data in snapshot:
+            info = zipfile.ZipInfo(name, FIXED_TIME)
+            info.compress_type = zipfile.ZIP_STORED
+            info.create_system = 3
+            info.external_attr = FIXED_MODE << 16
+            archive.writestr(info, data)
+
+
+# Windows without long-path support refuses paths past 260 characters, and the
+# staging directories under the output directory add about 40 more (#945).
+MAX_WINDOWS_OUTPUT_PATH = 200
+
+
+def _windows_long_paths_enabled() -> bool:
+    """Whether this Windows lets paths pass 260 characters (registry opt-in)."""
+    if os.name != "nt":
+        return True
+    try:
+        import winreg
+
+        with winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Control\FileSystem"
+        ) as key:
+            value, _kind = winreg.QueryValueEx(key, "LongPathsEnabled")
+            return int(value) == 1
+    except OSError:
+        return False
+
+
+def _require_workable_output_dir(output_dir: Path) -> None:
+    """Refuse, before anything is created, a directory Windows cannot stage under.
+
+    Only the operator's own --output-dir is measured; the staging roots the
+    build nests under it are internal and add a known ~40 characters.
+    """
+    chosen = str(output_dir)
+    if (
+        os.name == "nt"
+        and len(chosen) > MAX_WINDOWS_OUTPUT_PATH
+        and not _windows_long_paths_enabled()
+    ):
+        _fail(
+            "output",
+            f"output directory is {len(chosen)} characters; Windows without long-path"
+            f" support fails once staging directories are added (limit"
+            f" {MAX_WINDOWS_OUTPUT_PATH}): choose a shorter --output-dir or enable long paths",
+        )
+
+
+def _require_new_destinations(destinations: tuple[Path, ...]) -> None:
+    occupied = [path for path in destinations if os.path.lexists(path)]
+    if occupied:
+        _fail("output", f"immutable destination already exists: {occupied[0]}")
+
+
+def _publish_new_files(sources: tuple[Path, ...], destinations: tuple[Path, ...]) -> None:
+    """Hard-link complete candidates into never-before-used final names."""
+    _require_new_destinations(destinations)
+    published: list[Path] = []
+    try:
+        for source, destination in zip(sources, destinations, strict=True):
+            os.link(source, destination)
+            published.append(destination)
+        _sync_directory(destinations[0].parent)
+    except OSError as exc:
+        names = ", ".join(map(str, published)) or "none"
+        raise ReleaseError(
+            "output publication stopped without overwriting; immutable files published: "
+            f"{names}; use a new empty output directory: {exc}"
+        ) from exc
+
+
+def _write_json(path: Path, record: dict[str, object]) -> None:
+    """Replace ``path`` atomically with a readable, durable JSON document."""
+    raw = (json.dumps(record, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    temporary = path.with_name(f".{path.name}.tmp")
+    try:
+        with temporary.open("wb") as handle:
+            handle.write(raw)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        _sync_directory(path.parent)
+    except OSError as exc:
+        raise ReleaseError(f"{path}: cannot write: {exc}") from exc
+
+
+def _process_is_live(pid: int) -> bool:
+    """``os.kill(pid, 0)`` semantics on every OS, with no third-party dependency.
+
+    Windows asks the kernel directly. The published recovery command installs
+    only ``cryptography``; the earlier psutil lookup silently treated every
+    lock holder as dead when psutil was absent, so a live editor's lock was
+    replaced instead of refused.
+    """
+    if pid <= 0:
+        # os.kill(0, 0) signals the caller's own process group and "succeeds";
+        # no lock is ever held by pid 0.
+        return False
+    if os.name == "nt":
+        return _windows_process_is_live(pid)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _windows_process_is_live(pid: int) -> bool:
+    import ctypes
+    from ctypes import wintypes
+
+    if pid <= 0:
+        return False
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.GetExitCodeProcess.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
+    kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    process_query_limited_information = 0x1000
+    error_access_denied = 5
+    still_active = 259
+    handle = kernel32.OpenProcess(process_query_limited_information, False, pid)
+    if not handle:
+        # A process this account may not open still exists.
+        return ctypes.get_last_error() == error_access_denied
+    try:
+        code = wintypes.DWORD()
+        if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+            return True
+        return code.value == still_active
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def _foreign_lock_holder(lock: Path) -> int | None:
+    """The pid of another live process named by ``lock``, else ``None``.
+
+    A missing or malformed lock and a dead holder all count as unlocked; the
+    lock is then replaced by this process for the duration of the swap.
+    """
+    try:
+        raw = lock.read_bytes()
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise ReleaseError(f"update lock: cannot read {lock}: {exc}") from exc
+    try:
+        record = json.loads(raw)
+    except (UnicodeDecodeError, ValueError):
+        return None
+    pid = record.get("pid") if isinstance(record, dict) else None
+    if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0 or pid == os.getpid():
+        return None
+    return pid if _process_is_live(pid) else None
+
+
+def _installed_version(live: Path) -> str:
+    """The version of the live tree, which names its retained backup."""
+    version = _plugin_version(_read_bounded(live / "plugin.cfg", MAX_MANIFEST_SIZE))
+    if not SAFE_VERSION.fullmatch(version):
+        _fail("live add-on", f"plugin.cfg version {version!r} cannot name a backup directory")
+    return version
+
+
+def _prepare_update_directory(update: Path) -> None:
+    """Create ``addons/.godot_ai_update`` hidden from Godot's scanner and from git."""
+    try:
+        update.mkdir(parents=True, exist_ok=True)
+        for name in UPDATE_IGNORE_FILES:
+            ignore = update / name
+            if not ignore.is_file() or ignore.read_bytes() != b"*\n":
+                ignore.write_bytes(b"*\n")
+    except OSError as exc:
+        raise ReleaseError(f"update directory: cannot prepare {update}: {exc}") from exc
+
+
+def _rename(source: Path, target: Path) -> None:
+    if os.path.lexists(target):
+        _fail("swap", f"rename target already exists: {target}")
+    os.rename(source, target)
+    _sync_directory(target.parent)
+    if source.parent != target.parent:
+        _sync_directory(source.parent)
+
+
+def _live_tree_hash(live: Path) -> str:
+    try:
+        return _verify.hash_tree(live)["tree_sha256"]
+    except ReleaseError as exc:
+        return f"unhashable ({exc})"
+
+
+def _swap_and_verify(
+    live: Path,
+    staged: Path,
+    update: Path,
+    marker: Path,
+    record: dict[str, object],
+    after_swap: Callable[[Path], None] | None,
+) -> dict[str, object]:
+    """Two renames, one marker, then the same check the restarted editor makes."""
+    from_version = str(record["from_version"])
+    backup = update / "backup" / from_version if from_version else None
+    expected_tree = str(record["expected_tree_sha256"])
+    try:
+        if backup is not None:
+            backup.parent.mkdir(parents=True, exist_ok=True)
+            if os.path.lexists(backup):
+                # The intact live tree of this same version supersedes it.
+                shutil.rmtree(backup)
+            _rename(live, backup)
+        _rename(staged, live)
+    except (OSError, ReleaseError) as exc:
+        if backup is not None and not os.path.lexists(live) and os.path.lexists(backup):
+            try:
+                _rename(backup, live)
+            except (OSError, ReleaseError) as restore:
+                raise ReleaseError(
+                    "swap failed and the backup could not be restored; inspect "
+                    f"{live} and {backup}: {restore}"
+                ) from exc
+        raise ReleaseError(f"swap failed; nothing was installed: {exc}") from exc
+    _write_json(marker, record)
+    if after_swap is not None:
+        after_swap(live)
+    actual = _live_tree_hash(live)
+    if actual == expected_tree:
+        record["status"] = "success"
+        _write_json(marker, record)
+        return record
+    # Roll back: retain the rejected tree, restore the backup, and say why.
+    reason = f"live tree hash {actual} differs from expected {expected_tree}"
+    quarantine = update / "quarantine"
+    record["quarantine_root"] = str(quarantine)
+    try:
+        _rename(live, quarantine)
+        if backup is not None:
+            _rename(backup, live)
+    except (OSError, ReleaseError) as exc:
+        record.update(status="repair_required", reason=f"{reason}; rollback failed: {exc}")
+        _write_json(marker, record)
+        raise ReleaseError(
+            f"install failed and could not roll back; inspect {live}, {backup} "
+            f"and {quarantine}: {exc}"
+        ) from exc
+    record.update(status="rolled_back", reason=reason)
+    _write_json(marker, record)
+    raise ReleaseError(
+        f"install rolled back: {reason}; the rejected tree is retained at {quarantine}"
+    )
+
+
+def install_verified_release(
+    archive: Path,
+    manifest_path: Path,
+    signature: Path,
+    expected: tuple[str, ...],
+    project_root: Path,
+    *,
+    _after_swap_hook: Callable[[Path], None] | None = None,
+) -> dict[str, object]:
+    """Verify, stage, swap, verify again: the editor's own update path, closed.
+
+    Returns the final ``pending.json`` record. ``_after_swap_hook`` exists only
+    so tests can disturb the live tree between the swap and its verification.
+    """
+    project = project_root.expanduser().resolve()
+    if not (project / "project.godot").is_file():
+        _fail("project root", f"expected a Godot project (project.godot) beneath {project}")
+    live = project / "addons" / "godot_ai"
+    update = project / "addons" / UPDATE_DIRECTORY
+    stage, lock, marker = update / "stage", update / UPDATE_LOCK_NAME, update / UPDATE_MARKER_NAME
+
+    # Verify before the project is touched at all, then stage. Staging checks
+    # the same frozen bytes again; a stage left behind by an interrupted run
+    # holds nothing worth keeping.
+    verify_release(archive, manifest_path, signature, expected)
+    _prepare_update_directory(update)
+    if os.path.lexists(stage):
+        shutil.rmtree(stage)
+    with _pinned_key():
+        staged, manifest_sha256, manifest = _verify.stage_verified_release(
+            archive, manifest_path, signature, expected, stage
+        )
+    try:
+        expected_tree = _verify.inventory_tree_hash(manifest)
+        if _verify.hash_tree(staged)["tree_sha256"] != expected_tree:
+            _fail("staging", "the re-hashed stage differs from the signed inventory")
+        holder = _foreign_lock_holder(lock)
+        if holder is not None:
+            _fail("update lock", f"{lock} is held by live process {holder}; close that editor")
+        from_version = _installed_version(live) if os.path.lexists(live) else ""
+    except BaseException:
+        shutil.rmtree(stage, ignore_errors=True)
+        raise
+    record: dict[str, object] = {
+        "status": "swapped",
+        "from_version": from_version,
+        "to_version": expected[3],
+        "manifest_sha256": manifest_sha256,
+        "expected_tree_sha256": expected_tree,
+        # The user ran this recovery by hand, outside the editor, usually
+        # because the in-editor path left stale entries behind (a v3 client
+        # pin, a 4.0.0/4.0.1 install whose updater could not download). The
+        # plugin's first start may therefore replace every owned entry that
+        # launches Godot AI, whatever version the live tree carried; entries
+        # that launch something else are still left alone (#999).
+        "replace_owned_mismatches": True,
+        "backup_root": str(update / "backup" / from_version) if from_version else "",
+    }
+    _write_json(lock, {"pid": os.getpid(), "owner": "script/v4-release install"})
+    try:
+        return _swap_and_verify(live, staged, update, marker, record, _after_swap_hook)
+    finally:
+        shutil.rmtree(stage, ignore_errors=True)
+        try:
+            lock.unlink()
+        except OSError:
+            pass
+
+
+def package_release(
+    repo_root: Path, output_dir: Path, channel: str, tag: str, version: str, source_commit: str
+) -> tuple[Path, Path]:
+    _identity(REPOSITORY, channel, tag, version, source_commit)
+    repo_root, output_dir = repo_root.resolve(), output_dir.resolve()
+    plugin_root = repo_root / "plugin/addons/godot_ai"
+    if output_dir == plugin_root or plugin_root in output_dir.parents:
+        _fail("output", "must be outside the plugin tree")
+    _validate_source(repo_root, tag, source_commit, version)
+    snapshot = _snapshot_commit(repo_root, source_commit, version)
+    _validate_embedded_public_key(dict(snapshot).get(UPDATE_MANAGER, b""))
+    _validate_uv_resolution_policy(dict(snapshot).get(UV_RESOLUTION_POLICY, b""))
+    output_dir.mkdir(parents=True, exist_ok=True)
+    destinations = tuple(output_dir / name for name in (ASSET_NAME, MANIFEST_NAME))
+    _require_new_destinations(destinations)
+    with tempfile.TemporaryDirectory(prefix=".pkg-", dir=output_dir) as temporary:
+        archive, manifest_path = (Path(temporary) / path.name for path in destinations)
+        _write_zip(archive, snapshot)
+        size, digest = _hash_file(archive, MAX_ARCHIVE_SIZE)
+        manifest = {
+            "schema_version": 1,
+            "repository": REPOSITORY,
+            "channel": channel,
+            "tag": tag,
+            "version": version,
+            "source_commit": source_commit,
+            "asset": {"name": ASSET_NAME, "size": size, "sha256": digest},
+            "inventory": [
+                {"path": path, "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+                for path, data in snapshot
+            ],
+        }
+        raw = _canonical(manifest)
+        manifest_path.write_bytes(raw)
+        expected = (REPOSITORY, channel, tag, version, source_commit)
+        validated = _validate_manifest(raw, expected)
+        _verify_archive(_read_bounded(archive, MAX_ARCHIVE_SIZE), validated)
+        _publish_new_files((archive, manifest_path), destinations)
+    return destinations
+
+
+def sign_release(
+    manifest_path: Path, signature: Path, private_key: Path, expected: tuple[str, ...]
+) -> Path:
+    if manifest_path.is_symlink() or not manifest_path.is_file():
+        _fail("manifest", "must be a regular, non-symlink file")
+    if private_key.is_symlink() or not private_key.is_file():
+        _fail("private key", "must be a regular, non-symlink file")
+    if signature.is_symlink():
+        _fail("signature", "output must not be a symbolic link")
+    manifest_path, signature, private_key = (
+        manifest_path.resolve(),
+        signature.resolve(),
+        private_key.resolve(),
+    )
+    if signature in {manifest_path, private_key}:
+        _fail("signature", "output must not alias an input")
+    _require_new_destinations((signature,))
+    raw = _read_bounded(manifest_path, MAX_MANIFEST_SIZE)
+    _validate_manifest(raw, expected)
+    signature.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".sig-", dir=signature.parent) as temporary:
+        candidate = Path(temporary) / SIGNATURE_NAME
+        # OpenSSL's Windows file APIs may reject nested staging paths even
+        # when Python supports them. Only the key needs a filesystem argument.
+        candidate.write_bytes(_openssl("-sign", str(private_key), input_bytes=raw))
+        _verify_signature(raw, _read_bounded(candidate, SIGNATURE_SIZE), PUBLIC_KEY_PEM)
+        _publish_new_files((candidate,), (signature,))
+    return signature
+
+
+def build_release(
+    repo_root: Path,
+    output_dir: Path,
+    private_key: Path,
+    channel: str,
+    tag: str,
+    version: str,
+    source_commit: str,
+) -> tuple[Path, Path, Path]:
+    output_dir = output_dir.resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    destinations = tuple(output_dir / name for name in (ASSET_NAME, MANIFEST_NAME, SIGNATURE_NAME))
+    _require_new_destinations(destinations)
+    expected = (REPOSITORY, channel, tag, version, source_commit)
+    with tempfile.TemporaryDirectory(prefix=".bld-", dir=output_dir) as temporary:
+        root = Path(temporary)
+        archive, manifest = package_release(repo_root, root, channel, tag, version, source_commit)
+        signature = sign_release(manifest, root / SIGNATURE_NAME, private_key, expected)
+        verify_release(archive, manifest, signature, expected)
+        _publish_new_files((archive, manifest, signature), destinations)
+    return destinations
+
+
+def _final_v3_fallback(repo: Path, ref: str) -> bytes:
+    """The final v3 add-on re-packed at its live path, for the capsule to restore."""
+    context = "final v3 fallback"
+    snapshot = _snapshot_git_directory(repo, ref, V3_FALLBACK_SOURCE, PLUGIN_PREFIX, context)
+    snapshot.sort(key=lambda item: item[0])
+    _validate_paths([path for path, _data in snapshot], context)
+    if not any(path == PLUGIN_CONFIG for path, _data in snapshot):
+        _fail(context, f"{ref} has no {PLUGIN_CONFIG}")
+    with tempfile.TemporaryDirectory(prefix=".v3-fallback-") as temporary:
+        archive = Path(temporary) / V3_FALLBACK_NAME
+        _write_zip(archive, snapshot)
+        return _read_bounded(archive, MAX_ARCHIVE_SIZE)
+
+
+def build_migration_capsule(
+    repo_root: Path,
+    output_dir: Path,
+    private_key: Path,
+    canonical: tuple[Path, Path, Path],
+    expected: tuple[str, ...],
+    final_v3_ref: str = FINAL_V3_REF,
+) -> tuple[Path, Path, Path]:
+    """Build the signed v3-compatible capsule around one verified v4 release."""
+    repository, channel, tag, version, source_commit = expected
+    _identity(repository, channel, tag, version, source_commit)
+    verify_release(*canonical, expected)
+    output_dir = output_dir.resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    destinations = tuple(
+        output_dir / name
+        for name in (LEGACY_ASSET_NAME, LEGACY_CHECKSUM_NAME, LEGACY_SIGNATURE_NAME)
+    )
+    _require_new_destinations(destinations)
+
+    snapshot = _snapshot_git_directory(
+        repo_root.resolve(),
+        source_commit,
+        MIGRATION_BRIDGE_SOURCE,
+        PLUGIN_PREFIX,
+        "migration bridge",
+    )
+    config_rows = [index for index, (path, _data) in enumerate(snapshot) if path == PLUGIN_CONFIG]
+    if len(config_rows) != 1:
+        _fail("migration bridge", "expected exactly one plugin.cfg")
+    config_index = config_rows[0]
+    config_path, config = snapshot[config_index]
+    if config.count(b"@VERSION@") != 1:
+        _fail("migration bridge", "plugin.cfg must contain one @VERSION@ placeholder")
+    snapshot[config_index] = (config_path, config.replace(b"@VERSION@", version.encode("ascii")))
+    if _plugin_version(snapshot[config_index][1]) != version:
+        _fail("migration bridge", "rendered plugin version differs from release identity")
+    snapshot.extend(
+        _snapshot_installer_scripts(
+            repo_root.resolve(), source_commit, {path for path, _data in snapshot}
+        )
+    )
+
+    for artifact, name, maximum in zip(
+        canonical,
+        (ASSET_NAME, MANIFEST_NAME, SIGNATURE_NAME),
+        (MAX_ARCHIVE_SIZE, MAX_MANIFEST_SIZE, SIGNATURE_SIZE),
+        strict=True,
+    ):
+        if artifact.name != name or artifact.is_symlink() or not artifact.is_file():
+            _fail("migration payload", f"expected regular canonical artifact {name}")
+        snapshot.append((f"{MIGRATION_PAYLOAD_PREFIX}{name}", _read_bounded(artifact, maximum)))
+    snapshot.append(
+        (
+            f"{MIGRATION_PAYLOAD_PREFIX}{V3_FALLBACK_NAME}",
+            _final_v3_fallback(repo_root.resolve(), final_v3_ref),
+        )
+    )
+    snapshot.sort(key=lambda item: item[0])
+    _validate_paths([path for path, _data in snapshot], "migration capsule")
+    if sum(len(data) for _path, data in snapshot) > LEGACY_MAX_ARCHIVE_SIZE:
+        _fail("migration capsule", "expanded payload exceeds release bound")
+
+    with tempfile.TemporaryDirectory(prefix=".brg-", dir=output_dir) as temporary:
+        root = Path(temporary)
+        archive = root / LEGACY_ASSET_NAME
+        checksum = root / LEGACY_CHECKSUM_NAME
+        signature = root / LEGACY_SIGNATURE_NAME
+        _write_zip(archive, snapshot)
+        size, digest = _hash_file(archive, LEGACY_MAX_ARCHIVE_SIZE)
+        if size <= 0:
+            _fail("migration capsule", "archive is empty")
+        checksum.write_bytes(f"{digest}  {LEGACY_ASSET_NAME}\n".encode("ascii"))
+        raw = _read_bounded(checksum, LEGACY_MAX_CHECKSUM_SIZE)
+        signature.write_bytes(_openssl("-sign", str(private_key.resolve()), input_bytes=raw))
+        _verify_signature(raw, _read_bounded(signature, SIGNATURE_SIZE), PUBLIC_KEY_PEM)
+        _publish_new_files((archive, checksum, signature), destinations)
+    return destinations
+
+
+def build_release_set(
+    repo_root: Path,
+    output_dir: Path,
+    private_key: Path,
+    channel: str,
+    tag: str,
+    version: str,
+    source_commit: str,
+) -> tuple[Path, ...]:
+    """Publish the canonical v4 triple plus its signed v3 migration capsule."""
+    output_dir = output_dir.resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    names = (
+        ASSET_NAME,
+        MANIFEST_NAME,
+        SIGNATURE_NAME,
+        LEGACY_ASSET_NAME,
+        LEGACY_CHECKSUM_NAME,
+        LEGACY_SIGNATURE_NAME,
+    )
+    destinations = tuple(output_dir / name for name in names)
+    _require_new_destinations(destinations)
+    expected = (REPOSITORY, channel, tag, version, source_commit)
+    with tempfile.TemporaryDirectory(prefix=".set-", dir=output_dir) as temporary:
+        root = Path(temporary)
+        canonical = build_release(
+            repo_root, root, private_key, channel, tag, version, source_commit
+        )
+        bridge = build_migration_capsule(repo_root, root, private_key, canonical, expected)
+        _publish_new_files((*canonical, *bridge), destinations)
+    return destinations
+
+
+def _identity_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--channel", choices=("stable",), required=True)
+    for name in ("tag", "version", "source-commit"):
+        parser.add_argument(f"--{name}", required=True)
+
+
+def _verification_arguments(parser: argparse.ArgumentParser) -> None:
+    for name in ("archive", "manifest", "signature"):
+        parser.add_argument(f"--{name}", type=Path, required=True)
+    parser.add_argument("--expected-channel", choices=("stable",), required=True)
+    for name in ("repository", "tag", "version", "source"):
+        parser.add_argument(f"--expected-{name}", required=True)
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    commands = parser.add_subparsers(dest="command", required=True)
+    package = commands.add_parser("package", help="build unsigned deterministic bytes")
+    package.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[1])
+    package.add_argument("--output-dir", type=Path, required=True)
+    _identity_arguments(package)
+    sign = commands.add_parser("sign", help="sign one prebuilt canonical manifest")
+    for name in ("manifest", "signature", "private-key"):
+        sign.add_argument(f"--{name}", type=Path, required=True)
+    for name in ("repository", "channel", "tag", "version", "source"):
+        sign.add_argument(
+            f"--expected-{name}",
+            choices=("stable",) if name == "channel" else None,
+            required=True,
+        )
+    build = commands.add_parser(
+        "build", help="build the canonical v4 assets and signed v3 migration capsule"
+    )
+    build.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[1])
+    for name in ("output-dir", "private-key"):
+        build.add_argument(f"--{name}", type=Path, required=True)
+    _identity_arguments(build)
+    verify = commands.add_parser("verify", help="verify without installed godot-ai")
+    _verification_arguments(verify)
+    install = commands.add_parser(
+        "install", help="closed-editor install: verify, stage, swap, verify again"
+    )
+    _verification_arguments(install)
+    install.add_argument("--project-root", type=Path, required=True)
+    return parser
+
+
+def _expected(args: argparse.Namespace) -> tuple[str, ...]:
+    return tuple(
+        getattr(args, f"expected_{name}")
+        for name in ("repository", "channel", "tag", "version", "source")
+    )
+
+
+def main(argv: list[str] | None = None) -> int:
+    try:
+        _require_supported_python()
+    except ReleaseError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    args = _parser().parse_args(argv)
+    try:
+        ## The operator's directory is checked once, before any command creates it.
+        output_dir = getattr(args, "output_dir", None)
+        if output_dir is not None:
+            _require_workable_output_dir(Path(output_dir).resolve())
+        if args.command == "package":
+            outputs = package_release(
+                args.repo_root,
+                args.output_dir,
+                args.channel,
+                args.tag,
+                args.version,
+                args.source_commit,
+            )
+            print("\n".join(map(str, outputs)))
+        elif args.command == "sign":
+            print(sign_release(args.manifest, args.signature, args.private_key, _expected(args)))
+        elif args.command == "build":
+            outputs = build_release_set(
+                args.repo_root,
+                args.output_dir,
+                args.private_key,
+                args.channel,
+                args.tag,
+                args.version,
+                args.source_commit,
+            )
+            print("\n".join(map(str, outputs)))
+        elif args.command == "verify":
+            verify_release(args.archive, args.manifest, args.signature, _expected(args))
+            print("OK: signed v4 release identity, archive, and exact tree verified")
+        else:
+            record = install_verified_release(
+                args.archive, args.manifest, args.signature, _expected(args), args.project_root
+            )
+            retained = (
+                f"; retained {record['from_version']} at {record['backup_root']}"
+                if record["backup_root"]
+                else ""
+            )
+            print(f"OK: installed exact v4 tree {record['to_version']}{retained}")
+    except ReleaseError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

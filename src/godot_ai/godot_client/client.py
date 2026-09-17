@@ -1,0 +1,282 @@
+"""Typed async client for sending commands to the Godot editor plugin."""
+
+from __future__ import annotations
+
+import logging
+import os
+from typing import Any, Literal, TypeAlias
+
+from fastmcp.exceptions import FastMCPError
+
+from godot_ai.godot_client.circuit_breaker import EditorBridgeCircuitBreaker
+from godot_ai.godot_client.session_diagnostics import (
+    NO_ACTIVE_SESSION_MESSAGE,
+    no_active_session_data,
+    session_not_found_data,
+    session_not_found_message,
+)
+from godot_ai.protocol.envelope import find_non_finite_float
+from godot_ai.protocol.errors import ErrorCode
+from godot_ai.sessions.registry import PendingCommandLimitError
+from godot_ai.transport.websocket import GodotWebSocketServer
+
+logger = logging.getLogger(__name__)
+
+HintPolicy: TypeAlias = Literal["surface", "retain", "discard"]
+_HINT_POLICIES = frozenset({"surface", "retain", "discard"})
+
+
+def _default_hint_policy_from_env() -> HintPolicy:
+    value = os.getenv("GODOT_AI_SUPPRESS_DIAGNOSTIC_HINTS", "")
+    return "discard" if value.strip().lower() in {"1", "true"} else "surface"
+
+
+def _diagnostic_hint(kind: Literal["error", "warning"], count: int) -> str:
+    plural = "s" if count != 1 else ""
+    return (
+        f"{count} new GDScript {kind}{plural} since your last call. "
+        "If you are mid-way through a planned multi-file scaffold, finish the related "
+        'writes and run filesystem_manage(op="scan") before debugging; otherwise inspect '
+        "with logs_read(source='editor'|'game', include_details=true)."
+    )
+
+
+class GodotCommandError(FastMCPError):
+    """Raised when a Godot plugin command returns an error response."""
+
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        data: dict[str, Any] | None = None,
+    ):
+        self.code = code
+        self.message = message
+        self.data = data or {}
+        if self.data:
+            suffix = " [" + ", ".join(f"{k}={v}" for k, v in self.data.items()) + "]"
+            super().__init__(f"{code}: {message}{suffix}")
+        else:
+            super().__init__(f"{code}: {message}")
+
+    def to_payload(self) -> dict[str, Any]:
+        return {"code": self.code, "message": self.message, "data": self.data}
+
+
+class GodotClient:
+    """High-level client for interacting with connected Godot editors."""
+
+    def __init__(
+        self,
+        ws_server: GodotWebSocketServer,
+        circuit_breaker: EditorBridgeCircuitBreaker | None = None,
+        default_hint_policy: HintPolicy | None = None,
+    ):
+        self.ws_server = ws_server
+        self._table = ws_server.registry
+        self.default_hint_policy = (
+            _default_hint_policy_from_env()
+            if default_hint_policy is None
+            else default_hint_policy
+        )
+        if self.default_hint_policy not in _HINT_POLICIES:
+            raise ValueError(f"Unknown diagnostic hint policy: {self.default_hint_policy!r}")
+        ## F-006: stop death-spiral hot retries from melting the bridge.
+        ## Defaults: 5 consecutive transport failures opens for 1s, doubles
+        ## per re-open up to 30s. While open, the next call short-circuits
+        ## with PLUGIN_DISCONNECTED + retry_after_ms so retrying clients
+        ## get a clear back-off signal instead of another bare TimeoutError.
+        self._circuit = circuit_breaker or EditorBridgeCircuitBreaker()
+
+    @property
+    def circuit_breaker(self) -> EditorBridgeCircuitBreaker:
+        return self._circuit
+
+    def _raise_if_circuit_open(self, session_id: str | None) -> None:
+        retry_after_ms = self._circuit.check_open(session_id)
+        if retry_after_ms is None:
+            return
+        snapshot = self._circuit.snapshot(session_id)
+        data = {
+            "retryable": True,
+            "retry_after_ms": retry_after_ms,
+            "circuit_open": True,
+            **snapshot,
+        }
+        message = (
+            "Editor-bridge circuit is open after repeated transport failures — "
+            f"retry in {retry_after_ms}ms"
+        )
+        if session_id is None and snapshot.get("last_failure_kind") == "no_active_session":
+            data = no_active_session_data(**data)
+            message = (
+                "Editor-bridge circuit is open after repeated no-session failures — "
+                "this MCP server still has no connected Godot editor; "
+                f"retry in {retry_after_ms}ms"
+            )
+        elif session_id is not None and snapshot.get("last_failure_kind") == "session_not_found":
+            data = session_not_found_data(session_id, **data)
+            message = (
+                "Editor-bridge circuit is open after repeated missing-session failures — "
+                f"session '{session_id}' is still not connected to this MCP server; "
+                f"retry in {retry_after_ms}ms"
+            )
+        raise GodotCommandError(
+            code=ErrorCode.PLUGIN_DISCONNECTED,
+            message=message,
+            data=data,
+        )
+
+    def _record_failure(self, session_id: str | None, kind: str) -> None:
+        opened = self._circuit.record_failure(session_id, kind=kind)
+        if opened:
+            ## Log once on each closed→open transition so operators can
+            ## grep for the death-spiral entry point. Subsequent
+            ## short-circuited calls don't log to avoid amplifying the
+            ## spiral we're trying to dampen.
+            logger.warning(
+                "Editor-bridge circuit OPEN for session %s (kind=%s, snapshot=%s)",
+                (session_id or "<no-session>")[:16],
+                kind,
+                self._circuit.snapshot(session_id),
+            )
+
+    async def send(
+        self,
+        command: str,
+        params: dict[str, Any] | None = None,
+        session_id: str | None = None,
+        timeout: float = 5.0,
+        hint_policy: HintPolicy | None = None,
+    ) -> dict[str, Any]:
+        """Send a command to a Godot session and return the response data.
+
+        If session_id is None, uses the active session.
+        Raises GodotCommandError if the plugin returns an error.
+        Raises GodotCommandError(PLUGIN_DISCONNECTED) when there is no active
+        Godot editor session.
+        Raises GodotCommandError(PLUGIN_DISCONNECTED) when the per-session
+        transport circuit is open (death-spiral protection — see
+        ``EditorBridgeCircuitBreaker``).
+        Raises GodotCommandError(INVALID_PARAMS) when params contain a
+        non-finite float — JSON cannot represent NaN/Infinity, and
+        ``model_dump_json`` would silently serialize it as null, corrupting
+        the value the plugin stores (#688).
+        ``hint_policy=None`` uses the construction-time client default;
+        explicit ``surface``, ``retain``, or ``discard`` values override it
+        for this response's diagnostic counters.
+        """
+        effective_hint_policy = self.default_hint_policy if hint_policy is None else hint_policy
+        if effective_hint_policy not in _HINT_POLICIES:
+            raise ValueError(f"Unknown diagnostic hint policy: {effective_hint_policy!r}")
+
+        ## Rejected before session resolution: bad params are a caller error
+        ## regardless of editor state, and must not count as a transport
+        ## failure against the circuit breaker.
+        non_finite_path = find_non_finite_float(params) if params else None
+        if non_finite_path is not None:
+            raise GodotCommandError(
+                code=ErrorCode.INVALID_PARAMS,
+                message=(
+                    f"non-finite float in param '{non_finite_path}' — "
+                    "NaN/Infinity cannot be represented in JSON; send a finite "
+                    "number or omit the param"
+                ),
+            )
+
+        ## Resolve the active session first so the circuit check below
+        ## keys on a concrete session_id when possible. The no-session
+        ## sentinel is only used when there genuinely is no session —
+        ## otherwise a once-tripped no-session circuit would falsely
+        ## block calls against an editor that has since come back up.
+        if session_id is None:
+            session = self._table.get_active()
+            if session is None:
+                self._raise_if_circuit_open(None)
+                self._record_failure(None, kind="no_active_session")
+                raise GodotCommandError(
+                    code=ErrorCode.PLUGIN_DISCONNECTED,
+                    message=NO_ACTIVE_SESSION_MESSAGE,
+                    data=no_active_session_data(circuit_open=False),
+                )
+            session_id = session.session_id
+            if len(self._table) > 1:
+                logger.debug(
+                    "Routing %s to active session %s (%d sessions connected)",
+                    command,
+                    session_id[:8],
+                    len(self._table),
+                )
+
+        self._raise_if_circuit_open(session_id)
+
+        if self._table.get(session_id) is None:
+            self._record_failure(session_id, kind="session_not_found")
+            raise GodotCommandError(
+                code=ErrorCode.PLUGIN_DISCONNECTED,
+                message=session_not_found_message(session_id),
+                data=session_not_found_data(session_id, circuit_open=False),
+            )
+
+        try:
+            response = await self.ws_server.send_command(
+                session_id=session_id,
+                command=command,
+                params=params,
+                timeout=timeout,
+            )
+        except (ConnectionError, TimeoutError) as exc:
+            self._record_failure(session_id, kind=type(exc).__name__)
+            raise
+        except PendingCommandLimitError as exc:
+            raise GodotCommandError(
+                code=ErrorCode.TRANSPORT_OVERLOADED,
+                message=str(exc),
+                data={
+                    "retryable": True,
+                    "reason": "pending_command_limit",
+                    "scope": exc.scope,
+                    "pending_count": exc.count,
+                    "pending_limit": exc.limit,
+                    "session_id": exc.session_id,
+                    "hint": "Wait for an in-flight editor command to finish before retrying.",
+                },
+            ) from None
+
+        ## A bridge round-trip completed (even if the plugin returned an
+        ## error response — that's the plugin saying "no" to a valid
+        ## command, not a transport failure). Reset the circuit.
+        self._circuit.record_success(session_id)
+
+        if response.status == "error":
+            error = response.error
+            raise GodotCommandError(
+                code=error.code if error else "UNKNOWN",
+                message=error.message if error else "Unknown error",
+                data=error.data if error else {},
+            )
+
+        if effective_hint_policy == "discard":
+            self._table.consume_diagnostic_counts(session_id)
+            return response.data
+
+        if effective_hint_policy == "retain":
+            return response.data
+
+        pending_new_errors, pending_new_warnings = self._table.consume_diagnostic_counts(
+            session_id
+        )
+
+        if pending_new_errors > 0 or pending_new_warnings > 0:
+            data = dict(response.data)
+            if pending_new_errors > 0:
+                count = pending_new_errors
+                data["new_errors_since_last_call"] = count
+                data["new_errors_hint"] = _diagnostic_hint("error", count)
+            if pending_new_warnings > 0:
+                wcount = pending_new_warnings
+                data["new_warnings_since_last_call"] = wcount
+                data["new_warnings_hint"] = _diagnostic_hint("warning", wcount)
+            return data
+
+        return response.data
