@@ -1,14 +1,27 @@
-﻿"""Package Godot MCP release zip for GitHub releases and Godot Asset Library."""
+﻿"""Package Godot MCP release zip for GitHub releases and Godot Asset Library.
+
+Usage: python script/package_release.py [--version 5.0.2]
+"""
+import argparse
 import os
 import zipfile
 from pathlib import Path
 
-def main():
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--version",
+        default="5.0.2",
+        help="Release version used in the zip file name (default: 5.0.2).",
+    )
+    args = parser.parse_args()
+
     repo_root = Path(__file__).resolve().parent.parent
     dist_dir = repo_root / "dist"
     dist_dir.mkdir(exist_ok=True)
 
-    zip_path = dist_dir / "godot-mcp-v5.0.0.zip"
+    zip_path = dist_dir / f"godot-mcp-v{args.version}.zip"
 
     exclude_suffixes = {".uid", ".pyc", ".pyo", ".tmp"}
     exclude_names = {"__pycache__", ".DS_Store", "Thumbs.db"}
@@ -38,6 +51,7 @@ def main():
                 zf.write(p, doc_file)
 
     print(f"Successfully built {zip_path} ({zip_path.stat().st_size / 1024:.1f} KB)")
+
 
 if __name__ == "__main__":
     main()

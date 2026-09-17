@@ -1,5 +1,20 @@
+# Normalize line endings for all files that Git considers text files.
+* text=auto eol=lf
+
 # Shell scripts and git hooks must use LF regardless of platform — CRLF
 # breaks the shebang parser on Unix and breaks `post-checkout` everywhere.
 script/*       text eol=lf
 script/githooks/* text eol=lf
 *.sh           text eol=lf
+
+# Asset Library export set — GitHub computes the AssetLib download ZIP from
+# the repository archive, which respects `export-ignore`. Ship only the
+# addons plus the README, LICENSE, and docs icons so users get a clean plugin
+# archive instead of the whole repository (src/, tests/, CI, …).
+/** export-ignore
+/addons !export-ignore
+/addons/** !export-ignore
+/README.md !export-ignore
+/LICENSE !export-ignore
+/docs !export-ignore
+/docs/** !export-ignore

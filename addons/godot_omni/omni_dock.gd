@@ -80,7 +80,7 @@ func _build_ui() -> void:
 	header_box.add_child(title)
 
 	var version_badge := Label.new()
-	version_badge.text = "v5.0.0"
+	version_badge.text = "v5.0.2"
 	version_badge.modulate = Color(0.3, 0.75, 1.0)
 	version_badge.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header_box.add_child(version_badge)

@@ -13,7 +13,7 @@ var _dock: Control
 
 
 func _enter_tree() -> void:
-	print("[Godot MCP] Initializing Universal Godot MCP plugin v5.0.0...")
+	print("[Godot MCP] Initializing Universal Godot MCP plugin v5.0.2...")
 	_dock = OmniDockScript.new()
 	_dock.name = "Godot MCP"
 	add_control_to_dock(DOCK_SLOT_RIGHT_UL, _dock)

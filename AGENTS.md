@@ -1,5 +1,11 @@
 # AGENTS.md - Godot AI
 
+> **Repo note (Godot MCP fork):** the canonical GDScript plugin lives in the
+> root `addons/godot_ai/` and `addons/godot_omni/` folders — the release
+> archives are built from them. The duplicate `plugin/addons/` tree mentioned
+> in the upstream sections below was **removed in v5.0.2**; treat any
+> reference to it as stale.
+
 This guide is for any AI assistant working in this repository. Keep Claude-specific files such as `.claude/CLAUDE.md` and `.claude/skills/*` as thin pointers to this shared guidance.
 
 ## PR activity monitoring

@@ -54,7 +54,7 @@ jobs:
           # Extract the embedded key: the BEGIN marker shares its
           # line with the GDScript const assignment, so strip the prefix.
           sed -n '/-----BEGIN PUBLIC KEY-----/,/-----END PUBLIC KEY-----/p' \
-            plugin/addons/godot_ai/utils/update_manager.gd \
+            addons/godot_ai/utils/update_manager.gd \
             | sed 's/^.*-----BEGIN PUBLIC KEY-----/-----BEGIN PUBLIC KEY-----/' \
             > embedded_public_key.pem
           if ! openssl pkey -pubin -in embedded_public_key.pem -noout 2>/dev/null; then

@@ -50,7 +50,7 @@ The system provides 1,820 canonical engine operations across 59 domains, along w
 ### Step 1: Install the Godot Plugin
 
 #### Option A: From Release Archive (Recommended)
-1. Download godot-mcp-v5.0.0.zip from the [Releases](https://github.com/bebabinlarsson-blip/Godot-MCP/releases) page.
+1. Download godot-mcp-v5.0.2.zip from the [Releases](https://github.com/bebabinlarsson-blip/Godot-MCP/releases) page.
 2. Extract the archive directly into your Godot project root so that ddons/godot_omni and ddons/godot_ai sit in es://addons/.
 
 #### Option B: Clone or Copy Manually

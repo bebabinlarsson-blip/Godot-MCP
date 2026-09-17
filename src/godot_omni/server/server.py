@@ -30,7 +30,7 @@ def create_omni_server(
 
     mcp = FastMCP(
         "Godot Omni",
-        version="5.0.0",
+        version="5.0.2",
         instructions=(
             "Godot Omni: Universal Godot AI MCP Architecture. Gives agents 100% control "
             "over Godot: 1,763 canonical operations, arbitrary GDScript eval (godot_eval), "
@@ -298,7 +298,7 @@ def create_omni_server(
 
         return {
             "status": "online",
-            "server": "godot-omni 5.0.0",
+            "server": "godot-omni 5.0.2",
             "canonical_operations": len(registry.list_all()),
             "distinct_domains": len(registry.list_domains()),
             "editor_state": editor_state,

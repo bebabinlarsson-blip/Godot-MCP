@@ -5,6 +5,39 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.2 (2026-09-17)
+
+Packaging and Asset Library readiness release for Godot MCP. No runtime
+behavior changes.
+
+### Changed
+
+- Plugin version metadata (`plugin.cfg`) and the `godot-omni` server now all
+  report `5.0.2`, matching the GitHub release tag.
+- The release packaging script (`script/package_release.py`) takes the version
+  as an argument instead of hardcoding it.
+- Removed the duplicate `plugin/addons/*` tree from the repository; the
+  root `addons/godot_ai` and `addons/godot_omni` folders are the single
+  canonical source the release archives are built from.
+
+### Asset Library
+
+- `LICENSE` now carries a second copyright line for bebabin alongside the
+  upstream Godot AI contributors attribution.
+- `addons/godot_omni` now bundles its own `README.md` and `LICENSE` copies,
+  matching `addons/godot_ai`.
+- `.gitattributes` marks everything except `addons/`, `README.md`, `LICENSE`,
+  and `docs/` as `export-ignore`, so an Asset Library download (which is built
+  from the GitHub archive) contains a clean plugin archive instead of the
+  whole repository.
+- `addons/godot_ai/README.md` rewritten to describe this project instead of
+  the upstream signed-archive flow.
+
+### Fixed
+
+- The `verify-signing` workflow referenced the removed `plugin/` tree; the
+  embedded-key check now reads `addons/godot_ai/utils/update_manager.gd`.
+
 ## 4.1.0 (2026-09-11)
 
 Plugin updates now activate inside the running editor, preserving open scenes,
