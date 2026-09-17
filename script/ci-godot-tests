@@ -1,0 +1,270 @@
+#!/usr/bin/env bash
+# Run Godot handler tests via MCP in CI.
+# Usage: ci-godot-tests [python-command]
+# Expects: Python server reachable at $MCP_SERVER_URL (default :8000, set in
+# _ci_env.sh), Godot editor launched with plugin.
+# This script waits for the plugin to connect before running tests.
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PYTHON_CMD="${1:-${PYTHON_CMD:-python}}"
+export PYTHON_CMD
+source "$SCRIPT_DIR/_ci_env.sh"
+source "$SCRIPT_DIR/_ci_session_guard.sh"
+
+SERVER_URL="$MCP_SERVER_URL"
+ci_load_http_auth
+HEADERS=("${HTTP_AUTH_HEADERS[@]}" -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream")
+SESSION_ID=""
+
+source "$SCRIPT_DIR/_ci_mcp.sh"
+trap close_mcp_session EXIT
+
+# FastMCP can return streamable HTTP tool results as either an SSE ``data:``
+# frame or a plain JSON body. Normalize both to the structured content object.
+extract_mcp_content() {
+  "$PYTHON_CMD" -c "
+import json, sys
+
+raw = sys.stdin.read().lstrip('\\ufeff').strip()
+payload = None
+try:
+    candidate = json.loads(raw)
+    if isinstance(candidate, dict):
+        payload = candidate
+except json.JSONDecodeError:
+    pass
+if payload is None:
+    for line in raw.splitlines():
+        if not line.startswith('data:'):
+            continue
+        try:
+            candidate = json.loads(line[5:].lstrip())
+        except json.JSONDecodeError:
+            continue
+        if isinstance(candidate, dict):
+            payload = candidate
+            break
+if payload is None:
+    print(f'No JSON-RPC payload in response (first 500 chars): {raw[:500]}', file=sys.stderr)
+    raise SystemExit(1)
+if payload.get('error'):
+    print(f'RPC error: {json.dumps(payload[\"error\"])}', file=sys.stderr)
+    raise SystemExit(1)
+result = payload.get('result')
+if not isinstance(result, dict):
+    print('JSON-RPC response has no result object', file=sys.stderr)
+    raise SystemExit(1)
+blocks = result.get('content')
+if not isinstance(blocks, list):
+    blocks = []
+if result.get('isError'):
+    first = blocks[0] if blocks and isinstance(blocks[0], dict) else {}
+    message = first.get('text', 'unknown tool error')
+    print(f'Tool error: {message}', file=sys.stderr)
+    raise SystemExit(1)
+content = result.get('structuredContent')
+if not isinstance(content, dict) or not content:
+    first = blocks[0] if blocks and isinstance(blocks[0], dict) else {}
+    text = first.get('text', '{}')
+    try:
+        content = json.loads(text)
+    except (TypeError, json.JSONDecodeError):
+        print('Tool response content is not valid JSON', file=sys.stderr)
+        raise SystemExit(1)
+if not isinstance(content, dict):
+    print('Tool response content is not an object', file=sys.stderr)
+    raise SystemExit(1)
+print(json.dumps(content))
+"
+}
+
+# Wait for Godot plugin to connect (session_manage(op="list") returns count > 0)
+echo "Waiting for Godot plugin to connect (server: $SERVER_URL)..."
+GODOT_CONNECTED=0
+for i in $(seq 1 60); do
+  if [ -z "$SESSION_ID" ]; then
+    if ! initialize_mcp_session; then
+      sleep 2
+      continue
+    fi
+  fi
+
+  RAW_SESSIONS=$(curl -fsS --connect-timeout 3 --max-time 10 \
+    "$SERVER_URL" -X POST "${HEADERS[@]}" \
+    -H "Mcp-Session-Id: $SESSION_ID" \
+    -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"session_manage","arguments":{"op":"list"}}}' || true)
+  if SESSIONS=$(printf '%s' "$RAW_SESSIONS" | extract_mcp_content 2>/dev/null); then
+    COUNT=$(printf '%s' "$SESSIONS" | "$PYTHON_CMD" -c \
+      "import json, sys; print(json.load(sys.stdin).get('count', 0))" 2>/dev/null || echo "0")
+  else
+    COUNT=0
+  fi
+  if [ "$COUNT" -gt 0 ] 2>/dev/null; then
+    GODOT_CONNECTED=1
+    echo "Godot plugin connected (session count: $COUNT)"
+    break
+  fi
+
+  echo "  attempt $i — no session yet"
+  sleep 2
+done
+
+if [ -z "${SESSION_ID:-}" ]; then
+  echo "ERROR: Could not connect to MCP server at $SERVER_URL"
+  exit 1
+fi
+if [ "$GODOT_CONNECTED" -ne 1 ]; then
+  echo "ERROR: MCP server is reachable, but no Godot plugin connected"
+  exit 1
+fi
+
+# Resolve the exact editor this run will drive. A lone session is not trusted
+# until its project_path matches this checkout; after selection every call is
+# pinned so a later connection cannot change the active target (#885).
+FINAL_SESSIONS_RAW=$(curl -fsS --connect-timeout 3 --max-time 10 \
+  "$SERVER_URL" -X POST "${HEADERS[@]}" \
+  -H "Mcp-Session-Id: $SESSION_ID" \
+  -d '{"jsonrpc":"2.0","id":99,"method":"tools/call","params":{"name":"session_manage","arguments":{"op":"list"}}}' || true)
+FINAL_SESSIONS=$(printf '%s' "$FINAL_SESSIONS_RAW" | extract_mcp_content 2>/dev/null || true)
+
+if [ -z "$FINAL_SESSIONS" ]; then
+  echo "ERROR: Could not read connected sessions from $SERVER_URL."
+  exit 1
+fi
+if ! PIN_SESSION=$(ci_select_godot_session \
+  "$FINAL_SESSIONS" "$REPO_ROOT/test_project" "${GODOT_AI_SESSION_ID:-}"); then
+  exit 1
+fi
+
+# Built via the selected Python so the id is JSON-escaped rather than spliced into the body.
+# `set -e` does not propagate failures out of a command substitution, so a
+# a broken interpreter would otherwise splice an empty string into the request body
+# and surface as a confusing parse error downstream. Fail here instead.
+_tool_args() {
+  local out
+  out=$(GODOT_AI_PIN="$PIN_SESSION" "$PYTHON_CMD" -c "
+import json, os, sys
+args = json.loads(sys.argv[1])
+pin = os.environ.get('GODOT_AI_PIN', '')
+if pin:
+    args['session_id'] = pin
+print(json.dumps(args))" "$1") || { echo "ERROR: failed to build tool arguments" >&2; exit 1; }
+  if [ -z "$out" ]; then
+    echo "ERROR: tool arguments came back empty" >&2
+    exit 1
+  fi
+  printf '%s' "$out"
+}
+if [ -n "$PIN_SESSION" ]; then
+  echo "Pinned to session: $PIN_SESSION"
+fi
+
+# Give the editor time to finish its filesystem scan and script class
+# registration. Without this, test_run fires before DirAccess sees the
+# test scripts — the plugin connects before the scan completes.
+echo "Waiting for editor filesystem scan to settle..."
+sleep 8
+
+# Open main.tscn so tests that need a scene root can actually run.
+# In a fresh CI checkout there's no editor state, so no scene is open by default.
+echo "Opening main.tscn..."
+# Assign first: a bare $(_tool_args ...) nested inside the request body would
+# swallow its failure, since exiting a command substitution does not exit the
+# parent shell. The assignment propagates the status so `|| exit 1` can catch it.
+SCENE_ARGS=$(_tool_args '{"path":"res://main.tscn"}') || exit 1
+SCENE_OPEN_RESULT=$(curl -fsS "$SERVER_URL" -X POST "${HEADERS[@]}" \
+  -H "Mcp-Session-Id: $SESSION_ID" \
+  -d "$(printf '{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"scene_open","arguments":%s}}' "$SCENE_ARGS")")
+# A failed open hollows the run out: scene-dependent tests skip and the
+# summary still reads green. Fail loudly instead (audit backlog).
+printf '%s' "$SCENE_OPEN_RESULT" | extract_mcp_content > /dev/null || {
+  echo "ERROR: could not open main.tscn — aborting before a hollow run"
+  exit 1
+}
+sleep 2
+
+# Call test_run
+echo "Running handler tests..."
+TEST_ARGS=$(_tool_args '{}') || exit 1
+RESULT=$(curl -fsS "$SERVER_URL" -X POST "${HEADERS[@]}" \
+  -H "Mcp-Session-Id: $SESSION_ID" \
+  -d "$(printf '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"test_run","arguments":%s}}' "$TEST_ARGS")")
+
+# #882: discovery can be silently truncated — whole suites absent from
+# suites_run, or individual tests missing from a suite that did register —
+# with failed=0, no load_errors, and a non-zero total, so every gate below
+# this comment would pass over a hollowed-out run. Derive the expected suite
+# count from the checkout itself (suite files map 1:1 onto test_*.gd; helper
+# fixtures use mcp_/stub_ prefixes) so there is no magic number to drift.
+# GODOT_AI_MIN_TESTS (optional, set in the CI workflow) additionally floors
+# the total, because a suite-count check alone cannot see in-suite loss.
+# Anchored to the script's own location so the gate cannot be silently
+# disabled by running from a different cwd (an empty glob would read as
+# "expect 0 suites" and pass anything).
+TESTS_DIR="$REPO_ROOT/test_project/tests"
+EXPECTED_SUITES=$(ls "$TESTS_DIR"/test_*.gd 2>/dev/null | wc -l | tr -d ' ')
+EXPECTED_SUITE_NAMES=$(ls "$TESTS_DIR"/test_*.gd 2>/dev/null | xargs -n1 basename 2>/dev/null | sed -e 's/^test_//' -e 's/\.gd$//')
+if [ "$EXPECTED_SUITES" -eq 0 ]; then
+  echo "ERROR: found no test_*.gd files under $TESTS_DIR — cannot establish the expected suite count (#882)"
+  exit 1
+fi
+
+# Parse and report results
+RESULT_CONTENT=$(printf '%s' "$RESULT" | extract_mcp_content) || {
+  echo "ERROR: No valid response from test_run"
+  exit 1
+}
+printf '%s' "$RESULT_CONTENT" | \
+  EXPECTED_SUITES="$EXPECTED_SUITES" \
+  EXPECTED_SUITE_NAMES="$EXPECTED_SUITE_NAMES" \
+  "$PYTHON_CMD" -c "
+import json, os, sys
+content = json.load(sys.stdin)
+passed = content.get('passed', 0)
+failed = content.get('failed', 0)
+total = content.get('total', 0)
+load_errors = content.get('load_errors', []) or []
+skipped = content.get('skipped', 0)
+print(f'Godot tests: {passed}/{total} passed, {failed} failed, {skipped} skipped')
+if content.get('failures'):
+    for f in content['failures']:
+        print(f'  FAIL: {f[\"suite\"]}.{f[\"test\"]}: {f[\"message\"]}')
+if load_errors:
+    print(f'  LOAD ERRORS: {len(load_errors)} test file(s) failed to parse:')
+    for le in load_errors:
+        print(f'    - {le}')
+if failed > 0:
+    sys.exit(1)
+if load_errors:
+    print('ERROR: At least one test file failed to load (parse error?). Treating as failure so silent test-loss does not slip past CI.')
+    sys.exit(1)
+if total == 0:
+    print('ERROR: No tests ran — Godot plugin may not have connected')
+    sys.exit(1)
+# #882: fail on partial discovery, not just all-or-nothing loss.
+expected_suites = int(os.environ.get('EXPECTED_SUITES', '0') or 0)
+suite_count = content.get('suite_count', 0)
+suites_run = content.get('suites_run', []) or []
+if expected_suites and suite_count < expected_suites:
+    print(f'ERROR: only {suite_count} of {expected_suites} expected suites ran — suite discovery was truncated (#882).')
+    # Normalize BOTH sides by stripping an optional test_ prefix:
+    # suite_name() usually drops it (test_clients.gd -> 'clients')
+    # but not always (test_runner.gd -> 'test_runner'), and naming
+    # the wrong missing suite would misdirect the debugging.
+    def stripped(name):
+        return name[5:] if name.startswith('test_') else name
+    expected_names = set(os.environ.get('EXPECTED_SUITE_NAMES', '').split())
+    missing = sorted(expected_names - {stripped(s) for s in suites_run})
+    if missing:
+        print('  suites with no matching run (filename-derived names): ' + ', '.join(missing))
+    print('  Re-import and restart the editor, then re-run.')
+    sys.exit(1)
+min_tests = int(os.environ.get('GODOT_AI_MIN_TESTS', '0') or 0)
+if min_tests and total < min_tests:
+    print(f'ERROR: total {total} is below the GODOT_AI_MIN_TESTS floor of {min_tests} — in-suite discovery was truncated (#882).')
+    print('  If tests were legitimately removed, lower GODOT_AI_MIN_TESTS in .github/workflows/ci.yml.')
+    sys.exit(1)
+if expected_suites:
+    print(f'Suites: {suite_count}/{expected_suites} expected' + (f'; total floor: {min_tests}' if min_tests else ''))
+"

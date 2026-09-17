@@ -1,0 +1,470 @@
+#!/usr/bin/env python3
+"""Live v4 lifecycle smoke: detect occupants without ambient kill authority.
+
+``stale`` plants an authenticated, mismatched godot-ai endpoint and proves the
+editor probes it but leaves it alive. ``foreign`` plants an unidentifiable
+listener and proves it is also left alone. ``stale-compatible-reload`` starts a
+real capability-pair server, proves external adoption, reloads the plugin, and
+proves both the replacement session and external process survive.
+"""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import os
+import platform
+import secrets
+import shutil
+import signal
+import socket
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+from fastmcp import Client
+from fastmcp.client.transports import StreamableHttpTransport
+
+ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_PROJECT = ROOT / "test_project"
+HTTP_PORT = int(os.environ.get("GODOT_AI_HTTP_PORT", "8000"))
+WS_PORT = int(os.environ.get("GODOT_AI_WS_PORT", "9500"))
+STALE_VERSION = "0.0.0-stale"
+OCCUPANT_READY_MARKER = "smoke occupant bound"
+PROBE_MARKER = "authenticated stale status probe"
+
+
+class SmokeError(RuntimeError):
+    pass
+
+
+def find_godot() -> str:
+    for candidate in (
+        os.environ.get("GODOT_BIN"),
+        os.environ.get("GODOT4_BIN"),
+        ## setup-godot exports these extensionless launcher paths. Git Bash
+        ## resolves them, but Windows shutil.which("godot") does not.
+        os.environ.get("GODOT"),
+        os.environ.get("GODOT4"),
+        "godot",
+        "Godot",
+    ):
+        if candidate and (shutil.which(candidate) or Path(candidate).is_file()):
+            return candidate
+    raise SmokeError("Godot not found; set GODOT_BIN")
+
+
+def plugin_version() -> str:
+    cfg = ROOT / "plugin" / "addons" / "godot_ai" / "plugin.cfg"
+    for line in cfg.read_text(encoding="utf-8").splitlines():
+        if line.startswith("version="):
+            return line.split("=", 1)[1].strip().strip('"')
+    raise SmokeError(f"missing version in {cfg}")
+
+
+def port_is_free(port: int) -> bool:
+    with socket.socket() as probe:
+        if os.name != "nt":
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            probe.bind(("127.0.0.1", port))
+        except OSError:
+            return False
+    return True
+
+
+def wait_for_free_ports(timeout: float = 150.0) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if port_is_free(HTTP_PORT) and port_is_free(WS_PORT):
+            return
+        time.sleep(0.5)
+    raise SmokeError(f"ports {HTTP_PORT}/{WS_PORT} remained occupied")
+
+
+def secure_capability_temp_parent() -> Path:
+    """Return a canonical root-owned sticky temp root accepted by both runtimes."""
+
+    for candidate in (Path("/private/tmp"), Path("/tmp"), Path("/var/tmp")):
+        try:
+            info = candidate.lstat()
+        except OSError:
+            continue
+        mode = stat.S_IMODE(info.st_mode)
+        if (
+            stat.S_ISDIR(info.st_mode)
+            and not stat.S_ISLNK(info.st_mode)
+            and info.st_uid == 0
+            and bool(mode & stat.S_ISVTX)
+        ):
+            return candidate
+    raise SmokeError("no canonical root-owned sticky temporary directory is available")
+
+
+def capability_directory() -> Path:
+    override = os.environ.get("GODOT_AI_CAPABILITY_DIR", "").strip()
+    if override and os.name != "nt":
+        return Path(override)
+    if os.name == "nt":
+        base = os.environ.get("LOCALAPPDATA", "")
+        if not base:
+            raise SmokeError("LOCALAPPDATA is unavailable")
+        return Path(base) / "godot-ai" / "capabilities"
+    if platform.system() == "Darwin":
+        home = os.environ.get("HOME", "").strip()
+        if not home:
+            raise SmokeError("HOME is unavailable")
+        return Path(home) / "Library" / "Application Support" / "godot-ai" / "capabilities"
+    base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+    return base / "godot-ai" / "capabilities"
+
+
+def capability_path() -> Path:
+    return capability_directory() / f"http-{HTTP_PORT}.json"
+
+
+def write_capability_record(http: str, websocket: str, instance: str) -> None:
+    directory = capability_directory()
+    directory.mkdir(parents=True, exist_ok=True)
+    if os.name != "nt":
+        directory.chmod(0o700)
+    path = capability_path()
+    staged = path.with_name(path.name + f".{os.getpid()}.tmp")
+    staged.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "http": http,
+                "websocket": websocket,
+                "instance_nonce": instance,
+            },
+            separators=(",", ":"),
+        ),
+        encoding="ascii",
+    )
+    if os.name != "nt":
+        staged.chmod(0o600)
+    staged.replace(path)
+
+
+def request_status(http_capability: str, timeout: float = 2.0) -> dict:
+    request = urllib.request.Request(
+        f"http://127.0.0.1:{HTTP_PORT}/godot-ai/status",
+        headers={"Authorization": f"Bearer {http_capability}"},
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return json.loads(response.read())
+
+
+def wait_for_status(http_capability: str, expected: str, process: subprocess.Popen) -> dict:
+    deadline = time.monotonic() + 45.0
+    last_error: object = None
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise SmokeError(f"server exited early ({process.returncode})")
+        try:
+            status = request_status(http_capability)
+            version = str(status.get("server_version", status.get("version", "")))
+            if version == expected:
+                return status
+        except (OSError, ValueError, urllib.error.URLError) as exc:
+            last_error = exc
+        time.sleep(0.25)
+    raise SmokeError(f"status never became ready: {last_error}")
+
+
+def terminate(process: subprocess.Popen | None) -> None:
+    if process is None or process.poll() is not None:
+        return
+    try:
+        process.send_signal(signal.SIGTERM)
+        process.wait(timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        try:
+            process.kill()
+            process.wait(timeout=10)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+
+
+def editor_environment(capability_dir: Path) -> dict[str, str]:
+    environment = os.environ.copy()
+    environment["GODOT_AI_ALLOW_HEADLESS"] = "1"
+    environment["GODOT_AI_DISABLE_TELEMETRY"] = "true"
+    if os.name != "nt":
+        environment["GODOT_AI_CAPABILITY_DIR"] = str(capability_dir)
+    return environment
+
+
+def start_editor(godot: str, project: Path, log_path: Path, environment: dict[str, str]):
+    output = log_path.open("wb")
+    engine_log = log_path.with_name(log_path.name + ".godot")
+    process = subprocess.Popen(
+        [
+            godot,
+            "--headless",
+            "--editor",
+            "--path",
+            str(project),
+            "--log-file",
+            str(engine_log),
+        ],
+        env=environment,
+        stdout=output,
+        stderr=subprocess.STDOUT,
+    )
+    return process, output
+
+
+def wait_for_log(path: Path, marker: str, process: subprocess.Popen, timeout: float) -> str:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise SmokeError(f"process exited before {marker!r} ({process.returncode})")
+        if path.exists():
+            for line in path.read_text(errors="replace").splitlines():
+                if marker in line:
+                    return line
+        time.sleep(0.25)
+    raise SmokeError(f"never saw {marker!r} in {path}")
+
+
+class _OccupantHandler(BaseHTTPRequestHandler):
+    http_capability = ""
+    instance = ""
+    stale = False
+
+    def log_message(self, *_args) -> None:
+        pass
+
+    def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
+        if not self.stale or self.path != "/godot-ai/status":
+            self.send_response(404)
+            self.end_headers()
+            return
+        if self.headers.get("Authorization") != f"Bearer {self.http_capability}":
+            self.send_response(401)
+            self.end_headers()
+            return
+        body = json.dumps(
+            {
+                "name": "godot-ai",
+                "server_version": STALE_VERSION,
+                "ws_port": WS_PORT,
+                "instance_id": self.instance,
+            }
+        ).encode()
+        print(PROBE_MARKER, flush=True)
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+def serve_occupant(
+    stale: bool,
+    http_capability: str,
+    instance: str,
+    http_port: int,
+    ws_port: int,
+) -> None:
+    global HTTP_PORT, WS_PORT
+    HTTP_PORT = http_port
+    WS_PORT = ws_port
+    _OccupantHandler.stale = stale
+    _OccupantHandler.http_capability = http_capability
+    _OccupantHandler.instance = instance
+    server = ThreadingHTTPServer(("127.0.0.1", HTTP_PORT), _OccupantHandler)
+    print(OCCUPANT_READY_MARKER, flush=True)
+    server.serve_forever()
+
+
+def run_occupant_mode(
+    mode: str, godot: str, project: Path, log_dir: Path, timeout: float, capability_dir: Path
+) -> int:
+    stale = mode == "stale"
+    http_capability = secrets.token_urlsafe(32)
+    websocket = secrets.token_hex(32)
+    instance = secrets.token_hex(16)
+    if stale:
+        write_capability_record(http_capability, websocket, instance)
+
+    occupant = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            ("import runpy;m=runpy.run_path(%r);m['serve_occupant'](%r,%r,%r,%r,%r)")
+            % (__file__, stale, http_capability, instance, HTTP_PORT, WS_PORT),
+        ],
+        stdout=(log_dir / f"{mode}-occupant.log").open("wb"),
+        stderr=subprocess.STDOUT,
+    )
+    editor = None
+    editor_output = None
+    try:
+        occupant_log = log_dir / f"{mode}-occupant.log"
+        wait_for_log(occupant_log, OCCUPANT_READY_MARKER, occupant, timeout)
+        editor_log = log_dir / f"godot-{mode}-smoke.log"
+        editor, editor_output = start_editor(
+            godot, project, editor_log, editor_environment(capability_dir)
+        )
+        if stale:
+            wait_for_log(occupant_log, PROBE_MARKER, occupant, timeout)
+        else:
+            time.sleep(min(8.0, timeout))
+        if editor.poll() is not None:
+            raise SmokeError(f"editor exited during {mode} diagnosis")
+        if occupant.poll() is not None:
+            raise SmokeError(f"{mode} occupant was killed without explicit authorization")
+        print(f"PASS: {mode} occupant detected and left running")
+        return 0
+    finally:
+        terminate(editor)
+        terminate(occupant)
+        if editor_output is not None:
+            editor_output.close()
+
+
+async def reload_and_probe(http_capability: str) -> tuple[dict, dict]:
+    transport = StreamableHttpTransport(
+        f"http://127.0.0.1:{HTTP_PORT}/mcp",
+        headers={"Authorization": f"Bearer {http_capability}"},
+    )
+    ## `editor_reload_plugin` legitimately waits up to the server's 90 s
+    ## reconnect budget while the editor finishes its scan and re-registers.
+    async with Client(transport, timeout=120, init_timeout=30) as client:
+        deadline = time.monotonic() + 60
+        while True:
+            sessions = await client.call_tool("session_manage", {"op": "list"})
+            payload = sessions.structured_content or sessions.data or {}
+            if int(payload.get("count", 0)) > 0:
+                break
+            if time.monotonic() >= deadline:
+                raise SmokeError("editor never registered with external server")
+            await asyncio.sleep(0.5)
+        reload_result = await client.call_tool("editor_reload_plugin", {})
+        state_result = await client.call_tool("editor_state", {})
+        return (
+            reload_result.structured_content or reload_result.data or {},
+            state_result.structured_content or state_result.data or {},
+        )
+
+
+def run_compatible_reload(
+    godot: str,
+    project: Path,
+    log_dir: Path,
+    capability_dir: Path,
+    version: str,
+) -> int:
+    http_capability = secrets.token_urlsafe(32)
+    websocket = secrets.token_hex(32)
+    environment = editor_environment(capability_dir)
+    environment["GODOT_AI_HTTP_CAPABILITY"] = http_capability
+    environment["GODOT_AI_WS_TOKEN"] = websocket
+    server_log = (log_dir / "stale-compatible-external-server.log").open("wb")
+    server = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "godot_ai",
+            "--transport",
+            "streamable-http",
+            "--port",
+            str(HTTP_PORT),
+            "--ws-port",
+            str(WS_PORT),
+        ],
+        env=environment,
+        stdout=server_log,
+        stderr=subprocess.STDOUT,
+    )
+    editor = None
+    editor_output = None
+    try:
+        wait_for_status(http_capability, version, server)
+        editor, editor_output = start_editor(
+            godot,
+            project,
+            log_dir / "godot-stale-compatible-reload-smoke.log",
+            environment,
+        )
+        reload_result, state = asyncio.run(reload_and_probe(http_capability))
+        if reload_result.get("status") != "reloaded":
+            raise SmokeError(f"reload failed: {reload_result}")
+        if not state.get("godot_version"):
+            raise SmokeError(f"replacement editor did not answer: {state}")
+        if server.poll() is not None:
+            raise SmokeError("adopted external server was killed during reload")
+        wait_for_status(http_capability, version, server)
+        print("PASS: capability-pair external adoption survived plugin reload")
+        return 0
+    finally:
+        terminate(editor)
+        terminate(server)
+        if editor_output is not None:
+            editor_output.close()
+        server_log.close()
+
+
+def main() -> int:
+    global HTTP_PORT, WS_PORT
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--mode",
+        choices=("stale", "foreign", "stale-compatible-reload"),
+        default="stale",
+    )
+    parser.add_argument("--log-dir", default=".")
+    parser.add_argument("--timeout", type=float, default=90.0)
+    parser.add_argument("--http-port", type=int, default=HTTP_PORT)
+    parser.add_argument("--ws-port", type=int, default=WS_PORT)
+    parser.add_argument("--project", default=str(DEFAULT_PROJECT))
+    args = parser.parse_args()
+    HTTP_PORT = args.http_port
+    WS_PORT = args.ws_port
+
+    log_dir = Path(args.log_dir).resolve()
+    log_dir.mkdir(parents=True, exist_ok=True)
+    wait_for_free_ports()
+    godot = find_godot()
+    project = Path(args.project).resolve()
+
+    temporary_capability_dir = None
+    if os.name != "nt":
+        temporary_capability_dir = tempfile.TemporaryDirectory(
+            prefix="godot-ai-v4-capabilities-",
+            dir=secure_capability_temp_parent(),
+        )
+        # The plugin snapshots this explicit path on the main thread before
+        # lifecycle workers start; no worker needs to re-read HOME/getenv.
+        os.environ["GODOT_AI_CAPABILITY_DIR"] = temporary_capability_dir.name
+    capability_dir = capability_directory()
+    existing_record = capability_path().read_bytes() if capability_path().exists() else None
+    try:
+        if args.mode == "stale-compatible-reload":
+            return run_compatible_reload(godot, project, log_dir, capability_dir, plugin_version())
+        return run_occupant_mode(args.mode, godot, project, log_dir, args.timeout, capability_dir)
+    except Exception as exc:  # smoke runner: always print artifact pointers
+        print(f"FAIL: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        path = capability_path()
+        if existing_record is None:
+            path.unlink(missing_ok=True)
+        else:
+            path.write_bytes(existing_record)
+        if temporary_capability_dir is not None:
+            temporary_capability_dir.cleanup()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

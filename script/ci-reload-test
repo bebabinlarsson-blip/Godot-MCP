@@ -1,0 +1,408 @@
+#!/usr/bin/env bash
+# Smoke-test the editor_reload_plugin tool in CI.
+# Use --stress for ten reloads followed by the full handler suite (nightly).
+# 1. Creates a node (cube) via the OLD plugin
+# 2. Reloads the plugin, verifies new session ID
+# 3. Checks the log buffer is fresh (proves handlers were rebuilt)
+# 4. Finds the cube via the NEW plugin (proves scene tree continuity)
+#
+# Expects: Python server reachable at $MCP_SERVER_URL (default :8000, set in
+# _ci_env.sh), Godot editor with plugin connected.
+set -euo pipefail
+STRESS=0
+if [ "${1:-}" = "--stress" ]; then STRESS=1; shift; fi
+PYTHON_CMD="${1:-${PYTHON_CMD:-python}}"
+if [ "$#" -gt 0 ]; then shift; fi
+if [ "${1:-}" = "--stress" ]; then STRESS=1; shift; fi
+if [ "$#" -ne 0 ] || [[ "$PYTHON_CMD" == --* ]]; then
+  echo "Usage: $0 [--stress] [python-command]" >&2
+  exit 2
+fi
+export PYTHON_CMD
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$SCRIPT_DIR/_ci_env.sh"
+source "$SCRIPT_DIR/_ci_session_guard.sh"
+
+SERVER_URL="$MCP_SERVER_URL"
+ci_load_http_auth
+readonly MANAGED_RELOAD_TIMEOUT_SECONDS=60
+readonly MANAGED_RELOAD_POLL_SECONDS=0.5
+readonly MCP_CALL_TIMEOUT_SECONDS=90
+HEADERS=()
+SESSION_ID=""
+REQ_ID=0
+
+refresh_http_headers() {
+  HEADERS=(
+    "${HTTP_AUTH_HEADERS[@]}"
+    -H "Content-Type: application/json"
+    -H "Accept: application/json, text/event-stream"
+  )
+}
+
+source "$SCRIPT_DIR/_ci_mcp.sh"
+trap close_mcp_session EXIT
+
+refresh_http_headers
+
+# Helper: call an MCP tool and extract the content JSON from the SSE response.
+# Prints parsed content to stdout; diagnostics to stderr. Returns 1 on failure.
+mcp_call() {
+  local tool="$1"
+  local args="$2"
+  if [ "$tool" != "session_manage" ] && [ -n "${TARGET_GODOT_SESSION:-}" ]; then
+    args=$(ci_pin_tool_args "$args" "$TARGET_GODOT_SESSION") || return 1
+  fi
+  REQ_ID=$((REQ_ID + 1))
+  local raw
+  raw=$(curl -s --max-time "$MCP_CALL_TIMEOUT_SECONDS" "$SERVER_URL" -X POST "${HEADERS[@]}" \
+    -H "Mcp-Session-Id: $SESSION_ID" \
+    -d "{\"jsonrpc\":\"2.0\",\"id\":$REQ_ID,\"method\":\"tools/call\",\"params\":{\"name\":\"$tool\",\"arguments\":$args}}")
+  echo "$raw" | "$PYTHON_CMD" -c "
+import json, sys
+raw = sys.stdin.read()
+for line in raw.split('\n'):
+    if line.startswith('data: '):
+        data = json.loads(line[6:])
+        result = data.get('result', {})
+        if result.get('isError'):
+            msg = result.get('content', [{}])[0].get('text', 'unknown error')
+            print(f'Tool error: {msg}', file=sys.stderr)
+            print('{}')
+            sys.exit(1)
+        content = result.get('structuredContent', {})
+        if not content:
+            text = result.get('content', [{}])[0].get('text', '{}')
+            content = json.loads(text)
+        print(json.dumps(content))
+        sys.exit(0)
+print(f'No SSE data in response (first 500 chars): {raw[:500]}', file=sys.stderr)
+print('{}')
+sys.exit(1)
+"
+}
+
+# Helper: call mcp_call and capture output. On failure, print the captured output and exit.
+mcp_call_or_die() {
+  local label="$1"
+  shift
+  local result
+  if ! result=$(mcp_call "$@"); then
+    echo "FAIL at $label (tool: $1)"
+    echo "Captured output: $result"
+    exit 1
+  fi
+  echo "$result"
+}
+
+wait_for_managed_reload() {
+  local old_capability="$1"
+  local old_godot_session="$2"
+  local expected_project="$3"
+  local deadline=$((SECONDS + MANAGED_RELOAD_TIMEOUT_SECONDS))
+  local candidate_capability=""
+  local initialized_capability=""
+  local latest_sessions='{"sessions":[]}'
+  local replacement=""
+  local selection_status=0
+  local saw_rotated_capability=0
+
+  while (( SECONDS < deadline )); do
+    if ci_load_http_auth 2>/dev/null && \
+      [ "$HTTP_AUTH_CAPABILITY" != "$old_capability" ]; then
+      saw_rotated_capability=1
+      if [ "$HTTP_AUTH_CAPABILITY" != "$candidate_capability" ]; then
+        candidate_capability="$HTTP_AUTH_CAPABILITY"
+        initialized_capability=""
+        close_mcp_session
+        refresh_http_headers
+      fi
+
+      if [ "$initialized_capability" != "$candidate_capability" ]; then
+        if initialize_mcp_session; then
+          initialized_capability="$candidate_capability"
+        else
+          sleep "$MANAGED_RELOAD_POLL_SECONDS"
+          continue
+        fi
+      fi
+
+      if latest_sessions=$(mcp_call session_manage '{"op":"list"}' 2>/dev/null); then
+        if replacement=$(ci_select_replacement_session \
+          "$latest_sessions" "$expected_project" "$old_godot_session" 2>/dev/null); then
+          TARGET_GODOT_SESSION="$replacement"
+          echo "Managed reload reconnected: ${old_godot_session:0:12}... -> ${replacement:0:12}..."
+          return 0
+        else
+          selection_status=$?
+          if [ "$selection_status" -ne 2 ]; then
+            echo "ERROR: replacement Godot session selection failed closed" >&2
+            ci_select_replacement_session \
+              "$latest_sessions" "$expected_project" "$old_godot_session" diagnose || true
+            return 1
+          fi
+        fi
+      else
+        # The capability record can be published just before the new listener
+        # is stable. Reinitialize rather than reusing an uncertain HTTP session.
+        initialized_capability=""
+        close_mcp_session
+      fi
+    fi
+    sleep "$MANAGED_RELOAD_POLL_SECONDS"
+  done
+
+  if [ "$saw_rotated_capability" -eq 0 ]; then
+    echo "ERROR: managed reload timed out before the old HTTP capability disappeared" >&2
+  else
+    echo "ERROR: managed reload timed out before a fresh exact-project session appeared" >&2
+    ci_select_replacement_session \
+      "$latest_sessions" "$expected_project" "$old_godot_session" diagnose || true
+  fi
+  return 1
+}
+
+accept_reload_result() {
+  local result="$1"
+  local old_capability="$2"
+  local expected_project="$3"
+  local expected_old_session="$TARGET_GODOT_SESSION"
+  local parsed
+  local status
+  local new_session_id
+
+  if ! parsed=$("$PYTHON_CMD" -c '
+import json
+import sys
+
+expected_old = sys.argv[1]
+try:
+    content = json.load(sys.stdin)
+except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+    raise SystemExit(f"FAIL: editor_reload_plugin returned invalid JSON: {exc}") from None
+if not isinstance(content, dict):
+    raise SystemExit("FAIL: editor_reload_plugin response is not an object")
+status = content.get("status")
+old_id = content.get("old_session_id")
+new_id = content.get("new_session_id")
+if old_id != expected_old:
+    raise SystemExit(
+        f"FAIL: reload acknowledged old_session_id={old_id!r}, expected {expected_old!r}"
+    )
+if status == "reloaded":
+    if not isinstance(new_id, str) or not new_id or new_id == old_id:
+        raise SystemExit("FAIL: reloaded response has no distinct new_session_id")
+    print(f"reloaded\t{new_id}")
+elif status == "reload_initiated":
+    if content.get("transport_will_drop") is not True:
+        raise SystemExit("FAIL: reload_initiated response does not promise a transport drop")
+    if new_id not in (None, ""):
+        raise SystemExit("FAIL: reload_initiated response unexpectedly claims new_session_id")
+    print("reload_initiated\t")
+else:
+    raise SystemExit(
+        f"FAIL: editor_reload_plugin returned unsupported status={status!r}"
+    )
+' "$expected_old_session" <<< "$result"); then
+    return 1
+  fi
+
+  IFS=$'\t' read -r status new_session_id <<< "$parsed"
+  if [ "$status" = "reloaded" ]; then
+    TARGET_GODOT_SESSION="$new_session_id"
+    echo "External reload completed: ${expected_old_session:0:12}... -> ${new_session_id:0:12}..."
+    return 0
+  fi
+  wait_for_managed_reload "$old_capability" "$expected_old_session" "$expected_project"
+}
+
+# Initialize MCP session.
+echo "Initializing MCP session..."
+if ! initialize_mcp_session; then
+  echo "ERROR: Could not initialize MCP session"
+  exit 1
+fi
+
+# Resolve and pin the exact editor before the first scene mutation. An
+# explicit pin intentionally bypasses the checkout path check for supported
+# cross-worktree smoke runs; an implicit lone session must match (#885).
+echo "Verifying Godot session..."
+SESSIONS=$(mcp_call_or_die "session list" session_manage '{"op":"list"}')
+if ! TARGET_GODOT_SESSION=$(ci_select_godot_session \
+  "$SESSIONS" "$REPO_ROOT/test_project" "${GODOT_AI_SESSION_ID:-}"); then
+  exit 1
+fi
+echo "Godot session selected: $TARGET_GODOT_SESSION"
+if ! EXPECTED_GODOT_PROJECT=$(ci_project_for_session \
+  "$SESSIONS" "$TARGET_GODOT_SESSION"); then
+  exit 1
+fi
+
+# --- Step 1: Create a cube with the OLD plugin ---
+echo "Creating test node with old plugin..."
+CREATE_RESULT=$(mcp_call_or_die "node_create" node_create '{"type":"MeshInstance3D","name":"ReloadTestCube","parent_path":""}')
+echo "$CREATE_RESULT" | "$PYTHON_CMD" -c "
+import json, sys
+content = json.loads(sys.stdin.read())
+path = content.get('path', '')
+if not path:
+    print(f'FAIL: node_create did not return a path: {content}')
+    sys.exit(1)
+print(f'Created node: {path}')
+"
+
+# --- Step 2: Reload the plugin ---
+echo "Calling editor_reload_plugin..."
+OLD_HTTP_CAPABILITY="$HTTP_AUTH_CAPABILITY"
+RELOAD_RESULT=$(mcp_call_or_die "editor_reload_plugin" editor_reload_plugin '{}')
+if ! accept_reload_result \
+  "$RELOAD_RESULT" "$OLD_HTTP_CAPABILITY" "$EXPECTED_GODOT_PROJECT"; then
+  exit 1
+fi
+
+# --- Step 3: Verify log buffer is fresh (proves plugin fully rebuilt) ---
+echo "Checking log buffer..."
+LOGS_RESULT=$(mcp_call_or_die "logs_read" logs_read '{"count":20}')
+echo "$LOGS_RESULT" | "$PYTHON_CMD" -c "
+import json, sys
+content = json.loads(sys.stdin.read())
+lines = content.get('lines', [])
+total = content.get('total_count', -1)
+if not lines:
+    print('FAIL: logs_read returned no lines after reload')
+    sys.exit(1)
+if 'plugin loaded' not in lines[0]:
+    print(f'FAIL: first log line should be \"plugin loaded\", got: {lines[0]!r}')
+    sys.exit(1)
+if total > 20:
+    print(f'WARN: log buffer has {total} lines — expected a small fresh buffer')
+print(f'Log buffer OK: {total} lines, starts with \"{lines[0]}\"')
+"
+
+# --- Step 4: Find the cube with the NEW plugin (scene tree survived) ---
+echo "Finding test node with new plugin..."
+FIND_RESULT=$(mcp_call_or_die "node_find" node_find '{"name":"ReloadTestCube"}')
+echo "$FIND_RESULT" | "$PYTHON_CMD" -c "
+import json, sys
+content = json.loads(sys.stdin.read())
+nodes = content.get('nodes', [])
+if not nodes:
+    print('FAIL: ReloadTestCube not found after reload — scene tree did not survive')
+    sys.exit(1)
+node = nodes[0]
+print(f'Found node: {node.get(\"name\", \"?\")} ({node.get(\"type\", \"?\")})')
+"
+
+# --- Step 5: Verify editor_state works ---
+echo "Verifying editor_state..."
+HEALTH_RESULT=$(mcp_call_or_die "editor_state" editor_state '{}')
+echo "$HEALTH_RESULT" | "$PYTHON_CMD" -c "
+import json, sys
+content = json.loads(sys.stdin.read())
+version = content.get('godot_version', '')
+project = content.get('project_name', '')
+if not version:
+    print(f'FAIL: editor_state missing godot_version after reload')
+    print(f'Full response: {content}')
+    sys.exit(1)
+print(f'Post-reload health OK: {project} on Godot {version}')
+"
+
+# --- Step 6: Exercise the game-logs path (issue #46 crash site) ---
+# Before the cleanup fix in _exit_tree, logs_read(source=game) on the
+# new plugin would segfault at McpGameLogBuffer.get_range's first _storage
+# access. This asserts the handler's typed array stays valid across a reload.
+echo "Verifying logs_read source=game..."
+GAMELOGS_RESULT=$(mcp_call_or_die "logs_read source=game" logs_read '{"count":10,"source":"game"}')
+echo "$GAMELOGS_RESULT" | "$PYTHON_CMD" -c "
+import json, sys
+content = json.loads(sys.stdin.read())
+# A fresh editor has no game logs yet — we only care the call returned
+# without SIGSEGV and reports a sane shape. 'source' should echo 'game'.
+if content.get('source') != 'game':
+    print(f'FAIL: logs_read source=game returned wrong source: {content}')
+    sys.exit(1)
+total = content.get('total_count', -1)
+if total < 0:
+    print(f'FAIL: logs_read source=game missing total_count: {content}')
+    sys.exit(1)
+print(f'Game-logs path OK: total={total}, returned={content.get(\"returned_count\", 0)}')
+"
+
+# Normal CI already ran the full handler suite. The probes above prove a
+# single reload preserves the scene and rebuilds a working plugin session.
+if [ "$STRESS" -eq 0 ]; then
+  echo "Reload smoke test passed (1 reload)"
+  exit 0
+fi
+
+# --- Step 7: Multi-reload churn (cumulative corruption regression) ---
+# The original issue report saw crashes after ~10 reloads. Do 9 more
+# reloads (10 total with step 2 above) interleaved with cheap tool
+# calls — catches both single-reload and cumulative-state regressions.
+echo "Running 9 more reload iterations..."
+for i in $(seq 2 10); do
+  OLD_HTTP_CAPABILITY="$HTTP_AUTH_CAPABILITY"
+  RELOAD_ITER_RESULT=$(mcp_call_or_die "editor_reload_plugin #$i" editor_reload_plugin '{}')
+  if ! accept_reload_result \
+    "$RELOAD_ITER_RESULT" "$OLD_HTTP_CAPABILITY" "$EXPECTED_GODOT_PROJECT"; then
+    exit 1
+  fi
+  # Rotate the post-reload probe across the three reported-stable tools.
+  case $(( i % 3 )) in
+    0)
+      mcp_call_or_die "editor_state after reload #$i" editor_state '{}' > /dev/null
+      ;;
+    1)
+      mcp_call_or_die "node_find after reload #$i" node_find '{"name":"ReloadTestCube"}' > /dev/null
+      ;;
+    2)
+      mcp_call_or_die "logs_read source=game after reload #$i" logs_read '{"count":5,"source":"game"}' > /dev/null
+      ;;
+  esac
+  echo "  reload #$i OK"
+done
+
+# --- Step 8: Post-churn test_run (ResourceSaver.save path from issue #46) ---
+# The original crash report was "~10 reloads then run the test suite" —
+# the failing backtrace went through ResourceSaver::save during test
+# cleanup. Running the suite here exercises that exact path on top of
+# all the accumulated reload state.
+#
+# Exclude Camera2D current-state timing assertions here only. They remain in
+# the normal handler test pass above; reload smoke is guarding reload churn and
+# cleanup survivability, not synchronous viewport-current timing after undo.
+# Both excluded tests pass green in `Run handler tests` but flake on Windows
+# in the post-reload-churn re-run (refs #278 / PR #296). The comma-separated
+# form is parsed by `McpTestRunner._parse_exclusions` — see
+# `plugin/addons/godot_ai/testing/test_runner.gd`.
+echo "Running GDScript test suite on reloaded plugin..."
+TESTS_RESULT=$(mcp_call_or_die "test_run post-churn" test_run '{"verbose":false,"exclude_test_name":"test_configure_current_sibling_unmark_single_undo,test_get_returns_current_when_path_empty"}')
+echo "$TESTS_RESULT" | "$PYTHON_CMD" -c "
+import json, sys
+content = json.loads(sys.stdin.read())
+failed = content.get('failed', -1)
+passed = content.get('passed', 0)
+skipped = content.get('skipped', 0)
+load_errors = content.get('load_errors', []) or []
+if failed != 0:
+    print(f'FAIL: {failed} test(s) failed after reload churn (passed={passed})')
+    for f in content.get('failures', []):
+        print(f'  FAIL: {f[\"suite\"]}.{f[\"test\"]}: {f[\"message\"]}')
+    sys.exit(1)
+## Same guards as ci-godot-tests: silent test-loss must not slip past the
+## post-churn re-run either — a reload that breaks suite discovery would
+## otherwise pass with failed=0.
+if load_errors:
+    print(f'FAIL: {len(load_errors)} test file(s) failed to load after reload churn:')
+    for le in load_errors:
+        print(f'  - {le}')
+    sys.exit(1)
+if passed + skipped == 0:
+    print('FAIL: No tests ran after reload churn — plugin may not have reconnected')
+    sys.exit(1)
+print(f'Post-churn test suite OK: {passed} passed, {failed} failed, {skipped} skipped')
+"
+
+echo "Reload smoke test passed"

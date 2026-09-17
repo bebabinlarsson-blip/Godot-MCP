@@ -1,0 +1,208 @@
+"""Readiness gating for write operations."""
+
+from __future__ import annotations
+
+import asyncio
+import time
+from typing import TYPE_CHECKING
+
+from godot_ai.protocol.errors import EditorNotReadySubCode, ErrorCode
+from godot_ai.sessions.registry import Session
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from godot_ai.runtime.direct import DirectRuntime
+
+## #651 stage 2: bounded hold before rejecting on a live-confirmed
+## EDITOR_IMPORTING. Fleet retry-gap telemetry (14 days, N=733 import
+## collisions across 240 installs; P(still importing) measured from
+## same-tool retry success) shows the collision clears fast at first,
+## then plateaus: still-importing 59% at <1s gaps → 29% at 1-3s → 18%
+## at 3-5s → 9% at 5-10s → plateau ~12-15% past 10s. An ~8s cap thus
+## captures nearly every winnable collision; the ~12-17% floor (long or
+## re-triggered imports) is unwinnable by waiting, so past the cap we
+## fail fast with the retryable EDITOR_IMPORTING hint, exactly as
+## before the hold existed. Importing is the ONLY state that gets a
+## hold — the same telemetry shows waits are wrong for every other
+## blocking state ("playing" needs project_manage(op="stop"), not time).
+_IMPORTING_HOLD_CAP_SECONDS = 8.0
+_IMPORTING_HOLD_PROBE_INTERVAL_SECONDS = 0.5
+
+# (message, retryable, hint). Retryable means the condition clears on its own
+# (Godot finishes reimporting); non-retryable requires the caller to change
+# state (stop the game). The ``hint`` is a one-line, action-oriented sentence
+# surfaced to AI callers via the error ``data`` payload — its job is to tell
+# an LLM exactly which tool call (or wait) breaks the stall, so it stops
+# looping the failing write. See PR for the F-EDITOR-NOT-READY-LOOP fix
+# (telemetry showed two users alone producing 89% of EDITOR_NOT_READY
+# errors on plugin v2.5.6, all from caller-side retry loops during
+# ``playing``).
+_READINESS_INFO: dict[str, tuple[str, bool, str]] = {
+    "importing": (
+        "Editor is importing resources — try again shortly",
+        True,
+        (
+            "Editor is importing assets. Wait briefly and retry — "
+            "readiness will update via the response envelope."
+        ),
+    ),
+    "playing": (
+        'Editor is in play mode — call project_manage(op="stop") to stop the game, then retry',
+        False,
+        (
+            'Editor is playing the scene. Call project_manage(op="stop") '
+            "(or wait for the user to stop the game) before retrying writes."
+        ),
+    ),
+}
+
+## #651 stage 1: attribute each blocking readiness state to an
+## EDITOR_NOT_READY sub-code (carried in ``data.sub_code``; top-level code
+## unchanged) so telemetry can split the opaque bucket per state.
+_READINESS_SUB_CODE: dict[str, EditorNotReadySubCode] = {
+    "importing": EditorNotReadySubCode.EDITOR_IMPORTING,
+    "playing": EditorNotReadySubCode.EDITOR_PLAYING,
+}
+
+def sync_readiness_from_snapshot(runtime: "DirectRuntime", value: object) -> bool:
+    """Copy an authoritative readiness snapshot onto the active session.
+
+    Used by handlers that receive a live readiness from the plugin
+    (`editor_state`'s reply, `project_stop`'s `readiness_after`). Now
+    largely redundant with the per-response envelope sync that the
+    transport layer applies to every command reply, but kept so the
+    `data.readiness` / `data.readiness_after` payload paths still heal
+    the cache for callers that bypass the envelope (in-process tests
+    that wire a custom client without going through the WebSocket).
+    """
+    session_id = runtime.active_session_id
+    if session_id is None:
+        return False
+    return runtime.record_session_readiness(session_id, value)
+
+
+async def _probe_readiness(runtime: "DirectRuntime", session_id: str) -> bool:
+    """One ``get_editor_state`` round trip that heals cached readiness.
+
+    Production replies self-heal the cache via the WebSocket transport's
+    envelope sync; the explicit table transition here
+    covers in-process tests that wire a custom client and bypass the
+    transport. Returns False when the probe itself failed (timeout,
+    disconnect, plugin error) — the caller then enforces against the
+    cached value rather than escalating the failure mode from "blocked"
+    to "connection error"; the actual write would have failed anyway.
+    """
+    try:
+        result = await runtime.send_command(
+            "get_editor_state",
+            timeout=2.0,
+            hint_policy="retain",
+        )
+    except Exception:
+        return False
+    runtime.record_session_readiness(session_id, result.get("readiness"))
+    return True
+
+
+async def require_writable_async(
+    runtime: "DirectRuntime",
+    *,
+    clock: "Callable[[], float]" = time.monotonic,
+    sleep: "Callable[[float], Awaitable[None]]" = asyncio.sleep,
+) -> None:
+    """Check that the active session is in a writable state, with a live
+    readiness probe to defeat a stale cache and a bounded hold when the
+    editor is mid-import.
+
+    Fast path (cache says ``ready`` / ``no_scene``): no probe, no network.
+
+    Slow path (cache says ``importing`` / ``playing``): the cache may be
+    stale because a `readiness_changed` event was lost in transit (a brief
+    WebSocket disconnect), or coalesced inside the plugin's
+    ``pause_processing`` window around save/play frames. Before rejecting
+    a write, fire one ``get_editor_state`` round trip. If the editor
+    really is busy, the probe confirms the cache and we enforce as
+    before. If the plugin is unreachable, trust the cached value and
+    raise the gating error so the caller gets a clean
+    ``EDITOR_NOT_READY`` instead of a connection error.
+
+    Bounded hold (#651 stage 2): when the probe *confirms* ``importing``,
+    don't reject yet — re-probe every
+    ``_IMPORTING_HOLD_PROBE_INTERVAL_SECONDS`` for up to
+    ``_IMPORTING_HOLD_CAP_SECONDS`` (tuning telemetry above the
+    constants). Most import windows clear inside the cap, and the write
+    then proceeds as if it never collided. No intermediate errors are
+    emitted while holding: the caller sees either a clean pass-through
+    or, past the cap, exactly the pre-hold error. Only ``importing``
+    holds — ``playing`` (and any other blocking state) still fails fast,
+    because waiting provably doesn't clear those. ``clock`` and ``sleep``
+    exist for tests to fake time; production callers never pass them.
+
+    Raises GodotCommandError with EDITOR_NOT_READY if the editor is
+    importing or playing.  The ``ready`` and ``no_scene`` states are
+    allowed through — individual handlers already reject when no scene
+    is open.  If no session exists, this is a no-op; the downstream
+    ``send_command`` will raise on its own.
+
+    The raised error carries ``data={"editor_state": str, "retryable": bool,
+    "hint": str}`` so callers can distinguish a transient ``importing`` window
+    (retry with backoff) from a terminal ``playing`` state (stop the game
+    first) AND get an explicit one-line recovery instruction. The hint is
+    what stops the EDITOR_NOT_READY-loop pattern: without it, AI callers
+    just retry the failing write until the user notices.
+    """
+    session = runtime.get_active_session()
+    if session is None:
+        return
+    session_id = session.session_id
+    if _READINESS_INFO.get(session.readiness) is None:
+        return  # cache says writable — fast path, no probe
+
+    probed = await _probe_readiness(runtime, session_id)
+    session = runtime.get_session(session_id) or session
+    if probed and session.readiness == "importing":
+        ## Live-confirmed import in flight — hold instead of bouncing the
+        ## write back for the caller to blind-retry. A failed initial
+        ## probe skips the hold entirely: waiting can't fix a dead link.
+        deadline = clock() + _IMPORTING_HOLD_CAP_SECONDS
+        while (remaining := deadline - clock()) > 0:
+            ## Clamp the final sleep so the hold never overshoots the cap
+            ## when cap isn't an exact multiple of the interval — the last
+            ## re-probe then lands exactly at the deadline.
+            await sleep(min(_IMPORTING_HOLD_PROBE_INTERVAL_SECONDS, remaining))
+            if not await _probe_readiness(runtime, session_id):
+                break
+            session = runtime.get_session(session_id) or session
+            if session.readiness != "importing":
+                break
+
+    _enforce_blocking_state(runtime.get_session(session_id) or session)
+
+
+def _enforce_blocking_state(session: "Session | None") -> None:
+    if session is None:
+        return
+    info = _READINESS_INFO.get(session.readiness)
+    if info is None:
+        return
+    ## Lazy import keeps error construction outside the policy constants.
+    from godot_ai.godot_client.client import GodotCommandError
+
+    message, retryable, hint = info
+    ## ``sub_code`` first so it leads the agent-visible ``[k=v, ...]``
+    ## suffix that GodotCommandError builds from data. ``editor_state``
+    ## stays for callers/tests that key on the pre-#651 payload shape.
+    data: dict[str, object] = {
+        "editor_state": session.readiness,
+        "retryable": retryable,
+        "hint": hint,
+    }
+    sub_code = _READINESS_SUB_CODE.get(session.readiness)
+    if sub_code is not None:
+        data = {"sub_code": sub_code.value, **data}
+    raise GodotCommandError(
+        code=ErrorCode.EDITOR_NOT_READY,
+        message=message,
+        data=data,
+    )

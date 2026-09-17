@@ -1,0 +1,256 @@
+#!/usr/bin/env python3
+"""Select and pin the Godot editor session used by shell CI runners.
+
+The ci-* scripts may be run locally against a server shared by several editor
+worktrees.  A lone session is not automatically trustworthy: the configured
+MCP URL can point at an unrelated project.  This helper keeps the selection and
+path-normalization policy in one place so every shell runner fails closed in
+the same way.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import sys
+from pathlib import Path
+from typing import Any
+
+
+def _normalized_project_path(raw: str) -> str:
+    """Return a comparison form for a Godot or shell-reported project path."""
+
+    value = raw.strip().replace("\\", "/")
+    if os.name == "nt":
+        # Git Bash reports ``/c/path`` while Godot reports ``C:/path``.
+        match = re.match(r"^/([A-Za-z])(?:/(.*))?$", value)
+        if match:
+            suffix = match.group(2) or ""
+            value = f"{match.group(1)}:/{suffix}"
+
+    resolved = Path(value).expanduser().resolve(strict=False)
+    return os.path.normcase(os.path.normpath(str(resolved))).replace("\\", "/")
+
+
+def _read_object() -> dict[str, Any]:
+    try:
+        payload = json.load(sys.stdin)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"input is not valid JSON: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("input must be a JSON object")
+    return payload
+
+
+def _sessions(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    sessions = payload.get("sessions")
+    if not isinstance(sessions, list):
+        raise ValueError("session response is missing a sessions array")
+    if not all(isinstance(session, dict) for session in sessions):
+        raise ValueError("session response contains a non-object session")
+    return sessions
+
+
+def _print_sessions(sessions: list[dict[str, Any]]) -> None:
+    print("Connected sessions:", file=sys.stderr)
+    if not sessions:
+        print("  (none)", file=sys.stderr)
+        return
+    for session in sessions:
+        session_id = session.get("session_id", "?")
+        project_path = session.get("project_path", "?")
+        print(f"  {session_id}  {project_path}", file=sys.stderr)
+
+
+def _select_session(payload: dict[str, Any], *, expected_project: str, explicit_pin: str) -> str:
+    sessions = _sessions(payload)
+
+    if explicit_pin:
+        matches = [session for session in sessions if session.get("session_id") == explicit_pin]
+        if len(matches) != 1:
+            print(
+                f"ERROR: GODOT_AI_SESSION_ID={explicit_pin!r} is not connected.",
+                file=sys.stderr,
+            )
+            _print_sessions(sessions)
+            raise SystemExit(1)
+        return explicit_pin
+
+    if len(sessions) != 1:
+        if not sessions:
+            print("ERROR: no Godot session is connected.", file=sys.stderr)
+        else:
+            print(
+                f"ERROR: {len(sessions)} Godot sessions are connected; "
+                "refusing to guess which one to drive.",
+                file=sys.stderr,
+            )
+        _print_sessions(sessions)
+        if sessions:
+            print(
+                "Re-run with GODOT_AI_SESSION_ID set to the one you mean.",
+                file=sys.stderr,
+            )
+        raise SystemExit(1)
+
+    selected = sessions[0]
+    session_id = selected.get("session_id")
+    project_path = selected.get("project_path")
+    if not isinstance(session_id, str) or not session_id:
+        raise ValueError("connected session is missing a non-empty session_id")
+    if not isinstance(project_path, str) or not project_path:
+        raise ValueError("connected session is missing a non-empty project_path")
+
+    expected_normalized = _normalized_project_path(expected_project)
+    actual_normalized = _normalized_project_path(project_path)
+    if actual_normalized != expected_normalized:
+        print(
+            "ERROR: the only connected Godot session belongs to a different project; "
+            "refusing to drive it.",
+            file=sys.stderr,
+        )
+        print(f"Expected project:  {expected_project}", file=sys.stderr)
+        print(f"Connected project: {project_path}", file=sys.stderr)
+        _print_sessions(sessions)
+        print(
+            "Check MCP_SERVER_URL, or set GODOT_AI_SESSION_ID explicitly if this "
+            "cross-project target is intentional.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
+    return session_id
+
+
+def _project_for_session(payload: dict[str, Any], *, session_id: str) -> str:
+    """Return the project bound to exactly one selected session."""
+
+    if not session_id:
+        raise ValueError("session_id must be non-empty")
+    sessions = _sessions(payload)
+    matches = [session for session in sessions if session.get("session_id") == session_id]
+    if len(matches) != 1:
+        print(
+            f"ERROR: selected Godot session {session_id!r} is not exactly one live session.",
+            file=sys.stderr,
+        )
+        _print_sessions(sessions)
+        raise SystemExit(1)
+    project_path = matches[0].get("project_path")
+    if not isinstance(project_path, str) or not project_path:
+        raise ValueError(f"selected session {session_id!r} has no valid project_path")
+    return project_path
+
+
+def _select_replacement_session(
+    payload: dict[str, Any], *, expected_project: str, old_session_id: str
+) -> str | None:
+    """Select one fresh session for the same project, or report not-ready."""
+
+    if not expected_project:
+        raise ValueError("expected_project must be non-empty")
+    if not old_session_id:
+        raise ValueError("old_session_id must be non-empty")
+
+    sessions = _sessions(payload)
+    expected_normalized = _normalized_project_path(expected_project)
+    matches: list[str] = []
+    for session in sessions:
+        session_id = session.get("session_id")
+        project_path = session.get("project_path")
+        if not isinstance(session_id, str) or not session_id:
+            raise ValueError("connected session is missing a non-empty session_id")
+        if not isinstance(project_path, str) or not project_path:
+            raise ValueError(
+                f"connected session {session_id!r} is missing a non-empty project_path"
+            )
+        if session_id == old_session_id:
+            continue
+        if _normalized_project_path(project_path) == expected_normalized:
+            matches.append(session_id)
+
+    if len(matches) > 1:
+        print(
+            f"ERROR: {len(matches)} fresh Godot sessions belong to the expected project; "
+            "refusing to guess which reload replacement to drive.",
+            file=sys.stderr,
+        )
+        _print_sessions(sessions)
+        raise SystemExit(1)
+    return matches[0] if matches else None
+
+
+def _pin_args(payload: dict[str, Any], *, session_id: str) -> dict[str, Any]:
+    existing = payload.get("session_id")
+    if existing not in (None, "", session_id):
+        raise ValueError(
+            f"tool arguments already target session_id={existing!r}, "
+            f"not selected session {session_id!r}"
+        )
+    payload["session_id"] = session_id
+    return payload
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    select = subparsers.add_parser("select")
+    select.add_argument("--expected-project", required=True)
+    select.add_argument("--pin", default="")
+
+    project = subparsers.add_parser("project-for-session")
+    project.add_argument("--session-id", required=True)
+
+    replacement = subparsers.add_parser("select-replacement")
+    replacement.add_argument("--expected-project", required=True)
+    replacement.add_argument("--old-session-id", required=True)
+    replacement.add_argument("--diagnose", action="store_true")
+
+    pin_args = subparsers.add_parser("pin-args")
+    pin_args.add_argument("--session-id", required=True)
+    return parser
+
+
+def main() -> int:
+    args = _build_parser().parse_args()
+    try:
+        payload = _read_object()
+        if args.command == "select":
+            print(
+                _select_session(
+                    payload,
+                    expected_project=args.expected_project,
+                    explicit_pin=args.pin,
+                )
+            )
+        elif args.command == "project-for-session":
+            print(_project_for_session(payload, session_id=args.session_id))
+        elif args.command == "select-replacement":
+            replacement = _select_replacement_session(
+                payload,
+                expected_project=args.expected_project,
+                old_session_id=args.old_session_id,
+            )
+            if replacement is None:
+                if args.diagnose:
+                    print(
+                        "ERROR: no fresh Godot session for the expected project "
+                        "appeared before the reload deadline.",
+                        file=sys.stderr,
+                    )
+                    _print_sessions(_sessions(payload))
+                return 2
+            print(replacement)
+        else:
+            print(json.dumps(_pin_args(payload, session_id=args.session_id), separators=(",", ":")))
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

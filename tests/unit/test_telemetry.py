@@ -1,0 +1,587 @@
+"""Unit tests for ``godot_ai.telemetry``.
+
+Covers:
+* ``TelemetryConfig`` opt-out + endpoint validation
+* ``TelemetryCollector`` queue + worker behavior
+* ``hash_session_id`` shape and stability
+* customer_uuid persistence
+* milestone idempotence + on-disk persistence
+"""
+
+from __future__ import annotations
+
+import json
+import time
+import uuid
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
+
+from godot_ai import telemetry as tel
+
+## ``isolated_data_dir`` comes from ``tests/unit/conftest.py``.
+
+
+@pytest.fixture
+def clean_env(monkeypatch) -> None:
+    for name in (
+        "GODOT_AI_DISABLE_TELEMETRY",
+        "DISABLE_TELEMETRY",
+        "GODOT_AI_TELEMETRY_ENDPOINT",
+        "GODOT_AI_TELEMETRY_TIMEOUT",
+        "GODOT_AI_TELEMETRY_ALLOW_LOOPBACK",
+        "GODOT_AI_TELEMETRY_ALLOW_INSECURE_HTTP",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+
+# --- hash_session_id -----------------------------------------------------
+
+
+class TestHashSessionId:
+    def test_empty_returns_empty(self) -> None:
+        assert tel.hash_session_id("") == ""
+        assert tel.hash_session_id(None) == ""
+
+    def test_keeps_4hex_suffix_when_present(self) -> None:
+        result = tel.hash_session_id("my-secret-game@a3f2")
+        assert result.endswith("@a3f2")
+
+    def test_hashes_slug_to_8_hex_chars(self) -> None:
+        result = tel.hash_session_id("my-secret-game@a3f2")
+        head, sep, tail = result.partition("@")
+        assert sep == "@"
+        assert len(head) == 8
+        int(head, 16)  # must be valid hex
+
+    def test_stable_for_same_input(self) -> None:
+        a = tel.hash_session_id("godot-ai@1234")
+        b = tel.hash_session_id("godot-ai@1234")
+        assert a == b
+
+    def test_different_slugs_hash_differently(self) -> None:
+        a = tel.hash_session_id("project-a@1111")
+        b = tel.hash_session_id("project-b@1111")
+        assert a != b
+
+    def test_no_at_falls_back_to_full_hash(self) -> None:
+        result = tel.hash_session_id("legacy-session")
+        assert "@" not in result
+        assert len(result) == 8
+
+    def test_salt_changes_hash_across_uuids(self) -> None:
+        """Issue #529: the same slug must hash differently per install."""
+        a = tel.hash_session_id("common-project@1111", salt="uuid-a")
+        b = tel.hash_session_id("common-project@1111", salt="uuid-b")
+        assert a != b
+        assert a.endswith("@1111") and b.endswith("@1111")
+
+    def test_salt_stable_for_same_uuid_and_slug(self) -> None:
+        a = tel.hash_session_id("common-project@1111", salt="uuid-a")
+        b = tel.hash_session_id("common-project@1111", salt="uuid-a")
+        assert a == b
+
+    def test_salted_differs_from_unsalted(self) -> None:
+        assert tel.hash_session_id("proj@1111", salt="uuid-a") != tel.hash_session_id("proj@1111")
+
+
+# --- TelemetryConfig -----------------------------------------------------
+
+
+class TestTelemetryConfig:
+    def test_default_enabled_uses_baked_in_endpoint(
+        self, monkeypatch, clean_env, isolated_data_dir
+    ) -> None:
+        """A fresh install with no env overrides should resolve to the
+        baked-in production endpoint so the binary actually reports.
+        Regression test for "telemetry on by default" — empty default
+        endpoint used to mean zero traffic even when enabled."""
+        monkeypatch.delenv("GODOT_AI_TELEMETRY_ENDPOINT", raising=False)
+        config = tel.TelemetryConfig()
+        assert config.enabled is True
+        assert config.endpoint == tel.TelemetryConfig.DEFAULT_ENDPOINT
+        ## The bake-in must be a real https URL, not the empty string.
+        assert config.endpoint.startswith("https://")
+
+    def test_isolated_fixture_uses_invalid_endpoint_leak_guard(
+        self, clean_env, isolated_data_dir
+    ) -> None:
+        """Unit tests remove opt-out to exercise enabled telemetry.
+
+        The shared fixture must still prevent an unmocked background
+        worker from POSTing to the baked-in production endpoint.
+        """
+        config = tel.TelemetryConfig()
+        assert config.enabled is True
+        assert config.endpoint == ""
+
+    @pytest.mark.parametrize("var", ["GODOT_AI_DISABLE_TELEMETRY", "DISABLE_TELEMETRY"])
+    def test_opt_out_via_env(self, monkeypatch, clean_env, isolated_data_dir, var: str) -> None:
+        monkeypatch.setenv(var, "true")
+        assert tel.TelemetryConfig().enabled is False
+
+    def test_live_enabled_rereads_env_after_construction(
+        self, monkeypatch, clean_env, isolated_data_dir
+    ) -> None:
+        ## #913: the construction-time ``enabled`` snapshot decides whether
+        ## on-disk artifacts exist; ``live_enabled`` is the send-time answer
+        ## and re-reads the env on every call.
+        monkeypatch.delenv("GODOT_AI_DISABLE_TELEMETRY", raising=False)
+        monkeypatch.delenv("DISABLE_TELEMETRY", raising=False)
+        config = tel.TelemetryConfig()
+        assert config.enabled is True
+        assert config.live_enabled() is True
+        monkeypatch.setenv("GODOT_AI_DISABLE_TELEMETRY", "true")
+        assert config.enabled is True
+        assert config.live_enabled() is False
+
+    @pytest.mark.parametrize("value", ["1", "true", "TRUE", "YES", "On"])
+    def test_truthy_variants(self, monkeypatch, clean_env, isolated_data_dir, value: str) -> None:
+        monkeypatch.setenv("GODOT_AI_DISABLE_TELEMETRY", value)
+        assert tel.TelemetryConfig().enabled is False
+
+    @pytest.mark.parametrize("value", ["", "0", "false", "no", "anything-else"])
+    def test_falsy_variants_keep_enabled(
+        self, monkeypatch, clean_env, isolated_data_dir, value: str
+    ) -> None:
+        monkeypatch.setenv("GODOT_AI_DISABLE_TELEMETRY", value)
+        assert tel.TelemetryConfig().enabled is True
+
+    def test_accepts_https_endpoint(self, monkeypatch, clean_env, isolated_data_dir) -> None:
+        monkeypatch.setenv("GODOT_AI_TELEMETRY_ENDPOINT", "https://example.com/x")
+        assert tel.TelemetryConfig().endpoint == "https://example.com/x"
+
+    def test_rejects_unsupported_scheme(self, monkeypatch, clean_env, isolated_data_dir) -> None:
+        monkeypatch.setenv("GODOT_AI_TELEMETRY_ENDPOINT", "ftp://example.com/")
+        assert tel.TelemetryConfig().endpoint == ""
+
+    def test_rejects_localhost_by_default(self, monkeypatch, clean_env, isolated_data_dir) -> None:
+        monkeypatch.setenv("GODOT_AI_TELEMETRY_ENDPOINT", "http://127.0.0.1:7777")
+        assert tel.TelemetryConfig().endpoint == ""
+
+    def test_allows_loopback_when_opted_in(self, monkeypatch, clean_env, isolated_data_dir) -> None:
+        monkeypatch.setenv("GODOT_AI_TELEMETRY_ENDPOINT", "http://127.0.0.1:7777")
+        monkeypatch.setenv("GODOT_AI_TELEMETRY_ALLOW_LOOPBACK", "1")
+        assert tel.TelemetryConfig().endpoint == "http://127.0.0.1:7777"
+
+    def test_rejects_plain_http_non_loopback(
+        self, monkeypatch, clean_env, isolated_data_dir
+    ) -> None:
+        """Issue #532: cleartext http to a real host must be rejected."""
+        monkeypatch.setenv("GODOT_AI_TELEMETRY_ENDPOINT", "http://telemetry.example.com/events")
+        assert tel.TelemetryConfig().endpoint == ""
+
+    def test_allows_plain_http_with_insecure_flag(
+        self, monkeypatch, clean_env, isolated_data_dir
+    ) -> None:
+        monkeypatch.setenv("GODOT_AI_TELEMETRY_ENDPOINT", "http://telemetry.example.com/events")
+        monkeypatch.setenv("GODOT_AI_TELEMETRY_ALLOW_INSECURE_HTTP", "1")
+        assert tel.TelemetryConfig().endpoint == "http://telemetry.example.com/events"
+
+    def test_loopback_http_still_allowed_with_loopback_flag(
+        self, monkeypatch, clean_env, isolated_data_dir
+    ) -> None:
+        """Loopback http needs only the loopback flag, not the insecure one."""
+        monkeypatch.setenv("GODOT_AI_TELEMETRY_ENDPOINT", "http://localhost:7777/")
+        monkeypatch.setenv("GODOT_AI_TELEMETRY_ALLOW_LOOPBACK", "1")
+        assert tel.TelemetryConfig().endpoint == "http://localhost:7777/"
+
+    def test_default_timeout(self, clean_env, isolated_data_dir) -> None:
+        assert tel.TelemetryConfig().timeout == tel.TelemetryConfig.DEFAULT_TIMEOUT
+
+    def test_timeout_from_env(self, monkeypatch, clean_env, isolated_data_dir) -> None:
+        monkeypatch.setenv("GODOT_AI_TELEMETRY_TIMEOUT", "5.0")
+        assert tel.TelemetryConfig().timeout == 5.0
+
+    def test_invalid_timeout_falls_back(self, monkeypatch, clean_env, isolated_data_dir) -> None:
+        monkeypatch.setenv("GODOT_AI_TELEMETRY_TIMEOUT", "nope")
+        assert tel.TelemetryConfig().timeout == tel.TelemetryConfig.DEFAULT_TIMEOUT
+
+
+class TestTelemetryConfigCleanup:
+    """TelemetryConfig deletes persisted files when telemetry is disabled."""
+
+    def test_cleanup_deletes_existing_files(
+        self, monkeypatch, clean_env, isolated_data_dir: Path
+    ) -> None:
+        """Both persisted files are removed when opt-out is active."""
+        monkeypatch.setenv("GODOT_AI_DISABLE_TELEMETRY", "true")
+        # Pre-create the files so cleanup has something to delete.
+        (isolated_data_dir / "customer_uuid.txt").write_text("fake-uuid")
+        (isolated_data_dir / "milestones.json").write_text("{}")
+
+        tel.TelemetryConfig()  # disabled path → cleanup runs
+
+        assert not (isolated_data_dir / "customer_uuid.txt").exists()
+        assert not (isolated_data_dir / "milestones.json").exists()
+
+    def test_cleanup_is_noop_when_files_absent(
+        self, monkeypatch, clean_env, isolated_data_dir: Path
+    ) -> None:
+        """No error when files don't exist (fresh opt-out)."""
+        monkeypatch.setenv("GODOT_AI_DISABLE_TELEMETRY", "true")
+        # Ensure files are absent.
+        for name in ("customer_uuid.txt", "milestones.json"):
+            (isolated_data_dir / name).unlink(missing_ok=True)
+
+        config = tel.TelemetryConfig()  # must not raise
+        assert config.enabled is False
+
+    def test_cleanup_logs_warning_on_oserror(
+        self, monkeypatch, clean_env, isolated_data_dir: Path, caplog
+    ) -> None:
+        """A deletion failure logs a warning and does not propagate."""
+        import logging
+
+        monkeypatch.setenv("GODOT_AI_DISABLE_TELEMETRY", "true")
+        uuid_file = isolated_data_dir / "customer_uuid.txt"
+        uuid_file.write_text("fake-uuid")
+
+        def _bad_unlink(self_path, missing_ok=False):  # noqa: ARG001
+            raise OSError("permission denied")
+
+        monkeypatch.setattr(type(uuid_file), "unlink", _bad_unlink)
+        # Should complete without raising and must emit a warning:
+        with caplog.at_level(logging.WARNING, logger="godot_ai.telemetry"):
+            config = tel.TelemetryConfig()
+        assert config.enabled is False
+        expected_err = "Could not remove telemetry file customer_uuid.txt"
+        assert any(
+            r.levelno == logging.WARNING and expected_err in r.message for r in caplog.records
+        ), f"Expected warning about customer_uuid.txt, got: {caplog.records}"
+
+
+# --- TelemetryCollector --------------------------------------------------
+
+
+def _drain_to(collector: tel.TelemetryCollector, bucket: list[tel.TelemetryRecord]) -> None:
+    """Replace ``_send`` with a list-appender for assertion-friendly capture."""
+    collector._send = bucket.append  # type: ignore[method-assign]
+
+
+class TestTelemetryCollector:
+    def test_disabled_collector_drops_records(self, clean_env, isolated_data_dir) -> None:
+        with patch.object(tel.TelemetryConfig, "_is_disabled_via_env", return_value=True):
+            collector = tel.TelemetryCollector()
+        sent: list[tel.TelemetryRecord] = []
+        _drain_to(collector, sent)
+        collector.record(tel.RecordType.USAGE, {"x": 1})
+        time.sleep(0.1)
+        assert sent == []
+        collector.shutdown()
+
+    def test_runtime_env_opt_out_drops_later_records(
+        self, monkeypatch, clean_env, isolated_data_dir
+    ) -> None:
+        ## A later in-process opt-out is honored on the next record(); the
+        ## dock checkbox still cannot reach an adopted server's environment.
+        collector = tel.TelemetryCollector()
+        sent: list[tel.TelemetryRecord] = []
+        _drain_to(collector, sent)
+        collector.record(tel.RecordType.USAGE, {"x": 1})
+        for _ in range(40):
+            if sent:
+                break
+            time.sleep(0.05)
+        assert len(sent) == 1
+        monkeypatch.setenv("GODOT_AI_DISABLE_TELEMETRY", "true")
+        collector.record(tel.RecordType.USAGE, {"x": 2})
+        time.sleep(0.1)
+        assert len(sent) == 1
+        collector.shutdown()
+
+    def test_record_enqueues_and_worker_drains(self, clean_env, isolated_data_dir) -> None:
+        collector = tel.TelemetryCollector()
+        sent: list[tel.TelemetryRecord] = []
+        _drain_to(collector, sent)
+
+        collector.record(tel.RecordType.USAGE, {"x": 1})
+        for _ in range(40):  # up to ~2s
+            if sent:
+                break
+            time.sleep(0.05)
+
+        assert len(sent) == 1
+        assert sent[0].record_type is tel.RecordType.USAGE
+        assert sent[0].data == {"x": 1}
+        collector.shutdown()
+
+    def test_session_id_is_hashed_on_record(self, clean_env, isolated_data_dir) -> None:
+        collector = tel.TelemetryCollector()
+        sent: list[tel.TelemetryRecord] = []
+        _drain_to(collector, sent)
+
+        collector.record(
+            tel.RecordType.TOOL_EXECUTION,
+            {"tool_name": "node_create"},
+            session_id="secret-game@a3f2",
+        )
+        for _ in range(40):
+            if sent:
+                break
+            time.sleep(0.05)
+
+        assert sent
+        assert sent[0].session_id.endswith("@a3f2")
+        assert "secret-game" not in sent[0].session_id
+        ## The record path salts with the install's customer_uuid (#529):
+        ## the shipped hash must not equal the unsalted digest.
+        assert sent[0].session_id == tel.hash_session_id(
+            "secret-game@a3f2", salt=collector._customer_uuid
+        )
+        assert sent[0].session_id != tel.hash_session_id("secret-game@a3f2")
+        collector.shutdown()
+
+    def test_milestone_idempotent(self, clean_env, isolated_data_dir) -> None:
+        collector = tel.TelemetryCollector()
+        sent: list[tel.TelemetryRecord] = []
+        _drain_to(collector, sent)
+
+        assert collector.record_milestone(tel.MilestoneType.FIRST_STARTUP) is True
+        assert collector.record_milestone(tel.MilestoneType.FIRST_STARTUP) is False
+        ## Persistence now happens on the worker thread (#716) — join the
+        ## queue so the file is flushed before reading it back.
+        collector._queue.join()
+        ## On-disk milestones file must reflect exactly one entry.
+        on_disk = json.loads(collector.config.milestones_file.read_text(encoding="utf-8"))
+        assert "first_startup" in on_disk
+        collector.shutdown()
+
+    def test_milestone_survives_full_queue(self, clean_env, isolated_data_dir) -> None:
+        """The #716 persist-on-worker change must not lose the milestone
+        itself when the queue is saturated: the in-memory record (and
+        therefore idempotence) still lands; only the disk flush is deferred
+        to a later persist request.
+        """
+        collector = tel.TelemetryCollector()
+        ## Stop the worker and saturate the queue so put_nowait raises Full.
+        collector._shutdown = True
+        collector._worker.join(timeout=1.0)
+        for _ in range(collector.QUEUE_MAXSIZE):
+            collector.record(tel.RecordType.USAGE, {"x": 1})
+
+        assert collector.record_milestone(tel.MilestoneType.FIRST_STARTUP) is True
+        ## In-memory registration is intact — a repeat is still deduped.
+        assert collector.record_milestone(tel.MilestoneType.FIRST_STARTUP) is False
+
+    def test_customer_uuid_round_trip(self, clean_env, isolated_data_dir) -> None:
+        c1 = tel.TelemetryCollector()
+        uuid_one = c1._customer_uuid
+        c1.shutdown()
+
+        c2 = tel.TelemetryCollector()
+        assert c2._customer_uuid == uuid_one
+        c2.shutdown()
+
+    def test_corrupt_milestones_file_does_not_blow_up(
+        self, clean_env, isolated_data_dir: Path
+    ) -> None:
+        (isolated_data_dir / "milestones.json").write_text("not json {", encoding="utf-8")
+        collector = tel.TelemetryCollector()
+        assert collector._milestones == {}
+        collector.shutdown()
+
+    def test_drop_on_queue_full(self, clean_env, isolated_data_dir) -> None:
+        collector = tel.TelemetryCollector()
+        ## Stop the worker thread so the queue can fill.
+        collector._shutdown = True
+        collector._worker.join(timeout=1.0)
+
+        for _ in range(collector.QUEUE_MAXSIZE + 50):
+            collector.record(tel.RecordType.USAGE, {"x": 1})
+        ## ``put_nowait`` should silently drop once the bound is hit; the
+        ## queue should be sitting at exactly ``QUEUE_MAXSIZE``.
+        assert collector._queue.qsize() == collector.QUEUE_MAXSIZE
+
+    def test_disabled_does_not_touch_disk(
+        self, monkeypatch, clean_env, isolated_data_dir: Path
+    ) -> None:
+        """Opt-out must be fully side-effect-free: no UUID file, no
+        milestones file, no worker thread. Locks in the contract
+        documented in docs/TELEMETRY.md.
+        """
+        monkeypatch.setenv("GODOT_AI_DISABLE_TELEMETRY", "1")
+        collector = tel.TelemetryCollector()
+
+        ## No disk artifacts created.
+        assert not (isolated_data_dir / "customer_uuid.txt").exists()
+        assert not (isolated_data_dir / "milestones.json").exists()
+        ## No worker thread spun up.
+        assert collector._worker is None
+        ## No UUID in memory either.
+        assert collector._customer_uuid is None
+        ## Path-tracking fields are nullable; on-disk paths deferred.
+        assert collector.config.data_dir is None
+        assert collector.config.uuid_file is None
+        assert collector.config.milestones_file is None
+        ## Shutdown remains safe with no worker.
+        collector.shutdown()
+
+
+class TestPublicHelpers:
+    def test_shutdown_if_initialized_noop_when_no_collector(
+        self, clean_env, isolated_data_dir: Path
+    ) -> None:
+        assert tel._collector is None
+        tel.shutdown_if_initialized()  # must not create or raise
+        assert tel._collector is None
+
+    def test_shutdown_if_initialized_shuts_down_existing(
+        self, clean_env, isolated_data_dir: Path
+    ) -> None:
+        first = tel.get_telemetry()
+        worker = first._worker
+        tel.shutdown_if_initialized()
+        ## The original collector's worker drains and exits.
+        assert worker is None or not worker.is_alive()
+        ## Module-level reference is cleared so a subsequent
+        ## ``get_telemetry()`` builds a fresh, live collector instead
+        ## of returning the dead one.
+        assert tel._collector is None
+
+    def test_lifespan_restart_in_same_process_gets_fresh_collector(
+        self, clean_env, isolated_data_dir: Path
+    ) -> None:
+        """Regression: after the first lifespan teardown, a subsequent
+        ``record_telemetry()`` was reusing the dead collector and the
+        worker had exited — every record was enqueued into a queue with
+        no drainer. uvicorn ``--reload`` (and repeated test runs in
+        one process) reproduce this. Locked in by this test."""
+        import time
+
+        first = tel.get_telemetry()
+        first_worker = first._worker
+        tel.shutdown_if_initialized()
+
+        second = tel.get_telemetry()
+        assert second is not first, "Second start must build a fresh collector"
+        assert second._worker is not first_worker
+        assert second._worker is not None and second._worker.is_alive()
+
+        ## And the new collector actually drains records.
+        sent: list[tel.TelemetryRecord] = []
+        second._send = sent.append  # type: ignore[method-assign]
+        tel.record_telemetry(tel.RecordType.USAGE, {"after_restart": True})
+        deadline = time.monotonic() + 1.0
+        while not sent and time.monotonic() < deadline:
+            time.sleep(0.02)
+        assert sent and sent[0].data["after_restart"] is True
+
+
+class TestCustomerUuidValidation:
+    """Audit backlog: uuid file content must be validated, and a
+    regenerated uuid must be PERSISTED so the install converges on one
+    stable identity (the old empty-file branch re-minted every start)."""
+
+    def test_malformed_uuid_file_regenerates_and_persists(
+        self, clean_env, isolated_data_dir
+    ) -> None:
+        uuid_file = isolated_data_dir / "customer_uuid.txt"
+        uuid_file.write_text("not-a-uuid; drop table installs")
+        collector = tel.TelemetryCollector()
+        try:
+            stored = uuid_file.read_text(encoding="utf-8").strip()
+            assert stored == collector._customer_uuid
+            uuid.UUID(stored)  # must now be a real UUID
+            assert "drop table" not in stored
+        finally:
+            collector.shutdown()
+
+    def test_empty_uuid_file_regenerates_and_persists(self, clean_env, isolated_data_dir) -> None:
+        uuid_file = isolated_data_dir / "customer_uuid.txt"
+        uuid_file.write_text("")
+        collector = tel.TelemetryCollector()
+        try:
+            stored = uuid_file.read_text(encoding="utf-8").strip()
+            assert stored, "regenerated uuid must be written back"
+            assert stored == collector._customer_uuid
+            uuid.UUID(stored)
+        finally:
+            collector.shutdown()
+
+    def test_valid_uuid_file_is_preserved(self, clean_env, isolated_data_dir) -> None:
+        uuid_file = isolated_data_dir / "customer_uuid.txt"
+        fixed = str(uuid.uuid4())
+        uuid_file.write_text(fixed)
+        collector = tel.TelemetryCollector()
+        try:
+            assert collector._customer_uuid == fixed
+            assert uuid_file.read_text(encoding="utf-8").strip() == fixed
+        finally:
+            collector.shutdown()
+
+
+class TestRuntimeOptOutLatch:
+    """#913: the opt-out that reaches a server the plugin adopted rather than
+    spawned. These own the latch's semantics; ``test_telemetry_integration.py``
+    owns the wire event that sets it."""
+
+    def test_latch_disables_live_reads_without_touching_the_snapshot(
+        self, clean_env, isolated_data_dir
+    ) -> None:
+        config = tel.TelemetryConfig()
+        assert config.enabled is True
+        assert config.live_enabled() is True
+        assert tel.live_telemetry_enabled() is True
+
+        tel.latch_runtime_opt_out()
+
+        assert tel.runtime_opt_out_latched() is True
+        assert tel.live_telemetry_enabled() is False
+        assert config.live_enabled() is False
+        ## The snapshot stays put — it records what this process decided about
+        ## data dirs and the worker at startup, not the live answer.
+        assert config.enabled is True
+
+    def test_latch_reports_only_the_first_transition(
+        self, clean_env, isolated_data_dir
+    ) -> None:
+        ## Every reconnect re-asserts, so without this the "opted out" log
+        ## line would fire on every handshake for the rest of the process.
+        assert tel.latch_runtime_opt_out() is True
+        assert tel.latch_runtime_opt_out() is False
+        assert tel.latch_runtime_opt_out() is False
+
+    def test_latch_is_one_way_and_a_clean_env_cannot_lift_it(
+        self, monkeypatch, clean_env, isolated_data_dir
+    ) -> None:
+        ## What makes this safe on a shared backend: nothing re-enables for
+        ## the life of the process — no un-latch, and clearing the env vars
+        ## (the other opt-out source) must not resurrect sends either.
+        tel.latch_runtime_opt_out()
+        monkeypatch.delenv("GODOT_AI_DISABLE_TELEMETRY", raising=False)
+        monkeypatch.delenv("DISABLE_TELEMETRY", raising=False)
+        assert tel.live_telemetry_enabled() is False
+        assert not hasattr(tel, "unlatch_runtime_opt_out")
+
+    def test_latched_collector_drops_records_and_milestones(
+        self, clean_env, isolated_data_dir
+    ) -> None:
+        collector = tel.TelemetryCollector()
+        sent: list[tel.TelemetryRecord] = []
+        _drain_to(collector, sent)
+        collector.record(tel.RecordType.USAGE, {"x": 1})
+        for _ in range(40):  # up to ~2s
+            if sent:
+                break
+            time.sleep(0.05)
+        assert len(sent) == 1
+
+        tel.latch_runtime_opt_out()
+
+        collector.record(tel.RecordType.USAGE, {"x": 2})
+        assert collector.record_milestone(tel.MilestoneType.FIRST_TOOL_USAGE) is False
+        time.sleep(0.1)
+        assert len(sent) == 1
+        collector.shutdown()
+
+    def test_reset_telemetry_clears_the_latch_for_the_next_test(
+        self, clean_env, isolated_data_dir
+    ) -> None:
+        ## One-way per server process, but a test process runs many of them:
+        ## an uncleared latch would disable telemetry for every later test.
+        tel.latch_runtime_opt_out()
+        tel.reset_telemetry()
+        assert tel.runtime_opt_out_latched() is False
+        assert tel.live_telemetry_enabled() is True

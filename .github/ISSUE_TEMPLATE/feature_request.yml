@@ -1,0 +1,28 @@
+name: "Feature Request"
+description: "Suggest a new idea, tool domain, or operation for Godot MCP"
+title: "[Feature]: "
+labels: ["enhancement", "needs-review"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea for a new Godot engine tool, client integration, or enhancement? Let us know!
+  - type: textarea
+    id: problem
+    attributes:
+      label: Is your feature request related to a problem?
+      description: A clear description of the problem or limitation.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution / Feature
+      description: Describe what you would like Godot MCP to do.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Any alternative solutions or features you've considered.

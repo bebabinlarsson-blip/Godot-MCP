@@ -1,0 +1,646 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+  pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+
+## One run per PR at a time: a new push cancels the previous run's 30-odd
+## jobs instead of letting two full matrices race. Pushes to main are never
+## cancelled, so every merged commit keeps a complete record.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+## Stop CI from injecting fake "installs" into the telemetry dashboard or
+## burning streaming-insert quota on the backend. Opt-out is fully
+## side-effect-free in the collector (no UUID generated, no worker
+## thread, no _send), so the test/runtime behavior under this flag
+## matches a real opted-out end-user install. Mirrored in script/ci-*
+## shell scripts for any path that doesn't inherit this env.
+env:
+  GODOT_AI_DISABLE_TELEMETRY: "true"
+
+## CI only reads the repo — no job here writes to it, so drop the default
+## token down to read-only (third-party actions run with this grant too).
+permissions:
+  contents: read
+
+jobs:
+  python-tests:
+    name: Python ${{ matrix.python-version }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Two independent axes, not their product. Interpreter-version
+        # behavior is the same on every OS, so every supported version runs
+        # on Linux, where a cell costs ~4 minutes. Process, path, lease, and
+        # updater behavior is OS-specific, so Windows (the platform with the
+        # most platform-specific code: kernel32 process identity, junctions,
+        # sharing-violation retries) runs the floor and the ceiling, and macOS
+        # runs the ceiling; 3.14 is what uvx hands users (#746). The full
+        # 3x4 product cost twelve cells, four of them Windows at 10+ minutes
+        # each and four macOS cells that queued behind the runner limit, for
+        # no class of regression these seven cells do not catch.
+        os: [ubuntu-latest]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        include:
+          - os: windows-latest
+            python-version: "3.11"
+          - os: windows-latest
+            python-version: "3.14"
+          - os: macos-latest
+            python-version: "3.14"
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # Unit fixture preparation archives published v3 tags, including v3.2.5.
+          fetch-depth: 0
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Godot Omni Diagnostics & Operations Gate
+        run: |
+          godot-omni self-test
+          godot-omni tools stats
+        shell: bash
+
+      # Keep these conditions complementary so every matrix cell runs pytest
+      # exactly once: with coverage on the Codecov cell, plain everywhere else.
+      #
+      # --basetemp keeps every tmp_path under the runner's short temp directory
+      # (D:\a\_temp on Windows) instead of the deep per-user Temp tree. The
+      # updater canonicalizes paths by enumerating each ancestor directory on
+      # Windows and macOS, so ancestor fan-out is a per-call cost for the
+      # transaction, updater and qualification suites; together with the
+      # failed-only tmp_path retention in pyproject.toml this keeps that walk
+      # short for the whole run. --durations reports the slowest tests so a
+      # regression in a single test is visible in the hosted log.
+      # -n auto: one worker per runner core. The suite is 2,700 tests at
+      # ~0.1 s each, so serial rows cost 4-6 minutes and set the wall clock;
+      # the whole suite, integration included, runs clean under xdist
+      # because its fixtures allocate free ports per test (verified locally:
+      # 403 s serial -> 108 s parallel, zero ordering failures).
+      - name: Run tests
+        if: matrix.os != 'ubuntu-latest' || matrix.python-version != '3.13'
+        run: pytest -n auto -v --durations=25 --basetemp="${{ runner.temp }}/pytest-basetemp"
+
+      - name: Run tests with coverage
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
+        run: >-
+          pytest -n auto --cov=godot_ai --cov-report=xml -v --durations=25
+          --basetemp="${{ runner.temp }}/pytest-basetemp"
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v6
+        with:
+          files: ./coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Lint
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
+        run: >-
+          ruff check src/ tests/ script/
+          script/ci-game-capture-smoke
+          script/ci-stale-server-smoke
+          script/ci-unsupported-godot-smoke
+          script/generate-star-history
+          script/local-game-capture-diag
+          script/local-self-update-smoke
+          script/v4-release
+
+      - name: Enforce architecture simplification gates
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
+        run: python script/architecture_simplification_gates.py --check
+
+  build-distributions:
+    name: Build distributions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Build sdist and wheel
+        run: |
+          python -m pip install "build==1.6.0"
+          python -m build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: dist
+          path: dist/
+
+  release-smoke:
+    name: Release smoke / ${{ matrix.os }}
+    needs: build-distributions
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Download shared distributions
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: dist
+          path: dist/
+
+      - name: Install built wheel in a clean venv
+        shell: bash
+        run: |
+          venv="${RUNNER_TEMP}/smoke-venv"
+          python -m venv "$venv"
+          if [ -x "$venv/bin/python" ]; then
+            PY="$venv/bin/python"
+            GODOT_AI="$venv/bin/godot-ai"
+          else
+            PY="$venv/Scripts/python.exe"
+            GODOT_AI="$venv/Scripts/godot-ai.exe"
+          fi
+          # Use `python -m pip` rather than the pip executable — on Windows,
+          # pip.exe can't replace itself mid-upgrade, which breaks smoke tests.
+          "$PY" -m pip install dist/*.whl
+          "$GODOT_AI" --version
+          "$GODOT_AI" --help
+
+      - name: Install built sdist in a clean venv
+        shell: bash
+        run: |
+          venv="${RUNNER_TEMP}/smoke-sdist-venv"
+          python -m venv "$venv"
+          if [ -x "$venv/bin/python" ]; then
+            PY="$venv/bin/python"
+            GODOT_AI="$venv/bin/godot-ai"
+          else
+            PY="$venv/Scripts/python.exe"
+            GODOT_AI="$venv/Scripts/godot-ai.exe"
+          fi
+          "$PY" -m pip install dist/*.tar.gz
+          "$GODOT_AI" --version
+
+  godot-tests:
+    name: Godot tests / ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    env:
+      GODOT_AI_MODE: dev
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: Linux
+            godot-version: "4.7.0"
+          - os: macos-latest
+            label: macOS
+            godot-version: "4.7.0"
+          - os: windows-latest
+            label: Windows
+            godot-version: "4.7.0"
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # The release-blocking bridge smoke starts from the exact final-v3
+          # tree rather than a hand-written approximation.
+          fetch-depth: 0
+
+      - name: Build plugin link
+        shell: bash
+        run: bash script/verify-worktree
+
+      - uses: chickensoft-games/setup-godot@c233594225991af5aec714e52457cc76d6df8fa2 # v2
+        with:
+          version: ${{ matrix.godot-version }}
+          use-dotnet: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Install virtual display for Linux restart smoke
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      - name: Windows ordinary-start client regression
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        timeout-minutes: 6
+        run: GODOT_BIN=godot pytest -v -s tests/integration/test_client_owner_restarts.py
+
+      - name: Real-editor updater scenarios
+        # Linux only on pull requests and pushes: the lean updater's real-editor
+        # scenarios (signed update, v3 capsule crossing, post-swap rollback) plus
+        # the restart, bridge, reload-persistence and qualification-fixture
+        # suites. Windows and macOS run the same files nightly
+        # (nightly-diagnostics.yml); their editor starts are 3-5x slower and the
+        # per-OS Godot and smoke jobs already prove the plugin and server start
+        # on every OS. The local-files delivery duplicate runs nightly;
+        # ordinary CI exercises private HTTPS. See docs/self-update.md.
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        timeout-minutes: 12
+        run: |
+          xvfb-run -a env GODOT_BIN=godot pytest -v -s --durations=0 -k 'not local-files' --basetemp="${RUNNER_TEMP}/pytest-basetemp" \
+            tests/integration/test_godot_editor_restart.py \
+            tests/integration/test_test_run_cache_warning.py \
+            tests/integration/test_migration_bridge_failures.py \
+            tests/integration/test_linux_listener_tools.py \
+            tests/integration/test_self_update_status_driver.py \
+            tests/integration/test_self_update_upgrade_paths.py \
+            tests/integration/test_qualification_https.py \
+            tests/integration/test_plugin_reload_persistence.py \
+            tests/integration/test_runtime_qualification_driver.py
+
+      - name: Start MCP server
+        shell: bash
+        run: bash script/ci-start-server
+
+      - name: Import and validate GDScript
+        shell: bash
+        timeout-minutes: 3
+        run: |
+          godot --headless --path test_project --import > godot-import.log 2>&1 || true
+          bash script/ci-check-gdscript godot-import.log
+
+      - name: Start Godot editor (headless)
+        shell: bash
+        run: GODOT_AI_ALLOW_HEADLESS=1 godot --headless --path test_project --editor > godot-editor.log 2>&1 &
+
+      - name: Run handler tests
+        shell: bash
+        timeout-minutes: 3
+        env:
+          # #882: floor on test_run's `total`, catching in-suite discovery
+          # truncation that the script's suite-count gate cannot see (a suite
+          # can register and still run fewer tests than it has). Keep this a
+          # little below the real count so ordinary churn doesn't trip it;
+          # lower it deliberately when tests are legitimately removed.
+          GODOT_AI_MIN_TESTS: "2050"
+        run: bash script/ci-godot-tests
+
+      - name: Reload smoke test
+        shell: bash
+        timeout-minutes: 5
+        run: bash script/ci-reload-test
+
+      - name: Quit smoke test
+        shell: bash
+        timeout-minutes: 2
+        run: bash script/ci-quit-test
+
+      - name: Export-strip smoke test
+        shell: bash
+        timeout-minutes: 5
+        run: GODOT_BIN=godot bash script/ci-export-strip-smoke
+
+      - name: Dump Godot editor log on failure
+        if: failure()
+        shell: bash
+        run: |
+          echo "===== godot-editor.log (last 500 lines) ====="
+          tail -n 500 godot-editor.log || echo "(log not found)"
+          echo "===== godot-import.log (last 200 lines) ====="
+          tail -n 200 godot-import.log || echo "(log not found)"
+          echo "===== mcp-server.log (last 300 lines) ====="
+          tail -n 300 mcp-server.log || echo "(log not found)"
+
+  unsupported-godot-floor:
+    name: Unsupported Godot refusal / ${{ matrix.godot-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        godot-version: ["4.5.0", "4.6.0"]
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: chickensoft-games/setup-godot@c233594225991af5aec714e52457cc76d6df8fa2 # v2
+        with:
+          version: ${{ matrix.godot-version }}
+          use-dotnet: false
+
+      - name: Refuse v4 without mutation
+        shell: bash
+        timeout-minutes: 2
+        run: python3 script/ci-unsupported-godot-smoke "$(command -v godot)"
+
+  # Verifies that startup refuses an authenticated but mismatched godot-ai
+  # server without spending destructive authority. The occupant remains alive;
+  # only a later explicit Dock recovery intent may authorize kill/restart.
+  server-ownership-smoke:
+    name: Server ownership smoke / ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    env:
+      GODOT_AI_MODE: dev
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: Linux
+          - os: macos-latest
+            label: macOS
+          - os: windows-latest
+            label: Windows
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build plugin link
+        shell: bash
+        run: bash script/verify-worktree
+
+      - uses: chickensoft-games/setup-godot@c233594225991af5aec714e52457cc76d6df8fa2 # v2
+        with:
+          version: 4.7.0
+          use-dotnet: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Import and validate GDScript
+        shell: bash
+        timeout-minutes: 3
+        run: |
+          godot --headless --path test_project --import > godot-import.log 2>&1 || true
+          bash script/ci-check-gdscript godot-import.log
+
+      # Each invocation starts fresh processes and restores/removes its private
+      # capability record in finally. The next invocation checks both ports
+      # are free before starting; a leaked process fails the next smoke.
+      - name: Run stale-server smoke
+        shell: bash
+        timeout-minutes: 3
+        run: python script/ci-stale-server-smoke --log-dir .
+
+      - name: Run stale-compatible reload smoke
+        if: ${{ !cancelled() }}
+        shell: bash
+        timeout-minutes: 3
+        run: python script/ci-stale-server-smoke --mode stale-compatible-reload --log-dir .
+
+      - name: Run foreign-server smoke
+        if: ${{ !cancelled() }}
+        shell: bash
+        timeout-minutes: 3
+        run: python script/ci-stale-server-smoke --mode foreign --log-dir .
+
+      - name: Dump ownership smoke logs on failure
+        if: failure()
+        shell: bash
+        run: tail -n 300 ./godot-*.log ./*-occupant.log ./stale-compatible-external-server.log
+
+  # Separate job from godot-tests: the capture smoke test needs a real
+  # rendering driver (null RenderingDevice in --headless produces empty
+  # framebuffers) and a display server. Linux uses xvfb-run; macOS and
+  # Windows CI runners have a real graphics stack and run the editor
+  # windowed. This job verifies editor_screenshot(source="game") round-
+  # trips real game pixels — see closes #72.
+  game-capture-smoke:
+    name: Game capture smoke / ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    env:
+      GODOT_AI_MODE: dev
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: Linux
+            godot-version: "4.7.0"
+          - os: macos-latest
+            label: macOS
+            godot-version: "4.7.0"
+          - os: windows-latest
+            label: Windows
+            ## Godot 4.7's Windows game subprocess requires a working
+            ## Vulkan ICD that the headless GitHub runner's GPU-less
+            ## graphics stack does not provide (VK_KHR_surface missing).
+            ## The "Install software Vulkan driver" step below installs
+            ## Mesa lavapipe so 4.7 can run — see #586.
+            godot-version: "4.7.0"
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build plugin link
+        shell: bash
+        run: bash script/verify-worktree
+
+      - uses: chickensoft-games/setup-godot@c233594225991af5aec714e52457cc76d6df8fa2 # v2
+        with:
+          version: ${{ matrix.godot-version }}
+          use-dotnet: false
+
+      - name: Install xvfb
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      ## Godot 4.7 on the headless Windows runner fails with
+      ## "Required Vulkan instance extension VK_KHR_surface not found"
+      ## because the runner has no GPU/Vulkan driver. Install Mesa's
+      ## lavapipe software Vulkan ICD from mesa-dist-win. Version and archive
+      ## SHA-256 are pinned for reproducibility. Every setup failure exits non-zero —
+      ## no silent fallback to the broken no-ICD state.
+      ##
+      ## Registration is via the HKLM registry, not just env vars (#675):
+      ## the Vulkan loader silently discards VK_DRIVER_FILES /
+      ## VK_ICD_FILENAMES in elevated processes, and GitHub's Windows
+      ## runner executes jobs elevated — job logs from #675 show both a
+      ## passing and a failing run hitting the VK_KHR_surface error and
+      ## falling back to the D3D12 Microsoft Basic Render Driver with the
+      ## env vars set correctly. HKLM\SOFTWARE\Khronos\Vulkan\Drivers is
+      ## the loader's system-wide discovery path and is honored regardless
+      ## of integrity level. The env vars are kept as a belt-and-braces
+      ## for any non-elevated child. The "Report rendering driver" step
+      ## below surfaces which driver actually engaged on every run.
+      - name: Install software Vulkan driver (Mesa lavapipe)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        env:
+          MESA_VERSION: "26.1.3"
+          MESA_SHA256: "6dd431f4620cea73970b13e3ffa94f721f2a3924306b8a4283c97648cdb6eb9c"
+        run: |
+          $ErrorActionPreference = "Stop"
+          $url = "https://github.com/pal1000/mesa-dist-win/releases/download/$env:MESA_VERSION/mesa3d-$env:MESA_VERSION-release-msvc.7z"
+          $archive = "$env:RUNNER_TEMP\mesa3d.7z"
+          $dest = "$env:RUNNER_TEMP\mesa3d"
+          Invoke-WebRequest -Uri $url -OutFile $archive
+          $actualHash = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
+          if ($actualHash -ne $env:MESA_SHA256) {
+            throw "mesa-dist-win SHA-256 mismatch: expected $env:MESA_SHA256, got $actualHash"
+          }
+          7z x $archive "-o$dest" -y | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "7z extraction of mesa-dist-win failed" }
+          $icd = Join-Path $dest "x64\lvp_icd.x86_64.json"
+          $dll = Join-Path $dest "x64\vulkan_lvp.dll"
+          if (-not (Test-Path $icd)) { throw "lavapipe ICD manifest not found: $icd" }
+          if (-not (Test-Path $dll)) { throw "lavapipe driver DLL not found: $dll" }
+          $reg = "HKLM:\SOFTWARE\Khronos\Vulkan\Drivers"
+          New-Item -Path $reg -Force | Out-Null
+          New-ItemProperty -Path $reg -Name $icd -Value 0 -PropertyType DWord -Force | Out-Null
+          "VK_DRIVER_FILES=$icd" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "VK_ICD_FILENAMES=$icd" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Installed lavapipe ICD: $icd (registered in $reg)"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Start MCP server
+        shell: bash
+        run: bash script/ci-start-server
+
+      - name: Import and validate GDScript
+        shell: bash
+        timeout-minutes: 3
+        run: |
+          godot --headless --path test_project --import > godot-import.log 2>&1 || true
+          bash script/ci-check-gdscript godot-import.log
+
+      ## Editor output goes to godot-editor.log (mirroring the godot-tests
+      ## jobs) so a failed run keeps the boot/driver evidence — before #675
+      ## the smoke job's editor output was only interleaved into whichever
+      ## step happened to be running, and a stalled run left no artifact.
+      - name: Start Godot editor (Linux / xvfb)
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          xvfb-run -a --server-args="-screen 0 1280x720x24" \
+            godot --rendering-driver opengl3 --path test_project --editor \
+            > godot-editor.log 2>&1 &
+
+      - name: Start Godot editor (windowed)
+        if: matrix.os != 'ubuntu-latest'
+        shell: bash
+        run: godot --path test_project --editor > godot-editor.log 2>&1 &
+
+      ## Surface which rendering driver actually engaged, pass or fail.
+      ## On Windows this is the canary for the #661 lavapipe path: if the
+      ## editor fell back to the D3D12 Microsoft Basic Render Driver the
+      ## software path is in play (slow enough to flake — #675), so warn
+      ## loudly. A warning rather than a failure: the smoke has passed on
+      ## the fallback driver, so don't turn a working (if fragile) run
+      ## into a hard outage. Promote to a hard check once lavapipe is
+      ## confirmed engaging on the runner.
+      - name: Report rendering driver
+        shell: bash
+        run: |
+          pattern='Vulkan [0-9]|D3D12 |Metal [0-9]|OpenGL API'
+          for _ in $(seq 1 60); do
+            if grep -qE "$pattern" godot-editor.log 2>/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          driver_line=$(grep -m1 -E "$pattern" godot-editor.log 2>/dev/null || true)
+          if [ -z "$driver_line" ]; then
+            echo "::warning title=No rendering driver detected::godot-editor.log has no driver line after 60s — editor may not have booted"
+            exit 0
+          fi
+          echo "Rendering driver: $driver_line"
+          if echo "$driver_line" | grep -q "Microsoft Basic Render Driver"; then
+            echo "::warning title=lavapipe did not engage::Editor fell back to the D3D12 Microsoft Basic Render Driver (#675) — the Mesa lavapipe ICD was not picked up, and the software D3D12 path is slow enough to flake"
+          fi
+
+      - name: Run capture smoke test
+        ## Covers the worst case of the script's internal ceilings: 120s
+        ## session wait + 180s capture-ready wait + 120s capture budget.
+        timeout-minutes: 10
+        shell: bash
+        env:
+          ## Stream output as it happens — a killed/timed-out step otherwise
+          ## loses the buffered attempt log entirely.
+          PYTHONUNBUFFERED: "1"
+        run: python script/ci-game-capture-smoke
+
+      - name: Dump Godot editor log on failure
+        if: failure()
+        shell: bash
+        run: |
+          echo "===== godot-editor.log (last 500 lines) ====="
+          tail -n 500 godot-editor.log || echo "(log not found)"
+          echo "===== godot-import.log (last 200 lines) ====="
+          tail -n 200 godot-import.log || echo "(log not found)"
+          ## The server's side of a bridge drop (#958): keepalive kills,
+          ## circuit-breaker trips, command timeouts, with timestamps.
+          echo "===== mcp-server.log (last 300 lines) ====="
+          tail -n 300 mcp-server.log || echo "(log not found)"
+
+      - name: Upload capture diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: capture-smoke-diag-${{ matrix.label }}
+          path: |
+            capture-smoke-diag/
+            godot-editor.log
+            mcp-server.log
+          if-no-files-found: ignore

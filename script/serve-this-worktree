@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Thin wrapper around the cross-platform launcher `script/serve_worktree.py`.
+# Kept so the documented `script/serve-this-worktree` command keeps working;
+# the real logic (venv resolution, port free, --port/--ws-port, --reload) lives
+# in the Python launcher so POSIX and Windows share one implementation. See
+# #509 / #514.
+#
+# Usage: script/serve-this-worktree [--port N] [--ws-port N] [extra args]
+set -euo pipefail
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PY="$(command -v python3 || command -v python || true)"
+if [[ -z "$PY" ]]; then
+    echo "error: python3 not found on PATH" >&2
+    exit 1
+fi
+exec "$PY" "$DIR/serve_worktree.py" "$@"

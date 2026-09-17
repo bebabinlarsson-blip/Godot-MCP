@@ -1,0 +1,496 @@
+#!/usr/bin/env python3
+"""
+End-to-end smoke test for editor_screenshot(source="game").
+
+Drives a running Godot editor (launched separately by CI with a real
+rendering driver, typically under xvfb-run on Linux) through the MCP
+streamable-HTTP transport:
+
+  1. wait for the plugin's WebSocket session to register
+  2. open res://capture_smoke.tscn (four colored quadrants)
+  3. run the project in that scene
+  4. poll editor_state until is_playing=true AND game_capture_ready=true
+  5. capture-and-check loop until CAPTURE_BUDGET_SEC elapses:
+     call editor_screenshot(source="game"), decode the returned PNG,
+     sample the centre of each quadrant, and pass when every sample
+     matches red / green / blue / white within tolerance
+  6. stop the project
+
+The retry loop (not a fixed settle sleep) is deliberate: on GitHub's
+GPU-less paravirtualized macOS runners the game subprocess presents its
+first real frame nondeterministically late, so a single early capture
+either times out inside the bridge or reads back the pre-first-draw
+clear-color framebuffer (a uniform RGB(77,77,77) image). Polling until a
+correct frame arrives makes the test deterministic on slow runners while
+a genuine capture regression still fails every attempt until the budget
+expires.
+
+Exits non-zero on failure — each attempt prints per-quadrant diagnostics,
+and the final failure writes the last captured PNG plus an attempt log to
+CAPTURE_DIAG_DIR (default capture-smoke-diag/) for CI artifact upload.
+
+The core capture path is independent of Godot's render backend, but only
+returns game pixels when Godot can actually rasterise — on a headless
+runner the RenderingDevice is null and get_texture().get_image() is empty.
+CI must launch Godot with a rendering driver (opengl3 is the most
+forgiving on xvfb).
+"""
+
+from __future__ import annotations
+
+import base64
+import io
+import json
+import os
+import sys
+import time
+import traceback
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+from PIL import Image
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "script"))
+from _transport_auth import authorization_header  # noqa: E402
+
+# Mirror script/_ci_env.sh: smoke-run editors/servers must not send
+# telemetry from CI (audit backlog). setdefault keeps explicit overrides.
+os.environ.setdefault("GODOT_AI_DISABLE_TELEMETRY", "true")
+
+SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://127.0.0.1:8000/mcp")
+HEADERS = {
+    "Content-Type": "application/json",
+    "Accept": "application/json, text/event-stream",
+}
+
+SCENE_PATH = "res://capture_smoke.tscn"
+## (label, sample fraction x, sample fraction y, expected RGB)
+QUADRANTS = [
+    ("red", 0.25, 0.25, (255, 0, 0)),
+    ("green", 0.75, 0.25, (0, 255, 0)),
+    ("blue", 0.25, 0.75, (0, 0, 255)),
+    ("white", 0.75, 0.75, (255, 255, 255)),
+]
+## Generous tolerance: default Godot 2D rendering is gamma-correct and the
+## "pure red/green/blue" ColorRects come back as slightly darkened sRGB after
+## the framebuffer's linear → sRGB conversion. 40/255 easily covers that
+## while still catching "returned editor UI instead of game pixels".
+COLOR_TOLERANCE = 40
+## Total wall-clock budget for the capture-and-check retry loop, and the
+## pause between attempts. Sized against the macOS runner evidence: first
+## presents have been observed lagging tens of seconds behind the helper's
+## boot beacon.
+CAPTURE_BUDGET_SEC = float(os.environ.get("CAPTURE_BUDGET_SEC", "120"))
+CAPTURE_RETRY_DELAY_SEC = 2.0
+## Where the final-failure artifacts (last PNG + attempt log) land; CI
+## uploads this directory when the job fails.
+DIAG_DIR = os.environ.get("CAPTURE_DIAG_DIR", "capture-smoke-diag")
+## How long the editor's WS session may stay unreachable mid-wait before
+## the ready-poll gives up. The plugin auto-reconnects after transient
+## drops, so a brief outage is tolerated; a persistent one means the
+## editor bridge is gone and the remaining minutes of ready-wait can only
+## end in a misleading "never registered" timeout (#675).
+SESSION_LOSS_GRACE_SEC = 45.0
+
+
+def _post(session_id: str | None, body: dict, timeout: float = 10.0) -> dict:
+    headers = dict(HEADERS)
+    headers["Authorization"] = authorization_header(SERVER_URL)
+    if session_id:
+        headers["Mcp-Session-Id"] = session_id
+    req = urllib.request.Request(
+        SERVER_URL,
+        data=json.dumps(body).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        raw = resp.read().decode("utf-8")
+        new_session = resp.headers.get("mcp-session-id")
+    result = {"_session_id": new_session, "_raw": raw}
+    for line in raw.splitlines():
+        if line.startswith("data: "):
+            result.update(json.loads(line[6:]))
+            break
+    else:
+        try:
+            result.update(json.loads(raw))
+        except json.JSONDecodeError:
+            pass
+    return result
+
+
+def _tool_call(
+    session_id: str,
+    name: str,
+    args: dict,
+    request_id: int,
+    timeout: float = 30.0,
+) -> dict:
+    body = {
+        "jsonrpc": "2.0",
+        "id": request_id,
+        "method": "tools/call",
+        "params": {"name": name, "arguments": args},
+    }
+    resp = _post(session_id, body, timeout=timeout)
+    ## Prefer structuredContent; fall back to the text block the transport
+    ## wraps around dict/list results.
+    result = resp.get("result", {})
+    sc = result.get("structuredContent")
+    if sc:
+        return sc
+    content = result.get("content") or []
+    for block in content:
+        if block.get("type") == "text":
+            try:
+                return json.loads(block["text"])
+            except json.JSONDecodeError:
+                return {"_text": block["text"]}
+    return {"_raw": resp.get("_raw", "")}
+
+
+def _initialize_session() -> str:
+    body = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-03-26",
+            "capabilities": {},
+            "clientInfo": {"name": "ci-game-capture-smoke", "version": "1.0"},
+        },
+    }
+    resp = _post(None, body)
+    session_id = resp.get("_session_id")
+    if not session_id:
+        raw = resp.get("_raw", "")[:300]
+        raise RuntimeError(f"No Mcp-Session-Id in initialize response: {raw}")
+    _post(session_id, {"jsonrpc": "2.0", "method": "notifications/initialized"})
+    return session_id
+
+
+def _wait_for_godot_session(session_id: str, timeout: float = 120.0) -> None:
+    deadline = time.monotonic() + timeout
+    last_err: Exception | None = None
+    while time.monotonic() < deadline:
+        try:
+            result = _tool_call(session_id, "session_manage", {"op": "list"}, 2)
+            if result.get("count", 0) > 0:
+                print(f"Godot session connected: {result.get('active_session_id') or result}")
+                return
+        except (urllib.error.URLError, RuntimeError) as exc:
+            last_err = exc
+        time.sleep(2)
+    raise RuntimeError(f"Godot session never registered; last err: {last_err}")
+
+
+## 180s, not 60: run 28326896176 (macOS) showed the game subprocess taking
+## over a minute to boot far enough to register its capture on a
+## paravirtualized runner. The poll exits the moment it's ready, so the
+## ceiling only costs time when something is genuinely wrong.
+def _wait_for_game_capture_ready(
+    session_id: str, timeout: float = 180.0, history: list[str] | None = None
+) -> None:
+    ## is_playing flips when the editor *spawns* the game subprocess; it does
+    ## NOT imply the game's _mcp_game_helper autoload has reached _ready() and
+    ## registered its EngineDebugger "mcp" capture. Sending take_screenshot
+    ## before that registration silently lands in a dead channel and times
+    ## out — the historical 4s magic sleep here was an attempt to paper over
+    ## this race and was the source of the Windows-runner flake.
+    ##
+    ## game_capture_ready is the editor-side mirror of the game-side
+    ## "mcp:hello" boot beacon — it flips true exactly when the capture
+    ## handler is wired up, so polling it is the deterministic replacement.
+    ##
+    ## Each observed state change is printed and appended to `history` so a
+    ## failed wait leaves a timeline in the diag artifacts (#675: this path
+    ## used to raise with zero evidence of what the editor reported). A
+    ## persistently unreachable session fails fast with an honest message
+    ## instead of burning the rest of the timeout — in the #675 run the
+    ## editor's WS session dropped mid-wait and the "never registered"
+    ## timeout pointed away from the real problem.
+    start = time.monotonic()
+    deadline = start + timeout
+    lost_since: float | None = None
+    last_note = ""
+    last_logged_at = start
+
+    def _note(note: str) -> None:
+        nonlocal last_note, last_logged_at
+        now = time.monotonic()
+        if note == last_note and now - last_logged_at < 30.0:
+            return
+        line = f"[ready-wait +{now - start:.1f}s] {note}"
+        print(line)
+        if history is not None:
+            history.append(line)
+        last_note = note
+        last_logged_at = now
+
+    while time.monotonic() < deadline:
+        try:
+            state = _tool_call(session_id, "editor_state", {}, 100)
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            state = {"error": {"code": "TRANSPORT_ERROR", "message": str(exc)}}
+        err = state.get("error")
+        if err:
+            code = err.get("code", "?") if isinstance(err, dict) else str(err)
+            now = time.monotonic()
+            if lost_since is None:
+                lost_since = now
+            _note(f"editor_state failing: {code}")
+            if now - lost_since > SESSION_LOSS_GRACE_SEC:
+                raise RuntimeError(
+                    "Editor session lost while waiting for game capture: "
+                    f"editor_state has failed with {code} for "
+                    f"{now - lost_since:.0f}s straight — the editor<->server "
+                    "bridge dropped, not a slow game boot"
+                )
+        else:
+            lost_since = None
+            if state.get("is_playing") and state.get("game_capture_ready"):
+                print(f"Game capture ready (readiness={state.get('readiness')})")
+                return
+            _note(
+                f"is_playing={state.get('is_playing')} "
+                f"game_capture_ready={state.get('game_capture_ready')} "
+                f"readiness={state.get('readiness')}"
+            )
+        time.sleep(0.5)
+    raise RuntimeError(
+        "Game subprocess never registered its mcp capture within "
+        f"{timeout:.0f}s (last observed: {last_note or 'nothing'})"
+    )
+
+
+def _within_tolerance(a: tuple[int, int, int], b: tuple[int, int, int]) -> bool:
+    return all(abs(x - y) <= COLOR_TOLERANCE for x, y in zip(a, b))
+
+
+def _dump_diagnostics(session_id: str) -> None:
+    """On failure, print everything that could explain what happened."""
+    try:
+        autoloads = _tool_call(session_id, "autoload_manage", {"op": "list"}, 900)
+        print("\n[diag] autoloads:", json.dumps(autoloads, indent=2))
+    except Exception as exc:
+        print(f"[diag] autoload_list failed: {exc}")
+    try:
+        ## project.godot on disk — did ProjectSettings.save() actually persist
+        ## the autoload entry before the subprocess spawned?
+        proj = _tool_call(
+            session_id,
+            "filesystem_manage",
+            {"op": "read_text", "params": {"path": "res://project.godot"}},
+            901,
+        )
+        text = proj.get("content", "")
+        in_autoload = False
+        lines_out: list[str] = []
+        for line in text.splitlines():
+            if line.startswith("[autoload]"):
+                in_autoload = True
+            elif line.startswith("[") and in_autoload:
+                in_autoload = False
+            if in_autoload:
+                lines_out.append(line)
+        print("[diag] project.godot [autoload] section:")
+        for line in lines_out or ["  (section missing)"]:
+            print(f"    {line}")
+    except Exception as exc:
+        print(f"[diag] filesystem_read_file failed: {exc}")
+    try:
+        logs = _tool_call(session_id, "logs_read", {"count": 50}, 902)
+        print("[diag] recent plugin logs:")
+        for line in logs.get("lines", []):
+            print(f"    {line}")
+    except Exception as exc:
+        print(f"[diag] logs_read failed: {exc}")
+
+
+def _capture_attempt(session_id: str, request_id: int) -> tuple[list[str], bytes | None]:
+    """One capture-and-check pass. Returns (failures, png_bytes).
+
+    An empty failures list means the frame passed every quadrant check.
+    Bridge errors (screenshot timeouts, not-live replies) come back as
+    failure strings rather than raising so the caller's retry loop treats
+    them the same as a blank frame — on slow runners they are the same
+    underlying condition (first present hasn't happened yet).
+    """
+    ## Fetch metadata (include_image=False) first: this is the easiest
+    ## way to assert the capture actually succeeded on the plugin side.
+    ## 40s HTTP timeout: an error reply can legitimately take up to the
+    ## editor's 20s ready-wait + 8s reply timer; a 20s socket timeout
+    ## would swallow the actionable error body.
+    meta = _tool_call(
+        session_id,
+        "editor_screenshot",
+        {"source": "game", "include_image": False, "max_resolution": 0},
+        request_id,
+        timeout=40,
+    )
+    if "source" in meta and meta["source"] != "game":
+        return ([f"metadata source mismatch: {meta}"], None)
+    if meta.get("error"):
+        return ([f"editor_screenshot returned error: {meta['error']}"], None)
+
+    ## For the image bytes, go back to the raw server response for the
+    ## include_image=True call: the transport puts an image content
+    ## block alongside the text block, base64-encoded.
+    body = {
+        "jsonrpc": "2.0",
+        "id": request_id + 1,
+        "method": "tools/call",
+        "params": {
+            "name": "editor_screenshot",
+            "arguments": {"source": "game", "include_image": True, "max_resolution": 0},
+        },
+    }
+    resp = _post(session_id, body, timeout=40)
+    raw = resp.get("_raw", "")
+    image_b64: str | None = None
+    for line in raw.splitlines():
+        if not line.startswith("data: "):
+            continue
+        data = json.loads(line[6:])
+        for block in data.get("result", {}).get("content", []):
+            if block.get("type") == "image" and block.get("mimeType", "").startswith("image/"):
+                image_b64 = block.get("data")
+                break
+        if image_b64:
+            break
+    if not image_b64:
+        return ([f"no image block in response; raw: {raw[:500]}"], None)
+
+    png = base64.b64decode(image_b64)
+    img = Image.open(io.BytesIO(png)).convert("RGB")
+    print(f"Got PNG {img.width}x{img.height} ({len(png)} bytes)")
+
+    if img.width < 64 or img.height < 64:
+        return ([f"image too small to sample: {img.width}x{img.height}"], png)
+
+    failures: list[str] = []
+    samples: list[tuple[int, int, int]] = []
+    for label, fx, fy, expected in QUADRANTS:
+        x = int(img.width * fx)
+        y = int(img.height * fy)
+        actual = img.getpixel((x, y))
+        samples.append(actual)
+        match = _within_tolerance(actual, expected)
+        symbol = "OK" if match else "FAIL"
+        print(f"  [{symbol}] {label:>6} @ ({x}, {y}): got {actual}, expected ~{expected}")
+        if not match:
+            failures.append(f"{label} at ({x}, {y}): got {actual}, expected {expected}")
+
+    if failures and len(set(samples)) == 1:
+        ## All four quadrants identical: the game presented a frame but the
+        ## scene hasn't drawn yet (Godot's clear color) — the signature
+        ## pre-first-present blank, worth naming in the log.
+        failures.append(
+            f"frame is uniform {samples[0]} — likely captured before the scene's first draw"
+        )
+    return (failures, png)
+
+
+def _write_diag_artifacts(attempt_log: list[str], last_png: bytes | None) -> None:
+    try:
+        os.makedirs(DIAG_DIR, exist_ok=True)
+        with open(os.path.join(DIAG_DIR, "attempts.log"), "w", encoding="utf-8") as fh:
+            fh.write("\n".join(attempt_log) + "\n")
+        if last_png:
+            with open(os.path.join(DIAG_DIR, "last-capture.png"), "wb") as fh:
+                fh.write(last_png)
+        print(f"Diagnostics written to {DIAG_DIR}/", file=sys.stderr)
+    except OSError as exc:
+        print(f"(diag) failed to write artifacts: {exc}", file=sys.stderr)
+
+
+def main() -> int:
+    print(f"Connecting to MCP server at {SERVER_URL}")
+    session_id = _initialize_session()
+    _wait_for_godot_session(session_id)
+
+    ## Dump autoload state BEFORE we touch the game — tells us whether the
+    ## plugin's _enter_tree actually persisted _mcp_game_helper, which is the
+    ## hinge for the whole capture path.
+    _dump_diagnostics(session_id)
+
+    print(f"Opening {SCENE_PATH}")
+    _tool_call(session_id, "scene_open", {"path": SCENE_PATH}, 10)
+    time.sleep(1)
+
+    attempt_log: list[str] = []
+    last_png: bytes | None = None
+    try:
+        print("Running project (current scene)")
+        ## 60s, not 20 (#673): the reply waits on the editor spawning a
+        ## whole game process under a software rasterizer, and a busy
+        ## runner has blown a 20s socket margin. The ready-poll below
+        ## exits the moment the game is up, so the higher ceiling costs
+        ## nothing on healthy runs. Inside the try so a timeout here
+        ## still dumps diagnostics and writes the diag artifacts.
+        _tool_call(session_id, "project_run", {"mode": "current"}, 11, timeout=60)
+
+        _wait_for_game_capture_ready(session_id, history=attempt_log)
+
+        deadline = time.monotonic() + CAPTURE_BUDGET_SEC
+        attempt = 0
+        last_failures: list[str] = []
+        while True:
+            attempt += 1
+            print(f"Capturing source='game' (attempt {attempt})")
+            try:
+                failures, png = _capture_attempt(session_id, 100 + attempt * 10)
+            except (urllib.error.URLError, TimeoutError, OSError) as exc:
+                failures, png = ([f"transport error: {exc}"], None)
+            if not failures:
+                print(f"\nCapture smoke test PASSED (attempt {attempt})")
+                return 0
+            last_failures = failures
+            if png:
+                last_png = png
+            summary = "; ".join(failures)
+            attempt_log.append(f"attempt {attempt}: {summary}")
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            print(
+                f"Attempt {attempt} not clean ({summary}); "
+                f"{remaining:.0f}s of budget left, retrying"
+            )
+            time.sleep(min(CAPTURE_RETRY_DELAY_SEC, max(0.0, remaining)))
+
+        print(
+            f"\nCapture smoke test FAILED after {attempt} attempts "
+            f"over {CAPTURE_BUDGET_SEC:.0f}s:"
+        )
+        for f in last_failures:
+            print(f"  - {f}")
+        _dump_diagnostics(session_id)
+        _write_diag_artifacts(attempt_log, last_png)
+        return 1
+    except Exception:
+        print("\nCapture smoke test raised — dumping diagnostics:", file=sys.stderr)
+        _dump_diagnostics(session_id)
+        ## This path used to exit without touching DIAG_DIR, so a
+        ## ready-wait failure uploaded no artifacts at all (#675). Write
+        ## whatever timeline exists plus the traceback.
+        attempt_log.append("")
+        attempt_log.append(traceback.format_exc().rstrip())
+        _write_diag_artifacts(attempt_log, last_png)
+        raise
+    finally:
+        try:
+            ## "stop" has no named tool — it lives only under the project_manage
+            ## rollup, so calling "project_stop" returns an unknown-tool error
+            ## and the game subprocess is never stopped.
+            _tool_call(session_id, "project_manage", {"op": "stop"}, 999, timeout=10)
+        except Exception as exc:
+            print(f"(cleanup) project stop failed: {exc}", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

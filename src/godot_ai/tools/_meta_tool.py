@@ -1,0 +1,555 @@
+"""Helper for registering rolled-up `<domain>_manage` MCP tools.
+
+A `<domain>_manage` tool collapses many per-verb tools into a single
+dispatched tool that takes `op` (the action name) plus a `params` dict.
+The shape mirrors `batch_execute`'s `(command, params)` ergonomic and
+keeps the tool count small for clients with hard tool-count caps that
+ignore Anthropic's `defer_loading` hint.
+
+Each registered tool exposes an enum in the `op` JSON schema, so MCP
+clients with schema-driven autocomplete still see every valid verb.
+Unknown ops surface as a structured error with fuzzy `data.suggestions`.
+
+Op handlers are registered as bare callables: each entry in ``ops`` is a
+shared handler function (sync or async) accepting ``runtime`` plus the
+handler's own keyword args. The dispatcher unpacks ``params`` itself, so
+domain registrations stay free of identity-lambda boilerplate.
+"""
+
+from __future__ import annotations
+
+import difflib
+import functools
+import inspect
+import json
+from collections.abc import Awaitable, Callable, Mapping, MutableMapping, MutableSequence, Sequence
+from types import UnionType
+from typing import Annotated, Any, Literal, Union, get_args, get_origin, get_type_hints
+
+from fastmcp import Context, FastMCP
+
+from godot_ai.godot_client.client import GodotCommandError
+from godot_ai.protocol.errors import ErrorCode
+from godot_ai.runtime.direct import DirectRuntime
+from godot_ai.tools import DEFER_META
+
+## Op handlers may be async (the common case) or sync (e.g. session_*).
+## ``dispatch_manage_op`` awaits the result if it's awaitable. The first
+## positional arg is always the runtime; remaining kwargs come from the
+## caller's ``params`` dict, unpacked by the dispatcher.
+OpHandler = Callable[..., Awaitable[dict] | dict]
+
+
+## Registry of registered ``<domain>_manage`` tools and their op names.
+## Populated by ``register_manage_tool`` so middleware (e.g.
+## ``HintOpTypoOnManage``) can reach the candidate list without
+## reverse-engineering Pydantic's human-readable error string.
+MANAGE_TOOL_OPS: dict[str, tuple[str, ...]] = {}
+
+## (tool_name -> op_name -> handler) so the resource-form lint at test time
+## can introspect each handler's source to classify it as read vs write.
+MANAGE_TOOL_HANDLERS: dict[str, dict[str, OpHandler]] = {}
+
+## (tool_name -> op_name -> URI string | None). Per-op resource declaration
+## for read ops: a URI string declares the matching ``godot://...`` resource
+## form, ``None`` is an explicit waiver acknowledging there is no resource
+## counterpart. Write ops (handlers that call ``require_writable``) are
+## exempt from this declaration; the lint enforces only read-op coverage.
+MANAGE_TOOL_RESOURCE_FORMS: dict[str, dict[str, str | None]] = {}
+
+
+@functools.cache
+def _op_schema_type_for(op_names: frozenset[str]) -> Any:
+    ## Sort because the cache key is a frozenset (orderless); a stable arg
+    ## order keeps the exposed JSON-schema enum deterministic.
+    return Literal[tuple(sorted(op_names))]
+
+
+def register_manage_tool(
+    mcp: FastMCP,
+    *,
+    tool_name: str,
+    description: str,
+    ops: dict[str, OpHandler],
+    read_resource_forms: Mapping[str, str | None] | None = None,
+) -> None:
+    """Register a `<domain>_manage` tool that dispatches by op name.
+
+    Args:
+        mcp: FastMCP instance to register on.
+        tool_name: Tool name (e.g. ``"theme_manage"``).
+        description: Tool docstring; should list every op with its
+            required params so agents can compose calls without leaving
+            tool-search.
+        ops: Mapping of op name to a handler function. Each handler takes
+            ``runtime`` as its first arg and accepts the same keyword args
+            as the underlying shared handler in ``handlers/<domain>.py``.
+            The dispatcher unpacks ``params`` via ``**`` before calling.
+        read_resource_forms: Per-op declaration of the matching
+            ``godot://...`` resource URI for read ops, or ``None`` as an
+            explicit waiver when no resource counterpart exists. Keys must
+            be a subset of ``ops``. Read-vs-write classification is done
+            by ``tests/unit/test_resource_form_lint.py`` at test time
+            (handlers calling ``require_writable`` are write ops and are
+            exempt from declaration). The lint fails if a read op has
+            no entry here, or if the declared URI isn't actually
+            registered — catching both new-op drift and phantom-URI typos.
+
+    Unknown ops raise ``GodotCommandError`` with ``INVALID_PARAMS`` and
+    ``data.suggestions`` populated by ``difflib.get_close_matches``.
+    """
+    if not ops:
+        raise ValueError(f"register_manage_tool: ops cannot be empty (tool {tool_name!r})")
+
+    if read_resource_forms is not None:
+        unknown = set(read_resource_forms) - set(ops)
+        if unknown:
+            raise ValueError(
+                f"register_manage_tool: read_resource_forms keys "
+                f"{sorted(unknown)!r} are not in ops for {tool_name!r}"
+            )
+        for op_name, form in read_resource_forms.items():
+            if form is not None and not isinstance(form, str):
+                raise ValueError(
+                    f"register_manage_tool: read_resource_forms[{op_name!r}] "
+                    f"must be a 'godot://' URI string or None waiver "
+                    f"(got {type(form).__name__})"
+                )
+            if isinstance(form, str) and not form.startswith("godot://"):
+                raise ValueError(
+                    f"register_manage_tool: read_resource_forms[{op_name!r}] "
+                    f"URI must start with 'godot://' (got {form!r})"
+                )
+
+    MANAGE_TOOL_OPS[tool_name] = tuple(ops.keys())
+    MANAGE_TOOL_HANDLERS[tool_name] = dict(ops)
+    MANAGE_TOOL_RESOURCE_FORMS[tool_name] = (
+        dict(read_resource_forms) if read_resource_forms is not None else {}
+    )
+    op_schema_type = _op_schema_type_for(frozenset(ops.keys()))
+
+    async def manage(ctx: Context, op, params=None, session_id="") -> dict:
+        runtime = DirectRuntime.from_context(ctx, session_id=session_id or None)
+        return await dispatch_manage_op(
+            ops=ops,
+            tool_name=tool_name,
+            runtime=runtime,
+            op=op,
+            params=params,
+        )
+
+    ## ``from __future__ import annotations`` would stringify local type
+    ## objects; pydantic resolves forward refs against module globals.
+    ## Setting ``__annotations__`` post-hoc with real type objects bypasses
+    ## that resolution path. ``op_schema_type`` is a generated ``Literal`` so
+    ## FastMCP exposes the enum and validates op values at the schema boundary.
+    manage.__annotations__ = {
+        "ctx": Context,
+        "op": op_schema_type,
+        "params": dict[str, Any] | None,
+        "session_id": str,
+        "return": dict,
+    }
+    manage.__name__ = tool_name
+    manage.__qualname__ = tool_name
+    manage.__doc__ = (
+        description.rstrip() + '\n\nCanonical call shape: ``{"op": "<verb>", "params": {...}}``. '
+        "Flat op parameters are accepted as a compatibility alias when the client "
+        "transmits them; ``op`` and ``session_id`` remain top-level."
+    )
+    mcp.tool(meta=DEFER_META)(manage)
+
+
+def _is_json_shaped(value: str) -> bool:
+    return value.lstrip()[:1] in ("[", "{")
+
+
+def _json_container_kinds(annotation: Any) -> set[str]:
+    """Return container kinds accepted by a handler annotation.
+
+    An empty set means "do not coerce" — including unannotated, ``Any``, and
+    ``object`` params. This is intentional: pre-PR behavior eagerly decoded
+    every JSON-shaped string, which mangled legitimate values; post-PR we
+    only decode when the handler explicitly declares list/dict shape.
+    """
+    if annotation in (inspect.Parameter.empty, Any, object):
+        return set()
+
+    origin = get_origin(annotation)
+    args = get_args(annotation)
+    if origin is Annotated:
+        return _json_container_kinds(args[0]) if args else set()
+    if origin in (Union, UnionType):
+        kinds: set[str] = set()
+        for arg in args:
+            if arg is type(None):
+                continue
+            ## A str-accepting arm means a JSON-shaped string is a legitimate
+            ## literal value for this param (#714) — never decode. Eagerly
+            ## parsing `list[str] | str` would mangle e.g. a text payload
+            ## that happens to start with "[" or "{".
+            if arg is str or (isinstance(arg, type) and issubclass(arg, str)):
+                return set()
+            kinds.update(_json_container_kinds(arg))
+        return kinds
+
+    target = origin or annotation
+    if target in (dict, Mapping, MutableMapping):
+        return {"dict"}
+    if target in (list, Sequence, MutableSequence):
+        return {"list"}
+    return set()
+
+
+@functools.cache
+def _handler_meta(handler: OpHandler) -> tuple[inspect.Signature | None, dict[str, Any]]:
+    """Resolve and cache ``(signature, type_hints)`` for a registered handler.
+
+    Handlers are registered once at startup and live for the lifetime of the
+    process, so an unbounded cache is safe. ``get_type_hints`` walks module
+    globals to resolve forward references — not free — and ``inspect.signature``
+    introspects defaults; both ran on every dispatch before this cache.
+    """
+    try:
+        signature = inspect.signature(handler)
+    except (TypeError, ValueError):
+        signature = None
+    try:
+        type_hints = get_type_hints(handler)
+    except (NameError, TypeError, ValueError):
+        type_hints = {}
+    return (signature, type_hints)
+
+
+## Scalar pins enforced Python-side before dispatch (#714). Only exact
+## str/bool/int/float annotations (plus Optional/unions of those) are
+## enforced — Any/unannotated/container params stay with
+## _coerce_stringified_json_values and the GDScript handler's own checks.
+def _scalar_annotation_types(annotation: Any) -> tuple[type, ...] | None:
+    if annotation in (inspect.Parameter.empty, Any, object):
+        return None
+    origin = get_origin(annotation)
+    args = get_args(annotation)
+    if origin is Annotated:
+        return _scalar_annotation_types(args[0]) if args else None
+    if origin in (Union, UnionType):
+        allowed: list[type] = []
+        for arg in args:
+            if arg is type(None):
+                allowed.append(type(None))
+                continue
+            sub = _scalar_annotation_types(arg)
+            if sub is None:
+                return None
+            allowed.extend(sub)
+        return tuple(allowed)
+    if annotation in (str, bool, int, float):
+        return (annotation,)
+    return None
+
+
+def _scalar_mismatch_label(value: Any, allowed: tuple[type, ...]) -> str | None:
+    """None when ``value`` satisfies one of ``allowed``; else the expected label.
+
+    bool is checked before int (bool subclasses int — a bare ``True`` must
+    not satisfy an ``int`` pin, that's the classic type confusion this
+    guards). An ``int`` satisfies a ``float`` pin: JSON has one number type
+    and ``1`` for a float slot is legitimate.
+    """
+    for t in allowed:
+        if t is type(None):
+            if value is None:
+                return None
+        elif t is bool:
+            if isinstance(value, bool):
+                return None
+        elif t is int:
+            if isinstance(value, int) and not isinstance(value, bool):
+                return None
+        elif t is float:
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                return None
+        elif t is str:
+            if isinstance(value, str):
+                return None
+    names = sorted({"None" if t is type(None) else t.__name__ for t in allowed})
+    return " | ".join(names)
+
+
+def _expected_json_label(kinds: set[str]) -> str:
+    if kinds == {"list"}:
+        return "JSON array"
+    if kinds == {"dict"}:
+        return "JSON object"
+    return "JSON array or object"
+
+
+def _json_kind(value: Any) -> str:
+    if isinstance(value, list):
+        return "list"
+    if isinstance(value, dict):
+        return "dict"
+    return type(value).__name__
+
+
+def _coerce_stringified_json_values(
+    params: dict[str, Any],
+    *,
+    handler: OpHandler,
+    tool_name: str,
+    op: str,
+) -> dict[str, Any]:
+    """JSON-decode nested params only when the handler annotation expects it.
+
+    Some MCP clients stringify complex nested arguments before sending them
+    inside a manage tool's ``params`` object. Decode those compatibility
+    strings for list/dict-like handler params, but keep JSON-shaped strings
+    intact for string-typed params and leave missing/extra-argument errors to
+    the handler call below.
+
+    Returns ``params`` unchanged when nothing needs coercion (the common case).
+    """
+    signature, type_hints = _handler_meta(handler)
+    if signature is None:
+        return params
+
+    coerced: dict[str, Any] | None = None
+
+    for key, val in params.items():
+        if not isinstance(val, str) or not _is_json_shaped(val):
+            continue
+
+        parameter = signature.parameters.get(key)
+        if parameter is None:
+            continue
+
+        annotation = type_hints.get(key, parameter.annotation)
+        expected_kinds = _json_container_kinds(annotation)
+        if not expected_kinds:
+            continue
+
+        try:
+            decoded = json.loads(val)
+        except json.JSONDecodeError as exc:
+            expected = _expected_json_label(expected_kinds)
+            raise GodotCommandError(
+                code=ErrorCode.INVALID_PARAMS,
+                message=(
+                    f"{tool_name}.{op}: param {key!r} expects {expected}; "
+                    "received malformed JSON string"
+                ),
+                data={
+                    "tool": tool_name,
+                    "op": op,
+                    "param": key,
+                    "expected": expected,
+                    "json_error": exc.msg,
+                },
+            ) from exc
+
+        actual_kind = _json_kind(decoded)
+        if actual_kind not in expected_kinds:
+            expected = _expected_json_label(expected_kinds)
+            raise GodotCommandError(
+                code=ErrorCode.INVALID_PARAMS,
+                message=(
+                    f"{tool_name}.{op}: param {key!r} expects {expected}; "
+                    f"received JSON {actual_kind}"
+                ),
+                data={
+                    "tool": tool_name,
+                    "op": op,
+                    "param": key,
+                    "expected": expected,
+                    "actual": actual_kind,
+                },
+            )
+
+        if coerced is None:
+            coerced = dict(params)
+        coerced[key] = decoded
+
+    return params if coerced is None else coerced
+
+
+async def dispatch_manage_op(
+    *,
+    ops: dict[str, OpHandler],
+    tool_name: str,
+    runtime: DirectRuntime,
+    op: str,
+    params: dict[str, Any] | None,
+) -> dict:
+    """Run one op against ``runtime`` with ``params``.
+
+    Note: when called via FastMCP, op-name validation has already happened
+    at the Pydantic schema boundary (the wrapper's ``op`` parameter is a
+    ``Literal`` of registered op names). The ``difflib`` suggestion path
+    below only fires for direct dispatcher calls — e.g. unit tests, or
+    a hypothetical future caller that bypasses the schema. Pydantic's
+    own ``literal_error`` message already enumerates valid alternatives.
+
+    Extracted from the closure so unit tests can drive it without spinning
+    up a full FastMCP context. Handlers are called as
+    ``handler(runtime, **params)`` — the ``ops`` map holds bare handler
+    references rather than identity-lambda adapters.
+    """
+    handler = ops.get(op)
+    if handler is None:
+        suggestions = difflib.get_close_matches(op, ops, n=3, cutoff=0.5)
+        message = f"{tool_name}: unknown op {op!r}"
+        if suggestions:
+            message += f" — did you mean: {', '.join(suggestions)}?"
+        raise GodotCommandError(
+            code=ErrorCode.INVALID_PARAMS,
+            message=message,
+            data={"tool": tool_name, "op": op, "suggestions": suggestions},
+        )
+
+    call_params = params if params is not None else {}
+    if not isinstance(call_params, dict):
+        raise GodotCommandError(
+            code=ErrorCode.INVALID_PARAMS,
+            message=f"{tool_name}: 'params' must be an object/dict",
+            data={"tool": tool_name, "op": op, "type": type(call_params).__name__},
+        )
+
+    call_params = _coerce_stringified_json_values(
+        call_params,
+        handler=handler,
+        tool_name=tool_name,
+        op=op,
+    )
+
+    ## Scalar type pins (#714): 28 of 30 GDScript handlers skip
+    ## McpParamValidators, so a bool where an int belongs (or a dict where
+    ## a str belongs) used to surface as an opaque plugin-side crash. Check
+    ## here, where the cached type hints already exist, and fail with a
+    ## param-naming INVALID_PARAMS the agent can self-correct from.
+    signature, type_hints = _handler_meta(handler)
+    for key, value in call_params.items():
+        annotation = type_hints.get(key, inspect.Parameter.empty)
+        if annotation is inspect.Parameter.empty and signature is not None:
+            ## get_type_hints fails wholesale (one unresolvable forward ref
+            ## poisons every hint) — fall back to the raw signature
+            ## annotation, same as _coerce_stringified_json_values, so a
+            ## param annotated with a real type object keeps its pin. A
+            ## PEP 563 stringified annotation lands here as a string, which
+            ## matches no scalar type and leaves the pin off, as before.
+            parameter = signature.parameters.get(key)
+            if parameter is not None:
+                annotation = parameter.annotation
+        allowed = _scalar_annotation_types(annotation)
+        if allowed is None:
+            continue
+        expected = _scalar_mismatch_label(value, allowed)
+        if expected is not None:
+            raise GodotCommandError(
+                code=ErrorCode.INVALID_PARAMS,
+                message=(
+                    f"{tool_name}.{op}: param {key!r} must be {expected}, "
+                    f"got {type(value).__name__}"
+                ),
+                data={
+                    "tool": tool_name,
+                    "op": op,
+                    "param": key,
+                    "expected": expected,
+                    "received_type": type(value).__name__,
+                },
+            )
+
+    try:
+        result = handler(runtime, **call_params)
+    except TypeError as exc:
+        ## When a caller passes a key the handler doesn't accept (a common LLM
+        ## failure mode: invented kwargs like ``force=True`` on ``stop``,
+        ## ``session_id`` nested inside ``params``), the bare TypeError text
+        ## reads like an internal error. Surface the handler's accepted-key set
+        ## and the unexpected key (if Pydantic-style detectable) so the agent
+        ## can self-correct without a second round-trip.
+        signature, _ = _handler_meta(handler)
+        accepted: list[str] = []
+        required: list[str] = []
+        if signature is not None:
+            ## The first positional is always the runtime — skip by position
+            ## rather than name (handlers in tests use ``rt``; real handlers
+            ## use ``runtime``).
+            params_iter = iter(signature.parameters.items())
+            next(params_iter, None)
+            for name, param in params_iter:
+                if param.kind not in (
+                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    inspect.Parameter.KEYWORD_ONLY,
+                ):
+                    continue
+                accepted.append(name)
+                if param.default is inspect.Parameter.empty:
+                    required.append(name)
+        received = list(call_params.keys())
+        ## When we can't introspect the handler signature, leave unexpected empty
+        ## so the hint reads as the bare TypeError (no false claims about keys).
+        if signature is None:
+            unexpected = []
+        else:
+            unexpected = [k for k in received if k not in accepted]
+        missing = [key for key in required if key not in call_params]
+        example_param = missing[0] if missing else (accepted[0] if accepted else None)
+        if example_param is None:
+            example_data = {"op": op, "params": {}}
+            example = json.dumps(example_data)
+        else:
+            example_data = {"op": op, "params": {example_param: "..."}}
+            example = f'{{"op": {json.dumps(op)}, "params": {{{json.dumps(example_param)}: ...}}}}'
+        contract = "Op-specific parameters go inside 'params'; 'op' and 'session_id' are top-level."
+        hint = f"{tool_name}.{op}: {exc}"
+        if signature is not None:
+            accepted_label = ", ".join(repr(k) for k in accepted) if accepted else "(none)"
+            if unexpected:
+                hint += (
+                    f". Unexpected param(s): {', '.join(repr(k) for k in unexpected)}. "
+                    f"Accepted params for op {op!r}: {accepted_label}"
+                )
+            else:
+                hint += f". Accepted params for op {op!r}: {accepted_label}"
+                if missing:
+                    hint += (
+                        ". Op params must be nested inside the 'params' object, "
+                        f"e.g. {example} — not passed at the top level."
+                    )
+
+            if "session_id" in unexpected:
+                hint += (
+                    " 'session_id' is a top-level sibling of 'op' and 'params', "
+                    "not nested inside 'params'."
+                )
+            if "op" in unexpected:
+                hint += (
+                    " 'op' is a top-level sibling of 'params' and 'session_id', "
+                    "not nested inside 'params'."
+                )
+        raise GodotCommandError(
+            code=ErrorCode.INVALID_PARAMS,
+            message=hint,
+            data={
+                "tool": tool_name,
+                "op": op,
+                "received": received,
+                "accepted": accepted,
+                "required": required,
+                "missing": missing,
+                "unexpected": unexpected,
+                "contract": contract,
+                "example": example_data,
+            },
+        ) from exc
+
+    ## Outside the try (#714): the TypeError catch above exists for BINDING
+    ## errors (unexpected/missing kwargs). Awaiting here keeps a genuine
+    ## TypeError bug inside an async handler body propagating as the
+    ## internal error it is, instead of being misreported as INVALID_PARAMS
+    ## blaming the caller's params. (Sync handler bodies remain inseparable
+    ## from binding — Python raises both at the same call site.)
+    if inspect.isawaitable(result):
+        result = await result
+    return result

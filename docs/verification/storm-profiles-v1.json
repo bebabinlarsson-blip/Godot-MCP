@@ -1,0 +1,162 @@
+{
+  "schema_version": 1,
+  "seeds": [
+    41001,
+    41002,
+    41003
+  ],
+  "profiles": {
+    "steady": {
+      "description": "One editor under sustained mixed-domain load with no intentional reload.",
+      "editors": 1,
+      "workers_per_editor": 8,
+      "waves": 20,
+      "calls_per_worker_wave": 25,
+      "calls_per_seed": 4000,
+      "reload_enabled": false,
+      "reload_every": 0,
+      "reload_replaces_wave": false,
+      "reload_mode": "concurrent",
+      "session_pin_fraction": 0.0
+    },
+    "reload-churn": {
+      "description": "One editor with plugin/Dock reload scheduling every third wave; adopted and managed topology runs are recorded separately.",
+      "editors": 1,
+      "workers_per_editor": 12,
+      "waves": 30,
+      "calls_per_worker_wave": 25,
+      "calls_per_seed": 9000,
+      "reload_enabled": true,
+      "reload_every": 3,
+      "reload_replaces_wave": false,
+      "reload_mode": "concurrent",
+      "session_pin_fraction": 0.0
+    },
+    "multi-editor": {
+      "description": "Two configured editor endpoints, four workers each, with every operation explicitly session-pinned (exceeding the one-half minimum).",
+      "editors": 2,
+      "workers_per_editor": 4,
+      "waves": 20,
+      "calls_per_worker_wave": 25,
+      "calls_per_seed": 4000,
+      "reload_enabled": true,
+      "reload_every": 3,
+      "reload_replaces_wave": false,
+      "reload_mode": "concurrent",
+      "session_pin_fraction": 1.0
+    }
+  },
+  "thresholds": {
+    "unexpected_errors": 0,
+    "required_reload_survival_percent": 100,
+    "recovery_p95_seconds": 15,
+    "recovery_max_seconds": 30,
+    "required_domains": [
+      "animation",
+      "audio",
+      "batch",
+      "camera",
+      "editor",
+      "filesystem",
+      "input_map",
+      "logs",
+      "material",
+      "node",
+      "particle",
+      "project",
+      "resource",
+      "scene",
+      "script",
+      "session",
+      "signal",
+      "theme"
+    ],
+    "overall_latency_ms": {},
+    "per_operation_latency_ms": {},
+    "required_operation_labels": [
+      "animation_manage.player_create",
+      "audio_manage.list",
+      "audio_manage.player_create",
+      "batch_execute",
+      "camera_manage.create",
+      "camera_manage.list",
+      "editor_manage.monitors_get",
+      "editor_manage.selection_get",
+      "editor_manage.state",
+      "editor_screenshot",
+      "editor_state",
+      "ensure_container",
+      "filesystem_manage.read_text",
+      "filesystem_manage.search",
+      "filesystem_manage.write_text",
+      "input_map_manage.list",
+      "logs_read",
+      "material_manage.create",
+      "material_manage.list",
+      "material_manage.set_param",
+      "node_create",
+      "node_find",
+      "node_get_properties",
+      "node_manage.add_to_group",
+      "node_manage.delete",
+      "node_manage.duplicate",
+      "node_manage.get_children",
+      "node_manage.get_groups",
+      "node_manage.move",
+      "node_manage.remove_from_group",
+      "node_manage.rename",
+      "node_set_property",
+      "particle_manage.create",
+      "particle_manage.set_process",
+      "project_manage.settings_get",
+      "resource_manage.create",
+      "resource_manage.environment_create",
+      "resource_manage.gradient_texture_create",
+      "resource_manage.noise_texture_create",
+      "resource_manage.search",
+      "scene_get_hierarchy",
+      "scene_manage.get_roots",
+      "scene_save",
+      "script_attach",
+      "script_create",
+      "script_manage.detach",
+      "script_manage.find_symbols",
+      "script_manage.read",
+      "script_patch",
+      "session_manage.list",
+      "signal_manage.list",
+      "theme_manage.create",
+      "theme_manage.set_color"
+    ]
+  },
+  "profile_thresholds": {
+    "steady": {
+      "minimum_calls_per_supported_domain": 80,
+      "minimum_calls_by_domain": {
+        "project": 25,
+        "session": 70,
+        "signal": 70
+      }
+    },
+    "reload-churn": {
+      "minimum_calls_per_supported_domain": 180,
+      "minimum_calls_by_domain": {
+        "project": 60
+      }
+    },
+    "multi-editor": {
+      "minimum_session_pinned_fraction": 0.5,
+      "minimum_calls_per_supported_domain": 80,
+      "minimum_calls_by_domain": {
+        "project": 25,
+        "session": 70,
+        "signal": 70
+      }
+    }
+  },
+  "unresolved_baseline_fields": [
+    "overall and per-operation p95/p99 latency caps by fixed OS/Godot row",
+    "absolute RSS, file-descriptor, and thread ceilings",
+    "post-quiescence non-growth ceilings"
+  ]
+}

@@ -1,0 +1,84 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+# Not tracked: not CI-enforced (CI uses pip); pyproject ranges are the source of truth.
+uv.lock
+
+# PyInstaller
+*.spec
+
+# Godot
+.godot/
+*.import
+export_presets.cfg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude Code worktrees (per-session checkouts under .claude/worktrees/)
+# — .claude/settings.json, hooks/, skills/ are tracked; worktrees/ is local-only.
+.claude/worktrees/
+
+# OS
+.DS_Store
+Thumbs.db
+# macOS iCloud sync duplicate files (e.g. "foo 2.gd", "foo.py 2.uid")
+* 2.gd
+* 2.gd.uid
+* 2.py
+*.gd 2.uid
+*.py 2.uid
+
+# Distribution
+*.dmg
+*.exe
+*.AppImage
+
+# Plugin symlink/junction into test_project/ — built locally by
+# script/setup-dev (bash) or script/setup-dev.ps1 (Windows). Not tracked
+# because a committed symlink checks out as a plain text file on Windows
+# without Developer Mode and fights multi-step git ops (rebase,
+# cherry-pick) on every platform. See #185.
+test_project/addons/godot_ai
+
+# Local demo scene (not tracked in repo)
+test_project/tests/space_city.tscn
+test_project/tests/space_city_assets/
+
+# Test runtime artifacts (created by GDScript tests; ephemeral)
+test_project/tests/_mcp_test_*
+
+# stormtest scratch artifacts (script/stormtest.py)
+_stormtest/
+
+# Local audit / review reports (generated deliverables, not part of the repo)
+/security-audit*.html
+/robustness-review*.html
+
+# Self-update smoke-test artifact dropped into the test project
+test_project/godot-ai-LICENSE.txt
+mcp-server.log
+
+# Godot editor generated UID files and local test project
+*.uid
+*.uid.txt
+test_project/
+dist/
+

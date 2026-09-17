@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Dev environment setup — run once after cloning, or after recreating .venv.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+# Install git hooks to .git/hooks/ so they fire on `git worktree add` and
+# `git checkout <branch>` regardless of which branch the main repo is on.
+#
+# We copy from script/githooks/ (tracked) into .git/hooks/ (untracked,
+# local-only). Why not core.hooksPath=script/githooks? Because git resolves
+# that relative path against the main repo's working tree, which may be on a
+# branch that doesn't contain script/githooks/ — in which case the hook is
+# silently invisible to every worktree. Installing into .git/hooks/ (the
+# default path git always checks) avoids that trap. .git/hooks/ is shared
+# across all worktrees, so one install covers every future worktree.
+GIT_DIR="$(git rev-parse --git-common-dir)"
+if [ -d script/githooks ]; then
+    for hook in script/githooks/*; do
+        [ -f "$hook" ] || continue
+        name="$(basename "$hook")"
+        cp "$hook" "$GIT_DIR/hooks/$name"
+        chmod +x "$GIT_DIR/hooks/$name"
+    done
+fi
+# Clear any stale core.hooksPath from earlier setup-dev runs that used it.
+git config --unset core.hooksPath 2>/dev/null || true
+
+# Build (or repair) the test_project/addons/godot_ai -> plugin/addons/godot_ai
+# link. The link is not tracked in git (see #185 / .gitignore); this script
+# creates it on fresh clones and every `git worktree add` does the same via
+# the post-checkout hook.
+./script/verify-worktree || true
+
+if [ ! -d .venv ]; then
+    python3 -m venv .venv
+fi
+
+source .venv/bin/activate
+pip install -e ".[dev]"
+
+# macOS + Python 3.13: files inside .venv inherit the macOS hidden flag
+# (dot-prefixed directory). Python 3.13 skips hidden .pth files during
+# site initialization (CPython gh-113659), breaking editable installs.
+# sitecustomize.py is loaded via normal import machinery (not .pth
+# scanning), so the hidden flag does not affect it.
+SITE_PACKAGES=$(.venv/bin/python -c "import site; print(site.getsitepackages()[0])")
+cat > "$SITE_PACKAGES/sitecustomize.py" << 'PYEOF'
+"""Editable install path fix for .venv on macOS + Python 3.13+.
+
+macOS sets the hidden flag on files inside dot-prefixed directories.
+Python 3.13+ skips hidden .pth files during site initialization
+(CPython gh-113659), breaking editable installs. This module is loaded
+via normal import machinery (not .pth scanning), so the hidden flag
+does not affect it.
+"""
+import os, sys
+_src = os.path.normpath(os.path.join(sys.prefix, os.pardir, "src"))
+if os.path.isdir(_src) and _src not in sys.path:
+    sys.path.append(_src)
+PYEOF
+
+echo "Dev environment ready. Activate with: source .venv/bin/activate"

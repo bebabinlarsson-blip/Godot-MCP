@@ -1,0 +1,187 @@
+#!/usr/bin/env bash
+# Smoke-test the editor_quit tool in CI.
+# Calls editor_quit, then verifies the Godot session disconnects.
+#
+# Expects: Python server reachable at $MCP_SERVER_URL (default :8000, set in
+# _ci_env.sh), Godot editor with plugin connected.
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PYTHON_CMD="${1:-${PYTHON_CMD:-python}}"
+export PYTHON_CMD
+source "$SCRIPT_DIR/_ci_env.sh"
+source "$SCRIPT_DIR/_ci_session_guard.sh"
+
+SERVER_URL="$MCP_SERVER_URL"
+ci_load_http_auth
+HEADERS=("${HTTP_AUTH_HEADERS[@]}" -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream")
+SESSION_ID=""
+source "$SCRIPT_DIR/_ci_mcp.sh"
+trap close_mcp_session EXIT
+REQ_ID=0
+
+# Helper: call an MCP tool and extract the content JSON from the SSE response.
+mcp_call() {
+  local tool="$1"
+  local args="$2"
+  if [ "$tool" != "session_manage" ] && [ -n "${TARGET_GODOT_SESSION:-}" ]; then
+    args=$(ci_pin_tool_args "$args" "$TARGET_GODOT_SESSION") || return 1
+  fi
+  REQ_ID=$((REQ_ID + 1))
+  local raw
+  raw=$(curl -s --max-time 30 "$SERVER_URL" -X POST "${HEADERS[@]}" \
+    -H "Mcp-Session-Id: $SESSION_ID" \
+    -d "{\"jsonrpc\":\"2.0\",\"id\":$REQ_ID,\"method\":\"tools/call\",\"params\":{\"name\":\"$tool\",\"arguments\":$args}}")
+  echo "$raw" | "$PYTHON_CMD" -c "
+import json, sys
+raw = sys.stdin.read()
+for line in raw.split('\n'):
+    if line.startswith('data: '):
+        data = json.loads(line[6:])
+        result = data.get('result', {})
+        if result.get('isError'):
+            msg = result.get('content', [{}])[0].get('text', 'unknown error')
+            print(f'Tool error: {msg}', file=sys.stderr)
+            print('{}')
+            sys.exit(1)
+        content = result.get('structuredContent', {})
+        if not content:
+            text = result.get('content', [{}])[0].get('text', '{}')
+            content = json.loads(text)
+        print(json.dumps(content))
+        sys.exit(0)
+print(f'No SSE data in response (first 500 chars): {raw[:500]}', file=sys.stderr)
+print('{}')
+sys.exit(1)
+"
+}
+
+# Initialize MCP session
+echo "Initializing MCP session..."
+if ! initialize_mcp_session; then
+  echo "ERROR: Could not initialize MCP session"
+  exit 1
+fi
+
+# Verify Godot is connected before quitting
+echo "Verifying Godot session..."
+SESSIONS=$(mcp_call session_manage '{"op":"list"}')
+if ! TARGET_GODOT_SESSION=$(ci_select_godot_session \
+  "$SESSIONS" "$REPO_ROOT/test_project" "${GODOT_AI_SESSION_ID:-}"); then
+  exit 1
+fi
+echo "Godot session selected: $TARGET_GODOT_SESSION"
+TARGET_EDITOR_PID=$(TARGET_GODOT_SESSION="$TARGET_GODOT_SESSION" "$PYTHON_CMD" -c "
+import json, os, sys
+target = os.environ['TARGET_GODOT_SESSION']
+payload = json.loads(sys.stdin.read())
+matches = [
+    row for row in payload.get('sessions', [])
+    if isinstance(row, dict) and row.get('session_id') == target
+]
+if len(matches) != 1:
+    raise ValueError('selected session is not exactly one live session')
+pid = matches[0].get('editor_pid')
+if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 1:
+    raise ValueError('selected session has no valid editor_pid')
+print(pid)
+" <<< "$SESSIONS")
+
+editor_process_is_alive() {
+  "$PYTHON_CMD" - "$TARGET_EDITOR_PID" <<'PY'
+import os
+import subprocess
+import sys
+
+pid = int(sys.argv[1])
+try:
+    if os.name == "nt":
+        completed = subprocess.run(
+            ["tasklist", "/FI", f"PID eq {pid}", "/NH", "/FO", "CSV"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if completed.returncode != 0:
+            raise OSError("tasklist failed")
+        alive = f'"{pid}"' in completed.stdout
+    else:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            alive = False
+        except PermissionError:
+            alive = True
+        else:
+            alive = True
+except Exception as exc:
+    print(f"liveness probe failed: {exc}", file=sys.stderr)
+    raise SystemExit(2) from exc
+raise SystemExit(0 if alive else 1)
+PY
+}
+
+# Call editor_quit
+echo "Calling editor_quit..."
+QUIT_RESULT=$(mcp_call editor_manage '{"op":"quit"}')
+echo "$QUIT_RESULT" | "$PYTHON_CMD" -c "
+import json, sys
+content = json.loads(sys.stdin.read())
+status = content.get('status', '')
+if status != 'quitting':
+    print(f'FAIL: editor_quit returned status={status!r}, expected \"quitting\"')
+    sys.exit(1)
+print(f'editor_quit OK: {content.get(\"message\", \"\")}')
+"
+
+# Verify the session disconnected (proves Godot actually shut down).
+# The session should disappear from the registry within a few seconds.
+echo "Waiting for session to disconnect..."
+TARGET_PRESENT=1
+for i in $(seq 1 20); do
+  sleep 0.5
+  # A failed registry query is not proof that the editor disconnected. Retry,
+  # unless the exact captured editor PID is itself gone. A plugin-managed
+  # server exits with its editor, so that process proof is the only available
+  # success signal after the server has correctly shut down too.
+  if ! SESSIONS=$(mcp_call session_manage '{"op":"list"}'); then
+    if editor_process_is_alive; then
+      LIVENESS=0
+    else
+      LIVENESS=$?
+    fi
+    if [ "$LIVENESS" -eq 1 ]; then
+      TARGET_PRESENT=0
+      echo "Editor process $TARGET_EDITOR_PID exited with its managed server"
+      break
+    fi
+    echo "Session status check failed on attempt $i; retrying..." >&2
+    continue
+  fi
+  if ! TARGET_PRESENT=$(TARGET_GODOT_SESSION="$TARGET_GODOT_SESSION" "$PYTHON_CMD" -c "
+import json, os, sys
+target = os.environ['TARGET_GODOT_SESSION']
+payload = json.loads(sys.stdin.read())
+if not isinstance(payload, dict):
+    raise ValueError('session response must be a JSON object')
+sessions = payload.get('sessions')
+if not isinstance(sessions, list) or not all(isinstance(s, dict) for s in sessions):
+    raise ValueError('session response is missing a valid sessions array')
+print(1 if any(s.get('session_id') == target for s in sessions) else 0)
+" <<< "$SESSIONS"); then
+    TARGET_PRESENT=1
+    echo "Session status response was invalid on attempt $i; retrying..." >&2
+    continue
+  fi
+  if [ "$TARGET_PRESENT" -eq 0 ] 2>/dev/null; then
+    echo "Session disconnected after ~$((i / 2))s"
+    break
+  fi
+done
+
+if [ "$TARGET_PRESENT" -ne 0 ] 2>/dev/null; then
+  echo "FAIL: Godot session still connected after 10s — quit did not work"
+  exit 1
+fi
+
+echo "Quit smoke test passed"

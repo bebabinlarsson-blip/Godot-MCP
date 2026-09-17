@@ -1,0 +1,60 @@
+name: "Bug Report"
+description: "File a bug report or error encountered in Godot MCP"
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report an issue! Please provide as much context as possible.
+  - type: input
+    id: godot-version
+    attributes:
+      label: Godot Version
+      description: What Godot version are you using? (e.g. 4.3-stable, 4.4-rc1)
+      placeholder: "Godot 4.3"
+    validations:
+      required: true
+  - type: input
+    id: mcp-client
+    attributes:
+      label: MCP Client
+      description: Which AI client are you using? (e.g. Antigravity, Claude Code, Cursor, VS Code)
+      placeholder: "Claude Code / Antigravity"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - Windows 11 / 10
+        - macOS
+        - Linux (Ubuntu / Debian / Fedora)
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the Bug
+      description: A clear and concise description of what happened.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior.
+      placeholder: |
+        1. Start Godot with plugin enabled
+        2. Run `godot-omni attach`
+        3. Call tool `...`
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Diagnostics Output
+      description: Output of `godot-omni doctor` or terminal logs.
+      render: shell
