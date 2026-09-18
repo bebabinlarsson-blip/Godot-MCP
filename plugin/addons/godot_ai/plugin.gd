@@ -430,6 +430,8 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy("attach_script", "script", &"attach_script")
 	_dispatcher.register_lazy("detach_script", "script", &"detach_script")
 	_dispatcher.register_lazy("find_symbols", "script", &"find_symbols")
+	_dispatcher.register_lazy("validate_script", "script", &"validate_script")
+	_dispatcher.register_lazy("delete_script", "script", &"delete_script")
 	_dispatcher.register_lazy("search_resources", "resource", &"search_resources")
 	_dispatcher.register_lazy("load_resource", "resource", &"load_resource")
 	_dispatcher.register_lazy("assign_resource", "resource", &"assign_resource")
@@ -440,6 +442,9 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy("write_file", "filesystem", &"write_file")
 	_dispatcher.register_lazy("reimport", "filesystem", &"reimport")
 	_dispatcher.register_lazy("scan_filesystem", "filesystem", &"scan_filesystem")
+	_dispatcher.register_lazy("list_files", "filesystem", &"list_files")
+	_dispatcher.register_lazy("delete_file", "filesystem", &"delete_file")
+	_dispatcher.register_lazy("move_file", "filesystem", &"move_file")
 	_dispatcher.register_lazy("list_signals", "signal", &"list_signals")
 	_dispatcher.register_lazy("connect_signal", "signal", &"connect_signal")
 	_dispatcher.register_lazy("disconnect_signal", "signal", &"disconnect_signal")
@@ -553,6 +558,7 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy("collision_shape_create", "omni", &"collision_shape_create")
 	_dispatcher.register_lazy("animation_preset_motion", "omni", &"animation_preset_motion")
 	_dispatcher.register_lazy("mcp_ping", "omni", &"mcp_ping")
+	_dispatcher.register_lazy("ping", "omni", &"mcp_ping")
 
 	_connection.dispatcher = _dispatcher
 	add_child(_connection)

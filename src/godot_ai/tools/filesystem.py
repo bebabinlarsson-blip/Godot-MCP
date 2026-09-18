@@ -32,6 +32,12 @@ Ops:
         diagnostics, or ``scan`` for an asset awaiting its first import.
         Returns ``reimported``, ``skipped_non_imported``, ``not_found`` and their
         counts.
+  • list(path="res://", recursive=False, max_depth=1)
+        Browse the project's res:// tree (files, sizes, UIDs, and directories).
+  • delete(path)
+        Delete a file or directory from the project along with its .uid and .import sidecars.
+  • move(from_path, to_path)
+        Move or rename a file in the project, keeping sidecars consistent.
   • scan()
         Force a full ``EditorFileSystem.scan()`` and wait for it to settle.
         This is the headless equivalent of the editor regaining window focus:
@@ -56,14 +62,18 @@ def register_filesystem_tools(mcp: FastMCP) -> None:
         ops={
             "read_text": filesystem_handlers.filesystem_read_text,
             "write_text": filesystem_handlers.filesystem_write_text,
+            "list": filesystem_handlers.filesystem_list,
+            "delete": filesystem_handlers.filesystem_delete,
+            "move": filesystem_handlers.filesystem_move,
             "reimport": filesystem_handlers.filesystem_reimport,
             "scan": filesystem_handlers.filesystem_scan,
             "search": filesystem_handlers.filesystem_search,
         },
         read_resource_forms={
-            ## File reads/searches are per-call queries with arbitrary path
+            ## File reads/searches/lists are per-call queries with arbitrary path
             ## or query inputs; no fixed-URI resource shape fits.
             "read_text": None,
+            "list": None,
             "search": None,
             ## `scan` is an editor action (not require_writable — it must run
             ## while readiness is "importing" to await an in-flight scan), so

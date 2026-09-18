@@ -58,3 +58,21 @@ async def resource_create(
         params["properties"] = properties
     params.update(target_params(path, property, resource_path, overwrite))
     return await runtime.send_command("create_resource", params)
+
+
+async def resource_delete(runtime: DirectRuntime, path: str) -> dict:
+    await require_writable_async(runtime)
+    return await runtime.send_command("delete_file", {"path": path})
+
+
+async def resource_move(
+    runtime: DirectRuntime,
+    from_path: str,
+    to_path: str,
+) -> dict:
+    await require_writable_async(runtime)
+    return await runtime.send_command(
+        "move_file",
+        {"from_path": from_path, "to_path": to_path},
+    )
+

@@ -64,6 +64,16 @@ def register_session_tools(
         runtime = DirectRuntime.from_context(ctx)
         return session_handlers.session_activate(runtime, session_id)
 
+    @mcp.tool()
+    async def ping(ctx: Context, session_id: str = "") -> dict:
+        """Lightweight readiness probe echoing engine status, version, and memory metrics.
+
+        Verifies the end-to-end MCP communication path between the AI agent,
+        the local MCP server, and the active Godot Editor session.
+        """
+        runtime = DirectRuntime.from_context(ctx, session_id=session_id or None)
+        return await session_handlers.session_ping(runtime)
+
     def session_list(runtime: DirectRuntime) -> dict:
         return {**session_handlers.session_list(runtime), "exclude_domains": excluded}
 
@@ -73,8 +83,11 @@ def register_session_tools(
         description=_DESCRIPTION,
         ops={
             "list": session_list,
+            "ping": session_handlers.session_ping,
         },
         read_resource_forms={
             "list": "godot://sessions",
+            "ping": None,
         },
     )
+

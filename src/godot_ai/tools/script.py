@@ -25,6 +25,10 @@ Ops:
         Remove the currently attached script from a node. Undoable.
   • find_symbols(path)
         Outline a .gd — class_name, extends, functions, signals, @export vars.
+  • validate(path="", content="")
+        Validate a GDScript file or source string and return compiler diagnostics.
+  • delete(path)
+        Delete a script file and its .uid sidecar from the project.
 """
 
 
@@ -115,9 +119,12 @@ def register_script_tools(mcp: FastMCP) -> None:
             "read": script_handlers.script_read,
             "detach": script_handlers.script_detach,
             "find_symbols": script_handlers.script_find_symbols,
+            "validate": script_handlers.script_validate,
+            "delete": script_handlers.script_delete,
         },
         read_resource_forms={
             "read": "godot://script/{path*}",
             "find_symbols": None,  ## Per-script symbol lookup; no resource form.
+            "validate": None,
         },
     )

@@ -93,6 +93,8 @@ def register_resource_tools(mcp: FastMCP) -> None:
             "assign": resource_handlers.resource_assign,
             "get_info": resource_handlers.resource_get_info,
             "create": resource_handlers.resource_create,
+            "delete": resource_handlers.resource_delete,
+            "move": resource_handlers.resource_move,
             "curve_set_points": curve_handlers.curve_set_points,
             "environment_create": environment_handlers.environment_create,
             "physics_shape_autofit": physics_shape_handlers.physics_shape_autofit,

@@ -1,399 +1,336 @@
-﻿<p align="center">
-  <img src="docs/hero.png" alt="Godot MCP Banner" width="800">
-</p>
+﻿<div align="center">
 
 # Godot MCP
 
-The Model Context Protocol (MCP) server and official plugin for Godot Engine automation.
+### Production-Grade Model Context Protocol Server and Automation Plugin for the Godot Engine
 
-Built by bebabin. Supports Godot 4.1 through 4.8+ Dev.
+[![MCP Protocol](https://img.shields.io/badge/MCP-Model%20Context%20Protocol-8A2BE2?style=flat&labelColor=333A41)](https://modelcontextprotocol.io)
+[![Release](https://img.shields.io/badge/Release-v5.0.4-blue.svg?style=flat&labelColor=333A41)](https://github.com/bebabinlarsson-blip/Godot-MCP/releases)
+[![Godot](https://img.shields.io/badge/Godot-4.1%20to%204.8+-478CBF?style=flat&logo=godotengine&logoColor=white&labelColor=333A41)](https://godotengine.org)
+[![Python](https://img.shields.io/badge/Python-3.11%20|%203.12%20|%203.13%20|%203.14-3776AB?style=flat&logo=python&logoColor=white&labelColor=333A41)](https://www.python.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat&labelColor=333A41)](LICENSE)
+[![Author](https://img.shields.io/badge/Author-bebabin-2ea44f.svg?style=flat&labelColor=333A41)](https://github.com/bebabinlarsson-blip)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Godot Engine](https://img.shields.io/badge/Godot-4.1%20to%204.8+%20(dev)-478CBF?logo=godotengine&logoColor=white)](https://godotengine.org)
-[![MCP Protocol](https://img.shields.io/badge/MCP-Model%20Context%20Protocol-8A2BE2)](https://modelcontextprotocol.io)
-[![Author](https://img.shields.io/badge/Author-bebabin-green.svg)](https://github.com/bebabinlarsson-blip)
+<br>
+
+<img src="docs/hero.png" alt="Godot MCP Banner" width="100%">
+
+<br>
+
+**Compatible AI Clients**
+
+[Claude Code](https://claude.ai) | [Cursor](https://www.cursor.com) | [Antigravity](https://antigravity.google) | [VS Code / Cline](https://code.visualstudio.com) | [Windsurf](https://codeium.com/windsurf) | [GitHub Copilot](https://github.com/features/copilot) | [OpenAI Codex](https://openai.com)
+
+</div>
 
 ---
 
 ## Overview
 
-Godot MCP connects AI assistants directly to the Godot Editor through the Model Context Protocol. It allows an AI agent to operate the engine programmatically, performing tasks that previously required manual editor interaction.
+Godot MCP connects AI assistants directly to the Godot Editor through the Model Context Protocol (MCP). It equips any modern language model or autonomous agent with complete programmatic control over the Godot Engine, bridging natural language prompts with real-time in-editor creation, modification, inspection, and verification.
 
-The system provides 1,820 canonical engine operations across 59 domains, along with direct GDScript evaluation and semantic editor UI automation. Supported AI clients include Google Antigravity, Claude Code, Cursor, Windsurf, VS Code, and OpenAI Codex.
+Unlike wrappers requiring external cloud compilation or specialized .NET setups, Godot MCP operates via pure GDScript in-engine execution coupled with a high-performance local MCP server. It runs natively across all Godot 4.x installations on Windows, macOS, and Linux without requiring C# Mono builds or external cloud proxies.
 
-### What the AI Can Automate in Godot
+### Key Architectural Strengths
 
-* Complete Scene Authoring: Create, open, save, and compose 2D and 3D scenes.
-* Prefab Instantiation: Instantiate any .tscn scene into the current active scene hierarchy.
-* TileMap Editing: Paint tiles, rotate cells by 90, 180, or 270 degrees, flip tiles horizontally and vertically, and query cell metadata.
-* Spatial Transformations: Translate, rotate, and scale nodes in 2D and 3D with full Undo/Redo integration.
-* Procedural Animations: Insert property and method tracks, add keyframes, and generate motion presets such as spin, bounce, pulse, fade, and slide.
-* Shaders and Materials: Create GDShader files, configure ShaderMaterial uniform parameters, and assign materials to CanvasItem or MeshInstance3D nodes.
-* 3D Primitives and Colliders: Generate BoxMesh, SphereMesh, CylinderMesh, PlaneMesh, CapsuleMesh, and PrismMesh objects, along with matching 2D and 3D collision shapes.
-* Live GDScript Execution: Run arbitrary in-memory GDScript code using godot_eval with full access to EditorInterface, ProjectSettings, singletons, and ClassDB.
-* Universal Reflection: Read, write, inspect, and call methods on any Godot object, resource, or node handle.
-* Editor UI Automation: Traverse editor control trees, click buttons, select tabs, type into inputs, and trigger command palette actions.
-* In-Editor Inspector Dock: Monitor live AI tool invocations, verify connection health, and test expressions directly inside Godot.
+* Universal Compatibility: Runs seamlessly on both Standard (GDScript) and .NET (Mono) builds of Godot 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, and 4.8+ Dev.
+* Complete Feature Parity: 59 domain families encompassing 1,820 canonical engine operations, from granular scene and node transformations to procedural animation and tile manipulation.
+* Live GDScript Execution: Direct arbitrary script evaluation inside the editor process with full access to EditorInterface, ProjectSettings, singletons, and ClassDB.
+* Universal Reflection: Inspect, read, write, and invoke methods on any Godot Object, Resource, Node, or Singleton with typed argument conversion and handle safety.
+* Single Unified Dock: Clean, native editor panel positioned beside the Inspector dock with live tool activity tracking, connection status, memory indicators, and port conflict resolution.
+* Zero Cloud Dependency: All MCP traffic routes over secure local loopback WebSocket and standard I/O pipes. Your project code and game assets never leave your computer.
 
 ---
 
-## Requirements
+## Tool Families and Capabilities Matrix
 
-* Godot Engine: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, or 4.8+ (including dev builds)
-* Python: 3.11, 3.12, 3.13, or 3.14
-* Package Manager: Astral uv (recommended) or pip
+Godot MCP exposes 59 domain families covering the entire surface of the Godot Engine:
+
+| Family | Key Operations | Description |
+| :--- | :--- | :--- |
+| **ping** | `ping`, `mcp_ping` | Diagnostic readiness probe echoing engine status, version, process frames, and memory metrics. |
+| **node** | `node_create`, `node_set_property`, `node_get_properties`, `node_find`, `node_manage` | Find, spawn, modify, reparent, reorder, duplicate, delete, rotate, scale, and translate nodes in 2D and 3D with undo/redo. |
+| **scene** | `scene_open`, `scene_save`, `scene_get_hierarchy`, `scene_manage` | Open, save, create, close, inspect root hierarchies, and instantiate PackedScene prefabs. |
+| **script** | `script_create`, `script_patch`, `script_attach`, `script_manage` | Create, anchor-patch, read, detach, inspect symbols, validate syntax/compilation, and delete GDScript files. |
+| **filesystem** | `filesystem_manage` | List files and directories with UIDs, read/write text, delete, move, force reimport assets, and trigger editor scans. |
+| **resource** | `resource_manage` | Search, load, assign, introspect, create, delete, and move .tres/.res assets, curve profiles, and environment setups. |
+| **screenshot** | `editor_screenshot`, `camera_manage` | High-fidelity captures of the 3D viewport, 2D viewport, active cameras, running game frames, and isolated node framing. |
+| **editor** | `editor_state`, `editor_manage`, `editor_reload_plugin` | Read editor lifecycle, inspect/set node selections, query performance monitors, clear logs, and execute safe restarts. |
+| **console** | `logs_read`, `editor_manage(logs_clear)` | Real-time structured log streaming from plugin events, editor output, debugger errors, and game runtime stdout/stderr. |
+| **reflection** | `omni_eval`, `omni_manage(call, get, set, inspect)` | Universal object reflection, dynamic method invocation, property getters/setters, and ClassDB discovery. |
+| **tilemap** | `tilemap_manage` | Paint cells, rotate tiles (90, 180, 270 degrees), flip horizontally/vertically, erase, query coordinates, and inspect layers. |
+| **tileset** | `tileset_manage` | Inspect atlas source tiles, extract texture slices, and introspect physics and navigation layers. |
+| **animation** | `animation_create`, `animation_manage` | Create AnimationPlayers, add property/method tracks, insert keyframes, set autoplay, and apply procedural motion presets. |
+| **physics** | `collision_shape_create`, `physics_shape_autofit` | Generate 2D and 3D collision bodies, autofit shapes to visual mesh bounds, and configure collision layers. |
+| **mesh** | `mesh_create_primitive` | Procedural generation of BoxMesh, SphereMesh, CylinderMesh, PlaneMesh, CapsuleMesh, and PrismMesh objects with materials. |
+| **shader** | `shader_create`, `material_manage` | Author GDShader files, create ShaderMaterials, set uniforms, and assign materials to CanvasItem or MeshInstance3D nodes. |
+| **game** | `game_manage`, `project_run` | Launch, stop, restart, and command the running game instance with game helper diagnostics. |
+| **input** | `input_map_manage` | Configure InputMap actions, bind keyboard and gamepad events, and query registered input actions. |
+| **ui** | `ui_manage`, `ui_semantic_tree`, `ui_click`, `ui_type` | Inspect the semantic control hierarchy of the editor UI, click buttons/tabs, and simulate input keystrokes. |
 
 ---
 
-## Installation and Setup
+## Quick Start
 
 ### Step 1: Install the Godot Plugin
 
 #### Option A: From Release Archive (Recommended)
-1. Download godot-mcp-v5.0.2.zip from the [Releases](https://github.com/bebabinlarsson-blip/Godot-MCP/releases) page.
-2. Extract the archive directly into your Godot project root so that ddons/godot_omni and ddons/godot_ai sit in es://addons/.
 
-#### Option B: Clone or Copy Manually
-Copy the ddons/godot_omni and ddons/godot_ai directories from this repository into your project:
+1. Download `godot-mcp-v5.0.4.zip` from the [GitHub Releases](https://github.com/bebabinlarsson-blip/Godot-MCP/releases) page.
+2. Extract the archive into your Godot project root folder.
+3. Verify that your directory structure looks like this:
 
-`	ext
+```text
 your-godot-project/
 └── addons/
-    ├── godot_omni/
+    ├── godot_ai/
     │   ├── plugin.cfg
     │   ├── plugin.gd
-    │   ├── omni_dock.gd
-    │   ├── mcp_event_bus.gd
-    │   ├── omni_reflection.gd
-    │   └── omni_ui_tree.gd
-    └── godot_ai/
+    │   ├── godot_mcp_dock.gd
+    │   ├── connection.gd
+    │   ├── dispatcher.gd
+    │   └── handlers/
+    └── godot_omni/
         ├── plugin.cfg
         ├── plugin.gd
-        ├── dispatcher.gd
-        ├── connection.gd
-        └── handlers/
-`
+        ├── omni_dock.gd
+        ├── omni_reflection.gd
+        └── omni_ui_tree.gd
+```
 
-### Step 2: Enable the Plugins in Godot
-1. Open your project in Godot.
-2. Go to **Project -> Project Settings -> Plugins**.
-3. Enable **Godot MCP Omni** and **Godot MCP Core**.
+#### Option B: Automated via Terminal
 
-The plugin starts the local loopback WebSocket server and attaches the **Godot MCP** tab directly beside your Inspector.
-
----
-
-### Step 3: Install the Python MCP Server
-
-`ash
+```bash
 # Clone the repository
 git clone https://github.com/bebabinlarsson-blip/Godot-MCP.git
-cd "Godot-MCP"
 
-# Install with dependencies using uv
-uv sync
+# Copy addons to your project
+Copy-Item -Path "Godot-MCP/addons/*" -Destination "YourProject/addons/" -Recurse -Force
+```
 
-# Or install with pip
-pip install -e .
-`
+### Step 2: Enable the Plugin in Godot
 
-Verify your installation from the terminal:
-`ash
-godot-omni self-test
-godot-omni tools stats
-`
+1. Open your project in the Godot Editor.
+2. Navigate to **Project -> Project Settings -> Plugins**.
+3. Enable **Godot MCP Core** and **Godot MCP Omni**.
+4. The single **Godot MCP** inspector tab will immediately appear on the right side beside the Inspector dock.
 
 ---
 
-### Step 4: Configure Your AI Client
+## AI Client Configuration
 
-You can auto-configure supported clients using the CLI:
+Godot MCP can be run via `uvx` directly from GitHub, through a local Python installation, or via the `godot-omni` CLI.
 
-`ash
-# Configure all detected clients
-godot-omni clients configure all
+### Cursor
 
-# Or configure a specific client:
-godot-omni clients configure antigravity
-godot-omni clients configure claude-code
-godot-omni clients configure claude-desktop
-godot-omni clients configure cursor
-godot-omni clients configure windsurf
-godot-omni clients configure vscode
-`
+Add this entry to `.cursor/mcp.json` in your project or global Cursor settings:
 
-#### Manual Configuration (JSON)
-For manual setup, add the entry below to your client's MCP configuration file:
-
-`json
+```json
 {
   "mcpServers": {
     "godot-mcp": {
-      "command": "godot-omni",
-      "args": ["attach"]
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git",
+        "godot-ai"
+      ]
     }
   }
 }
-`
+```
+
+### Claude Desktop
+
+Add this configuration to `claude_desktop_config.json`:
+
+* Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+* macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git",
+        "godot-ai"
+      ]
+    }
+  }
+}
+```
+
+### Google Antigravity
+
+In Antigravity or Gemini CLI, add the server to your configuration:
+
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git",
+        "godot-ai"
+      ]
+    }
+  }
+}
+```
+
+### VS Code (Cline / Roo Code)
+
+Add this configuration to your Cline MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git",
+        "godot-ai"
+      ]
+    }
+  }
+}
+```
+
+### Windsurf
+
+Add this configuration to `~/.codeium/windsurf/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git",
+        "godot-ai"
+      ]
+    }
+  }
+}
+```
 
 ---
 
-## AI Agent Decision Framework
+## In-Editor Inspector Dock
 
-When an AI assistant automates tasks in Godot, it should follow this 6-step execution workflow:
+The Godot MCP dock integrates directly into the Godot Editor on the right dock bar beside the Inspector:
 
-### 1. State Inspection
-Always inspect the current project state before mutating scenes:
-`json
-call("godot-ai", "editor_state", {})
-call("godot-ai", "scene_get_hierarchy", {"max_depth": 5})
-`
-
-### 2. Scene and Prefab Composition
-Create nodes, instantiate sub-scenes (.tscn), or generate 3D primitives:
-`json
-// Instantiate a prefab:
-call("godot-ai", "omni_manage", {
-  "op": "instantiate_prefab",
-  "scene_path": "res://scenes/coin.tscn",
-  "parent_path": "Items",
-  "node_name": "Coin_01",
-  "position": [100.0, 200.0]
-})
-
-// Generate a 3D Box primitive:
-call("godot-ai", "omni_manage", {
-  "op": "mesh_primitive",
-  "primitive_type": "box",
-  "node_name": "Crate",
-  "size": [1.0, 1.0, 1.0],
-  "albedo_color": [0.6, 0.4, 0.2, 1.0],
-  "position": [0.0, 0.5, 0.0]
-})
-`
-
-### 3. Environment Construction (TileMaps)
-Paint and manipulate tiles in TileMapLayer or TileMap nodes:
-`json
-// Place a rotated tile:
-call("godot-ai", "tilemap_manage", {
-  "op": "tilemap_place_tile",
-  "path": "TileMapLayer",
-  "source_id": 0,
-  "atlas_col": 3,
-  "atlas_row": 1,
-  "map_x": 12,
-  "map_y": 8,
-  "rotation_degrees": 90,
-  "flip_h": false
-})
-`
-
-### 4. Node Transforms
-Apply translation, rotation, and scaling with native Undo/Redo:
-`json
-call("godot-ai", "node_manage", {
-  "op": "rotate",
-  "path": "Player",
-  "degrees": 90.0,
-  "relative": true
-})
-`
-
-### 5. Animation Authoring
-Generate keyframes and motion clips using presets or custom tracks:
-`json
-call("godot-ai", "animation_manage", {
-  "op": "preset_spin",
-  "player_path": "AnimationPlayer",
-  "target_path": "Icon",
-  "duration": 1.2,
-  "loop": true
-})
-`
-
-### 6. Live GDScript Omnipotence (godot_eval)
-When a bespoke operation is needed that has no pre-packaged tool, execute ephemeral GDScript:
-`json
-call("godot-ai", "omni_eval", {
-  "code": "return EditorInterface.get_editor_settings().get_setting('interface/editor/main_font_size')"
-})
-`
+* Live Status Indicator: Real-time visual feedback showing server connection state and engine bridge health.
+* Operation Activity Stream: Displays incoming tool calls with execution status, operation name, and response duration in milliseconds.
+* Diagnostic Controls: Run immediate self-tests, verify readiness probes (`ping`), and measure active session latency directly inside the editor.
+* Memory & Performance Telemetry: Displays static memory allocation, process frame counts, and active scene root details.
+* Free Port & Replace Server: One-click resolution for occupied HTTP/WebSocket ports, freeing port 8000 safely if an orphaned background process was left running.
 
 ---
 
-## The Godot MCP Inspector Dock
+## System Architecture
 
-Godot MCP adds an official editor dock placed directly in the upper-right dock area beside the **Inspector** tab (Inspector | Node | History | Godot MCP).
+```mermaid
+flowchart TD
+    subgraph AI_Clients [AI Clients & Agents]
+        Claude[Claude Code / Desktop]
+        Cursor[Cursor IDE]
+        Antigravity[Google Antigravity]
+        VSCode[VS Code / Cline / Roo]
+        Windsurf[Windsurf IDE]
+    end
 
-### Dock Features
-1. Connection Status and Diagnostics:
-   * Displays active bridge state (ACTIVE / CONNECTING / OFFLINE).
-   * Shows HTTP port (9500) and WebSocket port (9501).
-   * Displays running Godot version, domain count, and operation count.
-   * Includes a Test Connection button that executes an immediate roundtrip ping and prints measured latency in milliseconds.
-2. Live Tool Call Activity Monitor:
-   * Real-time stream of all tool calls dispatched by the AI.
-   * Displays timestamp, tool name, success or error status badges, and execution duration.
-   * Includes formatted arguments and return value previews.
-   * Filter controls allow viewing All calls, Succeeded calls, or Errors only.
-   * Auto-scroll toggle and Clear History button.
-3. Interactive GDScript Sandbox:
-   * LineEdit console allowing developers and agents to run live GDScript in the editor context and inspect return values immediately.
+    subgraph MCP_Server [Godot MCP Server (FastMCP / Python)]
+        Stdio[Standard I/O Pipe]
+        HttpSSE[Streamable HTTP / SSE]
+        Router[Adaptive Domain Router]
+        DirectRuntime[Direct Runtime Bridge]
+    end
 
----
+    subgraph Godot_Engine [Godot Engine Editor]
+        WSBridge[McpConnection WebSocket Server]
+        Dispatcher[McpDispatcher]
+        OmniHandler[Omni & Reflection Handler]
+        DomainHandlers[59 Domain Handlers]
+        EditorDock[Godot MCP Inspector Dock]
+    end
 
-## Customization and Advanced Configuration
-
-### 1. Registering Custom Add-on Tools
-You can expose custom GDScript tools to the AI by placing scripts in es://addons/godot_ai/custom_tools/:
-
-`gdscript
-# res://addons/godot_ai/custom_tools/spawn_enemy_tool.gd
-@tool
-extends RefCounted
-
-func get_tool_name() -> String:
-    return "spawn_custom_enemy"
-
-func get_tool_description() -> String:
-    return "Spawns a specialized enemy with custom health and behavior parameters."
-
-func execute(params: Dictionary) -> Dictionary:
-    var enemy_type = params.get("type", "goblin")
-    var health = int(params.get("health", 100))
-    # Custom game logic executed inside the editor
-    return {"status": "ok", "spawned": enemy_type, "hp": health}
-`
-
-The plugin automatically registers these custom tools into the MCP tool catalog without requiring Python server modifications.
-
-### 2. Adaptive Tool Exposure Modes
-Set the exposure strategy via the CLI to match client context capacities:
-
-`ash
-# Auto-detect client capabilities (default)
-godot-omni server --exposure AUTO
-
-# Force domain-grouped rollups (fits under 100-tool client caps)
-godot-omni server --exposure DOMAIN
-
-# Expose full unconstrained catalog (1,820 granular tools)
-godot-omni server --exposure FULL
-
-# Minimal router mode (4 tools: execute, search, describe, stats)
-godot-omni server --exposure ROUTER
-`
-
-### 3. Network and Port Configuration
-Customize ports in Godot under **Project Settings -> Editor Settings -> Plugins -> Godot AI**:
-
-* godot_ai/http_port: Default 9500 (range: 1024 - 65535)
-* godot_ai/ws_port: Default 9501 (range: 1024 - 65535)
-* godot_ai/mcp_logging: Enable or disable console echoing of MCP tool calls.
-
-To allow remote host access across a local network subnet, launch the server with:
-`ash
-godot-omni server --allow-host 192.168.1.0/24
-`
+    AI_Clients -->|MCP JSON-RPC| Stdio
+    AI_Clients -->|MCP HTTP/SSE| HttpSSE
+    Stdio --> Router
+    HttpSSE --> Router
+    Router --> DirectRuntime
+    DirectRuntime <-->|Loopback WebSocket :8000| WSBridge
+    WSBridge <--> Dispatcher
+    Dispatcher --> OmniHandler
+    Dispatcher --> DomainHandlers
+    Dispatcher --> EditorDock
+```
 
 ---
 
-## Architecture
+## Verification and Diagnostics
 
-`	ext
-┌─────────────────────────────────────────────────────────────┐
-│                       AI Assistant                          │
-│     (Antigravity, Claude Code, Cursor, Windsurf, ...)       │
-└──────────────────────────────┬──────────────────────────────┘
-                               │  stdio (FastMCP Protocol)
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                 Godot MCP Python Server                     │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │   Adaptive Exposure Engine (AUTO, FULL, DOMAIN, LAZY) │  │
-│  ├───────────────────────────────────────────────────────┤  │
-│  │   Canonical Registry: 1,820 Operations / 59 Domains   │  │
-│  ├───────────────────────────────────────────────────────┤  │
-│  │   Universal Reflection Handle Manager (obj://...)     │  │
-│  └───────────────────────────┬───────────────────────────┘  │
-└──────────────────────────────┼──────────────────────────────┘
-                               │  Loopback WebSocket (Port 9500/9501)
-                               │  (Token-authenticated)
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│               Godot Editor Plugin (addons/)                 │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │   OmniDock (Inspector Tab: Status, Live Monitor, Eval)│  │
-│  ├───────────────────────────────────────────────────────┤  │
-│  │   McpEventBus (Real-Time In-Editor Dispatch Broker)   │  │
-│  ├───────────────────────────────────────────────────────┤  │
-│  │   omni_handler.gd (Engine Operation Dispatcher)       │  │
-│  ├───────────────────────────────────────────────────────┤  │
-│  │   godot_eval (In-Memory Ephemeral GDScript Runner)    │  │
-│  ├───────────────────────────────────────────────────────┤  │
-│  │   omni_reflection.gd (Variant Serialization)          │  │
-│  ├───────────────────────────────────────────────────────┤  │
-│  │   omni_ui_tree.gd (Semantic Editor UI Automation)     │  │
-│  ├───────────────────────────────────────────────────────┤  │
-│  │   Godot Engine APIs: ClassDB, EditorInterface, Nodes  │  │
-│  └───────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-`
+You can verify your installation and test end-to-end communication from the terminal:
+
+```bash
+# Run the complete automated test suite
+uv run godot-omni self-test
+
+# Display tool registry metrics across all domains
+uv run godot-omni tools stats
+
+# Check client configuration health
+uv run godot-omni doctor
+```
+
+### Sample Python Interactive Verification
+
+```python
+import asyncio
+from godot_ai.runtime.direct import DirectRuntime
+
+async def main():
+    runtime = DirectRuntime()
+    # Ping the active Godot editor
+    result = await runtime.send_command("ping", {})
+    print("Ping response:", result)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
 
 ---
 
-## Command-Line Interface Reference
+## Troubleshooting
 
-The godot-omni CLI provides tools for management, diagnostics, and testing:
+### Port 8000 Already in Use
+If another process is using port 8000:
+1. In the Godot Editor, open the **Godot MCP** dock tab beside the Inspector.
+2. Click **Free Port & Replace Server**.
+3. Or from PowerShell:
+   ```powershell
+   Get-NetTCPConnection -LocalPort 8000 | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+   ```
 
-`ash
-# Tools and Registry
-godot-omni tools stats                       # Summary of 1,820 operations across 59 domains
-godot-omni tools search "tilemap"            # Search operations across domains
-godot-omni tools describe tilemap_place_tile # View parameters, schemas, and return formats
-godot-omni tools list --domain animation     # List all operations in a specific domain
-godot-omni tools export schema.json          # Export complete JSON catalog
+### Headless Execution
+To run Godot headlessly in CI or terminal automation, set the environment variable:
+```bash
+# Linux/macOS
+export GODOT_AI_ALLOW_HEADLESS=1
 
-# Client Setup and Diagnostics
-godot-omni clients detect                    # Detect installed AI clients
-godot-omni clients status                    # Check registration status across 12 clients
-godot-omni clients configure <client_name>   # Configure a specific client
-godot-omni clients configure all             # Auto-configure all detected clients
-godot-omni clients doctor                    # Validate client configs and check paths
-
-# Performance and Diagnostics
-godot-omni benchmark all                     # Run end-to-end latency benchmarks
-godot-omni doctor                            # Environment check: Python, Godot, ports
-godot-omni self-test                         # In-process test suite
-godot-omni versions status                   # Compatibility status across Godot 4.1 to 4.8+
-`
+# Windows PowerShell
+$env:GODOT_AI_ALLOW_HEADLESS="1"
+```
 
 ---
 
-## Security
+## Author and License
 
-* Local Loopback Binding: Sockets bind strictly to 127.0.0.1. No external ports or listening interfaces are exposed.
-* Authenticated Communication: WebSockets use session tokens generated per editor launch with restricted user permissions.
-* Ephemeral Code Execution: Dynamic code runs strictly in memory via @tool scripts and leaves no residual files on disk.
-* Telemetry Opt-Out: Telemetry can be disabled at any time by setting GODOT_AI_DISABLE_TELEMETRY=true. No code, scene structure, or file paths are ever transmitted.
-
-See [SECURITY.md](SECURITY.md) for vulnerability reporting procedures.
-
----
-
-## Author and Maintainer
-
-Created and maintained by **[bebabin](https://github.com/bebabinlarsson-blip)**.
-
----
-
-## Contributing
-
-Contributions, issues, and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and testing guidelines.
-
----
-
-## License
-
-This project is open-source software licensed under the [MIT License](LICENSE).
+* Author: [bebabin](https://github.com/bebabinlarsson-blip) (`bebabinlarsson@gmail.com`)
+* License: [MIT License](LICENSE)

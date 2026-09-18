@@ -88,3 +88,18 @@ def session_activate(runtime: DirectRuntime, session_id: str) -> dict:
 
 def session_resource_data(runtime: DirectRuntime) -> dict:
     return session_list(runtime)
+
+
+async def session_ping(runtime: DirectRuntime) -> dict:
+    """Readiness probe echoing engine status, version, and memory metrics."""
+    sessions = list(runtime.list_sessions())
+    if not sessions:
+        return {
+            "status": "ok",
+            "ping": "pong",
+            "ready": False,
+            "connected_sessions": 0,
+            "message": "MCP server running; waiting for Godot editor session to connect",
+        }
+    return await runtime.send_command("mcp_ping", {})
+

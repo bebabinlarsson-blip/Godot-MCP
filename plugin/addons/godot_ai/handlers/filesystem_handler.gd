@@ -318,3 +318,143 @@ static func _settle_scan(
 			"reason": "Filesystem scan is an editor operation",
 		}
 	})
+
+
+func list_files(params: Dictionary) -> Dictionary:
+	var path: String = params.get("path", "res://")
+	var recursive: bool = params.get("recursive", false)
+	var max_depth: int = int(params.get("max_depth", 1 if not recursive else 10))
+
+	if not path.begins_with("res://"):
+		path = "res://" + path.trim_prefix("/")
+
+	var dir := DirAccess.open(path)
+	if dir == null:
+		return ErrorCodes.make(ErrorCodes.RESOURCE_NOT_FOUND, "Directory not found: %s" % path)
+
+	var files: Array[Dictionary] = []
+	var dirs: Array[String] = []
+	_list_dir_contents(path, 0, max_depth, files, dirs)
+
+	return {
+		"data": {
+			"path": path,
+			"files": files,
+			"directories": dirs,
+			"file_count": files.size(),
+			"directory_count": dirs.size(),
+		}
+	}
+
+
+static func _list_dir_contents(current_path: String, depth: int, max_depth: int, out_files: Array[Dictionary], out_dirs: Array[String]) -> void:
+	var dir := DirAccess.open(current_path)
+	if dir == null:
+		return
+	dir.list_dir_begin()
+	var item := dir.get_next()
+	while not item.is_empty():
+		if item != "." and item != "..":
+			var full_item := current_path.path_join(item)
+			if dir.current_is_dir():
+				if not item.begins_with("."):
+					out_dirs.append(full_item)
+					if depth + 1 < max_depth:
+						_list_dir_contents(full_item, depth + 1, max_depth, out_files, out_dirs)
+			else:
+				var uid_val := ResourceUID.INVALID_ID
+				if ResourceLoader.exists(full_item):
+					uid_val = ResourceLoader.get_resource_uid(full_item)
+				out_files.append({
+					"path": full_item,
+					"name": item,
+					"size": FileAccess.get_file_as_bytes(full_item).size() if FileAccess.file_exists(full_item) else 0,
+					"uid": ResourceUID.id_to_text(uid_val) if uid_val != ResourceUID.INVALID_ID else "",
+				})
+		item = dir.get_next()
+	dir.list_dir_end()
+
+
+func delete_file(params: Dictionary) -> Dictionary:
+	var path: String = params.get("path", "")
+	var path_err = McpPathValidator.path_error(path, "path", true)
+	if path_err != null:
+		return path_err
+	if not FileAccess.file_exists(path) and not DirAccess.dir_exists_absolute(path):
+		return ErrorCodes.make(ErrorCodes.RESOURCE_NOT_FOUND, "Path not found: %s" % path)
+
+	var dir := DirAccess.open("res://")
+	if dir == null:
+		return ErrorCodes.make(ErrorCodes.INTERNAL_ERROR, "Cannot access res://")
+
+	var is_dir := DirAccess.dir_exists_absolute(path)
+	var err := OK
+	if is_dir:
+		err = dir.remove(path)
+	else:
+		err = dir.remove(path)
+		if FileAccess.file_exists(path + ".uid"):
+			dir.remove(path + ".uid")
+		if FileAccess.file_exists(path + ".import"):
+			dir.remove(path + ".import")
+
+	if err != OK:
+		return ErrorCodes.make(ErrorCodes.INTERNAL_ERROR, "Failed to delete %s: error %d" % [path, err])
+
+	var efs := EditorInterface.get_resource_filesystem()
+	if efs != null:
+		efs.update_file(path)
+
+	return {
+		"data": {
+			"path": path,
+			"deleted": true,
+			"is_dir": is_dir,
+			"undoable": false,
+		}
+	}
+
+
+func move_file(params: Dictionary) -> Dictionary:
+	var from_path: String = params.get("from_path", "")
+	var to_path: String = params.get("to_path", "")
+	if from_path.is_empty() or to_path.is_empty():
+		return ErrorCodes.make(ErrorCodes.MISSING_REQUIRED_PARAM, "from_path and to_path are required")
+
+	var from_err = McpPathValidator.path_error(from_path, "from_path", true)
+	if from_err != null:
+		return from_err
+	var to_err = McpPathValidator.path_error(to_path, "to_path", true)
+	if to_err != null:
+		return to_err
+
+	if not FileAccess.file_exists(from_path):
+		return ErrorCodes.make(ErrorCodes.RESOURCE_NOT_FOUND, "Source file not found: %s" % from_path)
+
+	var dir := DirAccess.open("res://")
+	if dir == null:
+		return ErrorCodes.make(ErrorCodes.INTERNAL_ERROR, "Cannot access res://")
+
+	var err := dir.rename(from_path, to_path)
+	if err != OK:
+		return ErrorCodes.make(ErrorCodes.INTERNAL_ERROR, "Failed to move %s to %s: error %d" % [from_path, to_path, err])
+
+	if FileAccess.file_exists(from_path + ".uid"):
+		dir.rename(from_path + ".uid", to_path + ".uid")
+	if FileAccess.file_exists(from_path + ".import"):
+		dir.rename(from_path + ".import", to_path + ".import")
+
+	var efs := EditorInterface.get_resource_filesystem()
+	if efs != null:
+		efs.update_file(from_path)
+		efs.update_file(to_path)
+
+	return {
+		"data": {
+			"from_path": from_path,
+			"to_path": to_path,
+			"moved": true,
+			"undoable": false,
+		}
+	}
+

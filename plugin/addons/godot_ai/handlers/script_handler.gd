@@ -570,3 +570,66 @@ func find_symbols(params: Dictionary) -> Dictionary:
 			"export_count": exports.size(),
 		}
 	}
+
+
+func validate_script(params: Dictionary) -> Dictionary:
+	var path: String = params.get("path", "")
+	var content: String = params.get("content", "")
+
+	if path.is_empty() and content.is_empty():
+		return ErrorCodes.make(ErrorCodes.MISSING_REQUIRED_PARAM, "Either path or content must be provided")
+
+	if not path.is_empty() and content.is_empty():
+		var path_err = McpPathValidator.path_error(path, "path")
+		if path_err != null:
+			return path_err
+		if not FileAccess.file_exists(path):
+			return ErrorCodes.make(ErrorCodes.RESOURCE_NOT_FOUND, "File not found: %s" % path)
+		var file := FileAccess.open(path, FileAccess.READ)
+		if file == null:
+			return ErrorCodes.make(ErrorCodes.INTERNAL_ERROR, "Failed to open file: %s" % path)
+		content = file.get_as_text()
+		file.close()
+
+	var data := {
+		"path": path,
+		"valid": true,
+		"line_count": content.count("\n") + (1 if not content.is_empty() else 0),
+		"size": content.length(),
+	}
+	_attach_gdscript_diagnostics(data, path if not path.is_empty() else "res://temp_validation.gd", content)
+	data["valid"] = not _script_has_error_diagnostics(data)
+	return {"data": data}
+
+
+func delete_script(params: Dictionary) -> Dictionary:
+	var path: String = params.get("path", "")
+	var path_err = McpPathValidator.path_error(path, "path", true)
+	if path_err != null:
+		return path_err
+	if not FileAccess.file_exists(path):
+		return ErrorCodes.make(ErrorCodes.RESOURCE_NOT_FOUND, "Script not found: %s" % path)
+
+	var dir := DirAccess.open("res://")
+	if dir == null:
+		return ErrorCodes.make(ErrorCodes.INTERNAL_ERROR, "Cannot access res://")
+
+	var err := dir.remove(path)
+	if err != OK:
+		return ErrorCodes.make(ErrorCodes.INTERNAL_ERROR, "Failed to remove %s: error %d" % [path, err])
+
+	if FileAccess.file_exists(path + ".uid"):
+		dir.remove(path + ".uid")
+
+	var efs := EditorInterface.get_resource_filesystem()
+	if efs != null:
+		efs.update_file(path)
+
+	return {
+		"data": {
+			"path": path,
+			"deleted": true,
+			"undoable": false,
+		}
+	}
+

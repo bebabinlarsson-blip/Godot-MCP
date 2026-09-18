@@ -52,3 +52,13 @@ async def script_detach(runtime: DirectRuntime, path: str) -> dict:
 
 async def script_find_symbols(runtime: DirectRuntime, path: str) -> dict:
     return await runtime.send_command("find_symbols", {"path": path})
+
+
+async def script_validate(runtime: DirectRuntime, path: str = "", content: str = "") -> dict:
+    return await runtime.send_command("validate_script", {"path": path, "content": content})
+
+
+async def script_delete(runtime: DirectRuntime, path: str) -> dict:
+    await require_writable_async(runtime)
+    return await runtime.send_command("delete_script", {"path": path})
+

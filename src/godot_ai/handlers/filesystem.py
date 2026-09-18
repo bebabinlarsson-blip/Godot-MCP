@@ -57,3 +57,33 @@ async def filesystem_search(
         params["path"] = path
     result = await runtime.send_command("search_filesystem", params)
     return paginate(result.get("files", []), offset, limit, key="files")
+
+
+async def filesystem_list(
+    runtime: DirectRuntime,
+    path: str = "res://",
+    recursive: bool = False,
+    max_depth: int = 1,
+) -> dict:
+    return await runtime.send_command(
+        "list_files",
+        {"path": path, "recursive": recursive, "max_depth": max_depth},
+    )
+
+
+async def filesystem_delete(runtime: DirectRuntime, path: str) -> dict:
+    await require_writable_async(runtime)
+    return await runtime.send_command("delete_file", {"path": path})
+
+
+async def filesystem_move(
+    runtime: DirectRuntime,
+    from_path: str,
+    to_path: str,
+) -> dict:
+    await require_writable_async(runtime)
+    return await runtime.send_command(
+        "move_file",
+        {"from_path": from_path, "to_path": to_path},
+    )
+
