@@ -5,6 +5,55 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.8 (2026-09-18)
+
+Maintenance release for Godot MCP. No runtime behavior changes.
+
+### Changed
+
+- Plugin version metadata (`plugin.cfg`), the dock version badges, and the
+  packaged zip now report `5.0.8`, matching the GitHub release tag.
+- Backfilled `CHANGELOG.md` entries for 5.0.3 through 5.0.7.
+
+## 5.0.7 (2026-09-18)
+
+Same-major-version server compatibility, clean port freeing, and robust dock
+recovery.
+
+### Changed
+
+- The dock can adopt/reuse a server of the same major version instead of
+  demanding a fresh instance.
+- Ports are freed cleanly on server teardown.
+- Dock recovery is robust when the server is active or reachable.
+
+## 5.0.6 (2026-09-18)
+
+### Fixed
+
+- Clear the dock's blocked state when the server is active or reachable.
+
+## 5.0.5 (2026-09-18)
+
+### Added
+
+- Precision TileMap placement.
+- CC0 asset downloader and search.
+- Direct editor placement directive.
+
+## 5.0.4 (2026-09-18)
+
+### Added
+
+- Parity tools for ping, script validation, and filesystem management.
+- README design overhaul.
+
+## 5.0.3 (2026-09-18)
+
+### Changed
+
+- Unified Godot MCP dock without emojis and reliable server launch.
+
 ## 5.0.2 (2026-09-17)
 
 Packaging and Asset Library readiness release for Godot MCP. No runtime
