@@ -2,18 +2,23 @@
 
 # Godot MCP
 
-### Production-Grade Model Context Protocol Server and Automation Plugin for the Godot Engine
+### Free and Open-Source Model Context Protocol Automation Plugin for the Godot Engine
 
 [![MCP Protocol](https://img.shields.io/badge/MCP-Model%20Context%20Protocol-8A2BE2?style=flat&labelColor=333A41)](https://modelcontextprotocol.io)
 [![Release](https://img.shields.io/badge/Release-v5.0.4-blue.svg?style=flat&labelColor=333A41)](https://github.com/bebabinlarsson-blip/Godot-MCP/releases)
 [![Godot](https://img.shields.io/badge/Godot-4.1%20to%204.8+-478CBF?style=flat&logo=godotengine&logoColor=white&labelColor=333A41)](https://godotengine.org)
 [![Python](https://img.shields.io/badge/Python-3.11%20|%203.12%20|%203.13%20|%203.14-3776AB?style=flat&logo=python&logoColor=white&labelColor=333A41)](https://www.python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat&labelColor=333A41)](LICENSE)
+[![Cost](https://img.shields.io/badge/Cost-100%25%20Free-brightgreen.svg?style=flat&labelColor=333A41)](LICENSE)
 [![Author](https://img.shields.io/badge/Author-bebabin-2ea44f.svg?style=flat&labelColor=333A41)](https://github.com/bebabinlarsson-blip)
 
 <br>
 
 <img src="docs/hero.png" alt="Godot MCP Banner" width="100%">
+
+<br>
+
+**100% Free & Open Source | Fully Local | No External Websites | No npm Packages | No Cloud Logins**
 
 <br>
 
@@ -27,24 +32,22 @@
 
 ## Overview
 
-Godot MCP connects AI assistants directly to the Godot Editor through the Model Context Protocol (MCP). It equips any modern language model or autonomous agent with complete programmatic control over the Godot Engine, bridging natural language prompts with real-time in-editor creation, modification, inspection, and verification.
+Godot MCP is a completely free, local, open-source automation plugin that connects AI coding assistants to the Godot Editor through the standard Model Context Protocol (MCP).
 
-Unlike wrappers requiring external cloud compilation or specialized .NET setups, Godot MCP operates via pure GDScript in-engine execution coupled with a high-performance local MCP server. It runs natively across all Godot 4.x installations on Windows, macOS, and Linux without requiring C# Mono builds or external cloud proxies.
+Unlike other solutions that rely on external websites, cloud subscriptions, device logins, or custom npm CLI wrappers, Godot MCP is designed to be a straightforward in-engine Godot plugin:
 
-### Key Architectural Strengths
-
-* Universal Compatibility: Runs seamlessly on both Standard (GDScript) and .NET (Mono) builds of Godot 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, and 4.8+ Dev.
-* Complete Feature Parity: 59 domain families encompassing 1,820 canonical engine operations, from granular scene and node transformations to procedural animation and tile manipulation.
-* Live GDScript Execution: Direct arbitrary script evaluation inside the editor process with full access to EditorInterface, ProjectSettings, singletons, and ClassDB.
-* Universal Reflection: Inspect, read, write, and invoke methods on any Godot Object, Resource, Node, or Singleton with typed argument conversion and handle safety.
-* Single Unified Dock: Clean, native editor panel positioned beside the Inspector dock with live tool activity tracking, connection status, memory indicators, and port conflict resolution.
-* Zero Cloud Dependency: All MCP traffic routes over secure local loopback WebSocket and standard I/O pipes. Your project code and game assets never leave your computer.
+* 100% Free and Open Source: Released under the permissive MIT license. No subscriptions, no paid tiers, and no paywalls.
+* Completely Local and Private: No external website accounts, no cloud relays, and no OAuth device logins. All communication stays strictly on your local machine.
+* Pure Godot Plugin: Drop the addons into your project and enable them in Godot. No npm packages to install, no global node.js tooling, and no external account setup.
+* Universal Engine Support: Operates via native GDScript inside Godot, supporting both Standard (GDScript) and .NET (Mono) editions of Godot 4.1 through 4.8+ Dev on Windows, macOS, and Linux.
+* 59 Tool Families & 1,820+ Operations: Comprehensive scene building, node transformations, procedural animation, tilemap editing, collision creation, and direct GDScript evaluation.
+* Single Native Dock: Seamlessly integrated tab directly beside your Inspector with live activity monitoring, connection diagnostics, and memory indicators.
 
 ---
 
 ## Tool Families and Capabilities Matrix
 
-Godot MCP exposes 59 domain families covering the entire surface of the Godot Engine:
+Godot MCP provides full engine automation across 59 domain families:
 
 | Family | Key Operations | Description |
 | :--- | :--- | :--- |
@@ -70,15 +73,14 @@ Godot MCP exposes 59 domain families covering the entire surface of the Godot En
 
 ---
 
-## Quick Start
+## Quick Start: 3 Simple Steps
 
-### Step 1: Install the Godot Plugin
+You do not need to register on any website or install any npm packages.
 
-#### Option A: From Release Archive (Recommended)
+### Step 1: Download and Extract the Plugin
 
-1. Download `godot-mcp-v5.0.4.zip` from the [GitHub Releases](https://github.com/bebabinlarsson-blip/Godot-MCP/releases) page.
-2. Extract the archive into your Godot project root folder.
-3. Verify that your directory structure looks like this:
+1. Download the free release archive `godot-mcp-v5.0.4.zip` from [GitHub Releases](https://github.com/bebabinlarsson-blip/Godot-MCP/releases).
+2. Extract the archive into your Godot project root so that the `addons/` folder is placed directly in your project:
 
 ```text
 your-godot-project/
@@ -98,138 +100,115 @@ your-godot-project/
         └── omni_ui_tree.gd
 ```
 
-#### Option B: Automated via Terminal
-
-```bash
-# Clone the repository
-git clone https://github.com/bebabinlarsson-blip/Godot-MCP.git
-
-# Copy addons to your project
-Copy-Item -Path "Godot-MCP/addons/*" -Destination "YourProject/addons/" -Recurse -Force
-```
-
 ### Step 2: Enable the Plugin in Godot
 
-1. Open your project in the Godot Editor.
-2. Navigate to **Project -> Project Settings -> Plugins**.
+1. Open your project in Godot.
+2. Open **Project -> Project Settings -> Plugins**.
 3. Enable **Godot MCP Core** and **Godot MCP Omni**.
-4. The single **Godot MCP** inspector tab will immediately appear on the right side beside the Inspector dock.
+4. The **Godot MCP** tab will appear beside your Inspector on the right-hand side.
+
+### Step 3: Configure Your AI Client
+
+Add Godot MCP to your AI editor of choice. The server runs directly via standard `uvx` without needing manual installation:
+
+#### Cursor
+Add to `.cursor/mcp.json`:
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git",
+        "godot-ai"
+      ]
+    }
+  }
+}
+```
+
+#### Claude Desktop
+Add to `claude_desktop_config.json` (Windows: `%APPDATA%\Claude\claude_desktop_config.json` | macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git",
+        "godot-ai"
+      ]
+    }
+  }
+}
+```
+
+#### Google Antigravity
+In Antigravity or Gemini CLI configuration:
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git",
+        "godot-ai"
+      ]
+    }
+  }
+}
+```
+
+#### VS Code (Cline / Roo Code)
+Add to Cline MCP settings:
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git",
+        "godot-ai"
+      ]
+    }
+  }
+}
+```
+
+#### Windsurf
+Add to `~/.codeium/windsurf/mcp_config.json`:
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git",
+        "godot-ai"
+      ]
+    }
+  }
+}
+```
+
+That is all. Start prompting your AI to build scenes, write scripts, paint tiles, or animate objects in Godot.
 
 ---
 
-## AI Client Configuration
+## The Godot MCP Dock
 
-Godot MCP can be run via `uvx` directly from GitHub, through a local Python installation, or via the `godot-omni` CLI.
+The single native Godot MCP dock lives beside the Inspector in Godot:
 
-### Cursor
-
-Add this entry to `.cursor/mcp.json` in your project or global Cursor settings:
-
-```json
-{
-  "mcpServers": {
-    "godot-mcp": {
-      "command": "uvx",
-      "args": [
-        "--from",
-        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git",
-        "godot-ai"
-      ]
-    }
-  }
-}
-```
-
-### Claude Desktop
-
-Add this configuration to `claude_desktop_config.json`:
-
-* Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-* macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "godot-mcp": {
-      "command": "uvx",
-      "args": [
-        "--from",
-        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git",
-        "godot-ai"
-      ]
-    }
-  }
-}
-```
-
-### Google Antigravity
-
-In Antigravity or Gemini CLI, add the server to your configuration:
-
-```json
-{
-  "mcpServers": {
-    "godot-mcp": {
-      "command": "uvx",
-      "args": [
-        "--from",
-        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git",
-        "godot-ai"
-      ]
-    }
-  }
-}
-```
-
-### VS Code (Cline / Roo Code)
-
-Add this configuration to your Cline MCP settings:
-
-```json
-{
-  "mcpServers": {
-    "godot-mcp": {
-      "command": "uvx",
-      "args": [
-        "--from",
-        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git",
-        "godot-ai"
-      ]
-    }
-  }
-}
-```
-
-### Windsurf
-
-Add this configuration to `~/.codeium/windsurf/mcp_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "godot-mcp": {
-      "command": "uvx",
-      "args": [
-        "--from",
-        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git",
-        "godot-ai"
-      ]
-    }
-  }
-}
-```
-
----
-
-## In-Editor Inspector Dock
-
-The Godot MCP dock integrates directly into the Godot Editor on the right dock bar beside the Inspector:
-
-* Live Status Indicator: Real-time visual feedback showing server connection state and engine bridge health.
-* Operation Activity Stream: Displays incoming tool calls with execution status, operation name, and response duration in milliseconds.
-* Diagnostic Controls: Run immediate self-tests, verify readiness probes (`ping`), and measure active session latency directly inside the editor.
-* Memory & Performance Telemetry: Displays static memory allocation, process frame counts, and active scene root details.
-* Free Port & Replace Server: One-click resolution for occupied HTTP/WebSocket ports, freeing port 8000 safely if an orphaned background process was left running.
+* Live Status: Visual badge displaying connection status ([OK], [IDLE], [WAIT], [ERROR]).
+* Tool Call Feed: Live stream of AI commands as they are executed in the engine with millisecond timing.
+* Probe Diagnostics: Built-in ping and self-test trigger buttons to verify connection without leaving Godot.
+* Memory Metrics: Process frame count, active scene root, and static memory usage metrics.
+* Free Port Button: In case port 8000 is held by an orphaned process, a single click clears it and resets the local server.
 
 ---
 
@@ -237,7 +216,7 @@ The Godot MCP dock integrates directly into the Godot Editor on the right dock b
 
 ```mermaid
 flowchart TD
-    subgraph AI_Clients [AI Clients & Agents]
+    subgraph AI_Clients [Local AI Clients]
         Claude[Claude Code / Desktop]
         Cursor[Cursor IDE]
         Antigravity[Google Antigravity]
@@ -245,15 +224,14 @@ flowchart TD
         Windsurf[Windsurf IDE]
     end
 
-    subgraph MCP_Server [Godot MCP Server (FastMCP / Python)]
+    subgraph MCP_Server [Local MCP Server]
         Stdio[Standard I/O Pipe]
-        HttpSSE[Streamable HTTP / SSE]
         Router[Adaptive Domain Router]
         DirectRuntime[Direct Runtime Bridge]
     end
 
-    subgraph Godot_Engine [Godot Engine Editor]
-        WSBridge[McpConnection WebSocket Server]
+    subgraph Godot_Editor [Godot Engine Editor]
+        WSBridge[Local WebSocket :8000]
         Dispatcher[McpDispatcher]
         OmniHandler[Omni & Reflection Handler]
         DomainHandlers[59 Domain Handlers]
@@ -261,11 +239,9 @@ flowchart TD
     end
 
     AI_Clients -->|MCP JSON-RPC| Stdio
-    AI_Clients -->|MCP HTTP/SSE| HttpSSE
     Stdio --> Router
-    HttpSSE --> Router
     Router --> DirectRuntime
-    DirectRuntime <-->|Loopback WebSocket :8000| WSBridge
+    DirectRuntime <-->|Local Loopback Only| WSBridge
     WSBridge <--> Dispatcher
     Dispatcher --> OmniHandler
     Dispatcher --> DomainHandlers
@@ -276,55 +252,29 @@ flowchart TD
 
 ## Verification and Diagnostics
 
-You can verify your installation and test end-to-end communication from the terminal:
+You can verify the local setup directly from the command line:
 
 ```bash
-# Run the complete automated test suite
+# Run the complete test suite
 uv run godot-omni self-test
 
-# Display tool registry metrics across all domains
+# Inspect tool registry metrics across all 59 domains
 uv run godot-omni tools stats
-
-# Check client configuration health
-uv run godot-omni doctor
-```
-
-### Sample Python Interactive Verification
-
-```python
-import asyncio
-from godot_ai.runtime.direct import DirectRuntime
-
-async def main():
-    runtime = DirectRuntime()
-    # Ping the active Godot editor
-    result = await runtime.send_command("ping", {})
-    print("Ping response:", result)
-
-if __name__ == "__main__":
-    asyncio.run(main())
 ```
 
 ---
 
 ## Troubleshooting
 
-### Port 8000 Already in Use
-If another process is using port 8000:
-1. In the Godot Editor, open the **Godot MCP** dock tab beside the Inspector.
-2. Click **Free Port & Replace Server**.
-3. Or from PowerShell:
-   ```powershell
-   Get-NetTCPConnection -LocalPort 8000 | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
-   ```
+### Port 8000 In Use
+Click **Free Port & Replace Server** in the Godot MCP dock tab, or run in PowerShell:
+```powershell
+Get-NetTCPConnection -LocalPort 8000 | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+```
 
 ### Headless Execution
-To run Godot headlessly in CI or terminal automation, set the environment variable:
-```bash
-# Linux/macOS
-export GODOT_AI_ALLOW_HEADLESS=1
-
-# Windows PowerShell
+To allow the plugin to run during headless testing or CI:
+```powershell
 $env:GODOT_AI_ALLOW_HEADLESS="1"
 ```
 
@@ -333,4 +283,4 @@ $env:GODOT_AI_ALLOW_HEADLESS="1"
 ## Author and License
 
 * Author: [bebabin](https://github.com/bebabinlarsson-blip) (`bebabinlarsson@gmail.com`)
-* License: [MIT License](LICENSE)
+* License: [MIT License](LICENSE) (100% Free and Open Source)
