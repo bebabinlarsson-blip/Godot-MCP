@@ -548,7 +548,7 @@ func present_client_status_refresh_results(_results: Dictionary) -> void:
 	pass
 
 
-func present_client_action_result(_client_id: String, _action: String, _result: Dictionary, _prewarm: bool) -> void:
+func present_client_action_result(_client_id: String, _action: String, _result: Dictionary, _prewarm: Variant) -> void:
 	pass
 
 

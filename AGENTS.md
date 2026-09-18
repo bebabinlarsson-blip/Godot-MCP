@@ -86,7 +86,10 @@ directory names say what they hold. The parts the layout does *not* tell you:
   list; adding one is a new `clients/<name>.gd` plus one script path there, with no
   strategy edits for standard shapes. Every advertised descriptor is command-shape
   (`godot-ai attach` stdio); clients without verified stdio/dynamic-capability
-  support, including Cherry Studio, are not advertised in v4.
+  support, including Cherry Studio, are not advertised in v4. On a ready transport
+  the plugin also auto-configures every installed, file-editable client that isn't
+  already pointing at the server (one-shot per session; `godot_ai/auto_configure_clients`
+  EditorSetting, default on) — see `plugin.gd::_auto_configure_clients_on_ready`.
   [docs/client-configuration.md](docs/client-configuration.md)
 
 ### Published `class_name` surface

@@ -28,6 +28,22 @@ rules are not visible in the code:
   dispatched on `config_type "dsh"`), plus the matching branch in
   `client_configurator.gd` and `_manual_command.gd`.
 
+### Automatic configuration on plugin enable
+
+Enabling the plugin also runs a one-shot auto-configuration sweep once the
+server transport is ready: each **installed** client that is editable by file
+(`automatic_config_edits`, so Zed is excluded) and **not already pointing at
+this server** gets its `godot-ai` attach entry written — same semantics as the
+dock's "Configure all" button, restricted to clients actually present on the
+machine. This is what keeps Claude Code, Codex, Antigravity and OpenCode
+working without a manual click after a fresh enable or plugin update. It never
+rewrites entries that already target the current server, and it only runs once
+per session — the dock remains the authority afterwards. Disable it via the
+`godot_ai/auto_configure_clients` EditorSetting (`Settings > Plugins` or a
+direct edit of `editor_settings-4.tres`). The sweep is driven by
+`plugin.gd::_auto_configure_clients_on_ready`, which delegates the candidate
+selection to the unit-testable `ClientConfigurator.auto_configure_candidates`.
+
 ### Path resolution fails closed
 
 Every descriptor path is `~`- or `$VAR`-rooted and expands through
