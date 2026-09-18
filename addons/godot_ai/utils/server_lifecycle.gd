@@ -64,6 +64,17 @@ var _endpoint_recovery_attempts := 0
 var _ready_since_msec := 0
 ## The episode whose re-probe is scheduled; 0 when none is pending.
 var _endpoint_recovery_pending_episode := 0
+## A launched server that exits or changes identity before publishing
+## capabilities usually lost the port bind race to a concurrent editor whose
+## own server now holds the port. Adopt that compatible server instead of
+## blocking; each attempt re-proves the endpoint exactly as a start does, and
+## after the last attempt the block stays until the dock's Restart. Reaching
+## READY at all earns a fresh budget, so a one-off race self-heals.
+const LAUNCH_RACE_RECOVERY_DELAYS_SECONDS: Array[float] = [1.0, 2.0, 4.0, 8.0]
+
+var _launch_race_recovery_attempts := 0
+## The episode whose launch-race adopt re-probe is scheduled; 0 when none is pending.
+var _launch_race_recovery_pending_episode := 0
 const MAX_STATUS_BODY_BYTES := 8 * 1024
 
 var _episode: Dictionary = _dormant_episode(0)
@@ -363,6 +374,82 @@ func _recover_lost_endpoint_after(delay_seconds: float, episode_id: int) -> void
 	recover_lost_endpoint(episode_id)
 
 
+## Whether a block reason is the launch-race family: the managed process
+## exited or its identity changed before it proved (it lost the port bind
+## race to a concurrent editor whose own server now holds the port). A
+## plain launch_failed is an environment problem, not a race, and keeps the
+## existing immediate block.
+func _is_launch_race_reason(reason: String) -> bool:
+	if reason == "process_proof_failed":
+		return true
+	return reason.begins_with("launch_") and reason != "launch_failed"
+
+
+## Auto-recover a launch-race block: re-probe the endpoint on a bounded
+## backoff and adopt the compatible server that won the port, instead of
+## sitting blocked until the dock's Restart. Returns true when the recovery
+## owns the block (the caller must not block again); the timer only runs
+## with automatic effects, mirroring endpoint recovery. Uses the same pending
+## episode guard, so a dock Restart in between supersedes the timer, and a
+## fresh READY earns a fresh budget.
+func _begin_launch_race_recovery(reason: String, message: String) -> bool:
+	if not _is_launch_race_reason(reason):
+		return false
+	var limit := LAUNCH_RACE_RECOVERY_DELAYS_SECONDS.size()
+	if _launch_race_recovery_attempts >= limit:
+		_block(
+			reason,
+			"%s Automatic adoption gave up after %d attempts; click Restart." % [message, limit],
+		)
+		return true
+	_launch_race_recovery_attempts += 1
+	var delay := float(LAUNCH_RACE_RECOVERY_DELAYS_SECONDS[_launch_race_recovery_attempts - 1])
+	_block(
+		reason,
+		"%s Adopting the server on this port in %ds (attempt %d of %d)." % [
+			message, int(delay), _launch_race_recovery_attempts, limit,
+		],
+	)
+	print(
+		"MCP | launched server lost the port race; adopting the server on the port in %ds (attempt %d of %d)"
+		% [int(delay), _launch_race_recovery_attempts, limit]
+	)
+	_launch_race_recovery_pending_episode = int(_episode.get("id", 0))
+	if bool(_plan.get("automatic_effects", true)):
+		_recover_launch_race_after(delay, _launch_race_recovery_pending_episode)
+	return true
+
+
+## The scheduled launch-race re-probe. Only the episode that lost the race,
+## and only while its attempt is still pending, may start it: a dock Restart
+## in between supersedes the timer.
+func recover_launch_race(episode_id: int) -> bool:
+	if episode_id <= 0 or episode_id != _launch_race_recovery_pending_episode:
+		return false
+	if episode_id != int(_episode.get("id", -1)):
+		_launch_race_recovery_pending_episode = 0
+		return false
+	if str(_episode.get("state")) != BLOCKED:
+		_launch_race_recovery_pending_episode = 0
+		return false
+	_launch_race_recovery_pending_episode = 0
+	## Losing the race does not prove the shared backend needs a new process:
+	## the probe adopts the compatible server that already holds the port (a
+	## concurrent editor's), or launches our own only if the port is free.
+	_process_grant = null
+	_begin_start_episode()
+	return str(_episode.get("state")) != BLOCKED
+
+
+func _recover_launch_race_after(delay_seconds: float, episode_id: int) -> void:
+	var tree := Engine.get_main_loop()
+	if tree is SceneTree:
+		await (tree as SceneTree).create_timer(delay_seconds).timeout
+	if not is_instance_valid(self):
+		return
+	recover_launch_race(episode_id)
+
+
 func complete_effect(episode_id: int, effect: String, result: Dictionary) -> bool:
 	if episode_id != int(_episode.get("id", -1)):
 		return false
@@ -442,7 +529,10 @@ func _complete_launch(result: Dictionary) -> void:
 	_process_grant = _owned_process_grant(pid, fingerprint)
 	if not _process_grant.is_valid():
 		_process_grant = null
-		_block("launch_unproven", "The launched process identity could not be proven.")
+		if not _begin_launch_race_recovery(
+			"launch_unproven", "The launched process identity could not be proven."
+		):
+			_block("launch_unproven", "The launched process identity could not be proven.")
 		return
 	_episode["launch"] = launch
 	_episode["phase"] = PROVE
@@ -472,14 +562,18 @@ func _complete_prove(result: Dictionary) -> void:
 		var pending_reason := str(_episode.get("proof_pending_reason", ""))
 		if not pending_reason.is_empty():
 			message += " Last pending proof: %s." % pending_reason
-		_block(str(result.get("reason", "proof_failed")), message)
+		if not _begin_launch_race_recovery(str(result.get("reason", "proof_failed")), message):
+			_block(str(result.get("reason", "proof_failed")), message)
 		return
 	var launch: Dictionary = _episode.get("launch", {})
 	var pid := int(result.get("pid", 0))
 	var fingerprint := str(result.get("fingerprint", ""))
 	var exact_grant = _owned_process_grant(pid, fingerprint)
 	if not exact_grant.is_valid():
-		_block("process_proof_failed", "The server process identity changed before proof completed.")
+		if not _begin_launch_race_recovery(
+			"process_proof_failed", "The server process identity changed before proof completed."
+		):
+			_block("process_proof_failed", "The server process identity changed before proof completed.")
 		return
 	_process_grant = exact_grant
 	launch["pid"] = pid
@@ -535,6 +629,7 @@ func _ready(kind: String, transport, version: String) -> void:
 		return
 	_transport = transport
 	_ready_since_msec = maxi(1, Time.get_ticks_msec())
+	_launch_race_recovery_attempts = 0
 	_episode["state"] = READY
 	_episode["phase"] = ""
 	_episode["ready_kind"] = kind
