@@ -5,6 +5,32 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.9 (2026-09-18)
+
+Enabling the plugin now auto-configures every installed MCP client — Claude
+Code, Codex, Antigravity, OpenCode and the others — one at a time, reliably.
+
+### Added
+
+- On its first ready transport per session, the plugin now auto-configures
+  every installed, file-editable MCP client that isn't already pointing at
+  the current server, writing the `godot-ai` attach entry for each
+  (EditorSetting `godot_ai/auto_configure_clients`, default on; one-shot per
+  session). Entries that already point at the server are never rewritten.
+- The auto-configure sweep is strictly serialized: one client is configured
+  at a time, and the queue only advances after the previous client's action
+  completes — matching the dock's "Configure all" lock.
+
+### Fixed
+
+- The sweep no longer stalls after the first client. The completion handler
+  advanced the queue only *after* presenting the result in the dock, so a
+  dock presentation that crashed — the dock's `present_client_action_result`
+  expected a bool prewarm flag while the handler passes the full result
+  dictionary — aborted the handler and stranded the queue. The queue now
+  advances before presentation, and the dock callback accepts the dictionary
+  it is actually given.
+
 ## 5.0.8 (2026-09-18)
 
 Maintenance release for Godot MCP. No runtime behavior changes.
