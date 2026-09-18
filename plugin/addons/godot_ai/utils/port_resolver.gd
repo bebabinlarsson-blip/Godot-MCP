@@ -736,6 +736,20 @@ static func wait_for_port_free(port: int, timeout_s: float) -> void:
 		OS.delay_msec(100)
 
 
+static func kill_process(pid: int) -> bool:
+	if pid <= 1 or pid == OS.get_process_id():
+		return false
+	if OS.get_name() == "Windows":
+		var output: Array = []
+		return OS.execute("taskkill", ["/PID", str(pid), "/T", "/F"], output, true) == 0
+	return OS.kill(pid) == OK
+
+
+static func kill_processes_on_port(port: int) -> void:
+	for pid in find_all_pids_on_port(port):
+		kill_process(pid)
+
+
 ## Choose a non-Windows-reserved WS port. Returns `configured` when free;
 ## otherwise the first non-excluded port within `span` of it. Optional
 ## `log_buffer` is a duck-typed sink (`log(String)`) that gets the

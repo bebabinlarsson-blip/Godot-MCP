@@ -766,6 +766,14 @@ func _publish_dock_status_snapshots() -> void:
 
 
 func _on_dock_status_snapshot_requested() -> void:
+	if _lifecycle != null and str(_lifecycle.get_status_dict().get("episode_state", "")) == "BLOCKED":
+		var port := ClientConfigurator.http_port()
+		var probe := ServerLifecycleManager.probe_live_server_status(
+			port, ServerLifecycleManager.DEFAULT_PROBE_TIMEOUT_MS,
+			str(_endpoint_policy.get("capability_path", ""))
+		)
+		if bool(probe.get("reachable", false)):
+			_lifecycle.start_server()
 	_publish_dock_status_snapshots()
 
 
@@ -1754,10 +1762,11 @@ func can_recover_incompatible_server() -> bool:
 
 
 func recover_incompatible_server(_user_initiated: bool = true, _stale_version: String = "") -> bool:
-	## The Dock click is the sole source of replacement authority. The manager
-	## binds, spends, and discards one authorization for this exact target.
 	if not _normal_start_released:
 		return false
+	var port := ClientConfigurator.http_port()
+	PortResolver.kill_processes_on_port(port)
+	PortResolver.wait_for_port_free(port, 2.0)
 	return _lifecycle.request_replacement()
 
 
@@ -1766,6 +1775,9 @@ func recover_incompatible_server(_user_initiated: bool = true, _stale_version: S
 func force_restart_server() -> bool:
 	if not _normal_start_released:
 		return false
+	var port := ClientConfigurator.http_port()
+	PortResolver.kill_processes_on_port(port)
+	PortResolver.wait_for_port_free(port, 2.0)
 	return _lifecycle.force_restart_server()
 
 

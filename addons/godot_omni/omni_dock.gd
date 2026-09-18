@@ -107,7 +107,7 @@ func _build_ui() -> void:
 	header_bar.add_child(title)
 
 	var version_badge := Label.new()
-	version_badge.text = "v5.0.6"
+	version_badge.text = "v5.0.7"
 	version_badge.modulate = Color(0.45, 0.75, 1.0)
 	version_badge.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header_bar.add_child(version_badge)
@@ -427,7 +427,10 @@ func _on_test_connection_pressed() -> void:
 		}
 	}
 	McpEventBusScript.record_tool_call("mcp_ping", {"test": true}, simulated_result, dt)
-	_eval_output.text = "[color=#44ff88]Ping Succeeded:[/color] MCP Bridge roundtrip %.1fms | Engine frames: %s" % [dt, str(res)]
+	if _is_connected:
+		_eval_output.text = "[color=#44ff88]Ping Succeeded:[/color] MCP Bridge connected %.1fms | Engine frames: %s" % [dt, str(res)]
+	else:
+		_eval_output.text = "[color=#ffaa33]Bridge Connecting:[/color] Engine alive | Refreshing server status..."
 	status_snapshot_requested.emit()
 	live_server_probe_requested.emit(_http_port)
 

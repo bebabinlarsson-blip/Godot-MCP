@@ -57,8 +57,17 @@ static func is_older_same_major(candidate: String, reference: String) -> bool:
 static func evaluate(actual_version: String, expected_version: String) -> Dictionary:
 	if actual_version.is_empty():
 		return {"compatible": false, "reason": "missing_version"}
-	var compatible := actual_version == expected_version
+	if actual_version == expected_version:
+		return {"compatible": true, "reason": ""}
+	var actual_tuple := version_tuple(actual_version)
+	var expected_tuple := version_tuple(expected_version)
+	if not actual_tuple.is_empty() and not expected_tuple.is_empty():
+		var compatible: bool = int(actual_tuple[0]) == int(expected_tuple[0])
+		return {
+			"compatible": compatible,
+			"reason": "" if compatible else "version_mismatch",
+		}
 	return {
-		"compatible": compatible,
-		"reason": "" if compatible else "version_mismatch",
+		"compatible": false,
+		"reason": "version_mismatch",
 	}
