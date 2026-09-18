@@ -107,7 +107,7 @@ func _build_ui() -> void:
 	header_bar.add_child(title)
 
 	var version_badge := Label.new()
-	version_badge.text = "v5.0.5"
+	version_badge.text = "v5.0.6"
 	version_badge.modulate = Color(0.45, 0.75, 1.0)
 	version_badge.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header_bar.add_child(version_badge)
@@ -428,6 +428,8 @@ func _on_test_connection_pressed() -> void:
 	}
 	McpEventBusScript.record_tool_call("mcp_ping", {"test": true}, simulated_result, dt)
 	_eval_output.text = "[color=#44ff88]Ping Succeeded:[/color] MCP Bridge roundtrip %.1fms | Engine frames: %s" % [dt, str(res)]
+	status_snapshot_requested.emit()
+	live_server_probe_requested.emit(_http_port)
 
 
 func _on_eval_pressed() -> void:
@@ -468,6 +470,9 @@ func _on_eval_pressed() -> void:
 
 func present_transport_snapshot(snapshot: Dictionary) -> void:
 	_is_connected = bool(snapshot.get("connected", false))
+	if _is_connected and is_instance_valid(_blocked_box):
+		_blocked_box.visible = false
+		_blocked_message = ""
 	_update_ui_state()
 
 
@@ -475,7 +480,12 @@ func present_lifecycle_snapshot(snapshot: Dictionary) -> void:
 	_server_state = str(snapshot.get("episode_state", "READY"))
 	_ws_port = int(snapshot.get("resolved_ws_port", 9500))
 	_blocked_message = str(snapshot.get("message", ""))
-	if not _blocked_message.is_empty() and str(snapshot.get("episode_state", "")) == "BLOCKED":
+	if not is_instance_valid(_blocked_box):
+		return
+	if _is_connected:
+		_blocked_box.visible = false
+		_blocked_message = ""
+	elif not _blocked_message.is_empty() and str(snapshot.get("episode_state", "")) == "BLOCKED":
 		_blocked_box.visible = true
 		_blocked_label.text = "Blocked: %s" % _blocked_message
 		_status_badge.text = "[BLOCKED]"
@@ -489,17 +499,26 @@ func present_lifecycle_snapshot(snapshot: Dictionary) -> void:
 func _update_ui_state() -> void:
 	if not is_instance_valid(_status_badge):
 		return
-	if _blocked_box.visible:
-		return
 
 	if _is_connected:
+		if is_instance_valid(_blocked_box):
+			_blocked_box.visible = false
+			_blocked_message = ""
 		_status_badge.text = "[ACTIVE]"
 		_status_badge.modulate = Color(0.3, 1.0, 0.4)
 		_status_desc.text = "Bridge Active & Connected"
-	elif _server_state == "READY" or _server_state == "STARTING":
+		if is_instance_valid(_port_label):
+			_port_label.text = "HTTP: %d | WebSocket: %d" % [_http_port, _ws_port]
+		return
+
+	if _blocked_box.visible:
+		return
+
+	if _server_state == "READY" or _server_state == "STARTING":
 		_status_badge.text = "[STARTING]"
 		_status_badge.modulate = Color(1.0, 0.75, 0.25)
-		_status_desc.text = "Server running, connecting WebSocket..."
+		if _status_desc.text != "HTTP server reachable":
+			_status_desc.text = "Server running, connecting WebSocket..."
 	else:
 		_status_badge.text = "[STOPPED]"
 		_status_badge.modulate = Color(0.7, 0.7, 0.7)
@@ -526,8 +545,12 @@ func present_client_action_timeout(_client_id: String, _action: String, _detail:
 
 
 func present_live_server_probe_result(result: Dictionary) -> void:
-	if bool(result.get("reachable", false)):
+	var reachable: bool = bool(result.get("reachable", false))
+	if reachable:
 		_status_desc.text = "HTTP server reachable"
+		if is_instance_valid(_blocked_box):
+			_blocked_box.visible = false
+			_blocked_message = ""
 	_update_ui_state()
 
 
