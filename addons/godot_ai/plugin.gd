@@ -532,6 +532,7 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy("tilemap_flip_cell", "tilemap", &"flip_cell")
 	_dispatcher.register_lazy("tilemap_erase_cell", "tilemap", &"erase_cell")
 	_dispatcher.register_lazy("tilemap_get_cell", "tilemap", &"get_cell")
+	_dispatcher.register_lazy("tilemap_generate_layout", "tilemap", &"generate_layout")
 	_dispatcher.register_lazy("tileset_get_atlas_tiles", "tileset", &"get_atlas_tiles")
 	_dispatcher.register_lazy("tileset_get_atlas_image", "tileset", &"get_atlas_image")
 	_dispatcher.register_lazy("gridmap_set_item", "gridmap", &"set_item")

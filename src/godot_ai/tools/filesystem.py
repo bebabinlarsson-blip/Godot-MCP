@@ -51,6 +51,15 @@ Ops:
   • search(name="", type="", path="", offset=0, limit=100)
         Find files by name, resource type, or path substring. At least one
         filter must be set. Paginated.
+  • download_asset(url, path, extract=False, reimport=True)
+        Download an asset or zip archive from the internet directly into the
+        Godot project (res:// path). If extract=True or archive is zip, extracts
+        into target directory. Automatically triggers editor reimport and scan.
+        Returns: {url, path, size_bytes, is_archive, extracted_files, reimport_result}
+  • search_assets(query="", category="all", limit=20)
+        Search curated free/CC0 game assets (tilesets, audio, textures, UI, 3D models).
+        Categories: "all", "tileset", "audio", "texture", "ui".
+        Returns matching assets with direct download URLs ready for download_asset.
 """
 
 
@@ -68,6 +77,10 @@ def register_filesystem_tools(mcp: FastMCP) -> None:
             "reimport": filesystem_handlers.filesystem_reimport,
             "scan": filesystem_handlers.filesystem_scan,
             "search": filesystem_handlers.filesystem_search,
+            "download_asset": filesystem_handlers.filesystem_download_asset,
+            "download_file": filesystem_handlers.filesystem_download_asset,
+            "search_assets": filesystem_handlers.filesystem_search_assets,
+            "asset_search": filesystem_handlers.filesystem_search_assets,
         },
         read_resource_forms={
             ## File reads/searches/lists are per-call queries with arbitrary path
@@ -79,5 +92,7 @@ def register_filesystem_tools(mcp: FastMCP) -> None:
             ## while readiness is "importing" to await an in-flight scan), so
             ## the lint classes it as a read; it has no resource-URI form.
             "scan": None,
+            "search_assets": None,
+            "asset_search": None,
         },
     )

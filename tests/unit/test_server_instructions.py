@@ -30,12 +30,13 @@ from tests.conftest import create_test_server as create_server
 ## loudly.
 _FROZEN_NO_EXCLUSION_TEXT = (
     "Production-grade Godot MCP server with persistent editor integration.\n\n"
-    "Tool surface — 19 named verbs + per-domain `<domain>_manage` rollups:\n\n"
+    "Tool surface — 20 named verbs + per-domain `<domain>_manage` rollups:\n\n"
     "Core named verbs (always loaded — common reads + high-traffic writes):\n"
     "  editor_state                      — readiness, version, current scene\n"
     "  scene_get_hierarchy               — paginated scene tree walk\n"
     "  node_get_properties               — full property snapshot\n"
     "  session_activate                  — pin commands to one editor\n"
+    "  ping                              — lightweight engine and server probe\n"
     "  node_create / node_set_property / node_find\n"
     "  scene_open / scene_save\n"
     "  script_create / script_attach / script_patch\n"

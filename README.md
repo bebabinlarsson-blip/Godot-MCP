@@ -1,11 +1,11 @@
-﻿<div align="center">
+<div align="center">
 
 # Godot MCP
 
 ### Free and Open-Source Model Context Protocol Automation Plugin for the Godot Engine
 
 [![MCP Protocol](https://img.shields.io/badge/MCP-Model%20Context%20Protocol-8A2BE2?style=flat&labelColor=333A41)](https://modelcontextprotocol.io)
-[![Release](https://img.shields.io/badge/Release-v5.0.4-blue.svg?style=flat&labelColor=333A41)](https://github.com/bebabinlarsson-blip/Godot-MCP/releases)
+[![Release](https://img.shields.io/badge/Release-v5.0.5-blue.svg?style=flat&labelColor=333A41)](https://github.com/bebabinlarsson-blip/Godot-MCP/releases)
 [![Godot](https://img.shields.io/badge/Godot-4.1%20to%204.8+-478CBF?style=flat&logo=godotengine&logoColor=white&labelColor=333A41)](https://godotengine.org)
 [![Python](https://img.shields.io/badge/Python-3.11%20|%203.12%20|%203.13%20|%203.14-3776AB?style=flat&logo=python&logoColor=white&labelColor=333A41)](https://www.python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat&labelColor=333A41)](LICENSE)
@@ -55,13 +55,13 @@ Godot MCP provides full engine automation across 59 domain families:
 | **node** | `node_create`, `node_set_property`, `node_get_properties`, `node_find`, `node_manage` | Find, spawn, modify, reparent, reorder, duplicate, delete, rotate, scale, and translate nodes in 2D and 3D with undo/redo. |
 | **scene** | `scene_open`, `scene_save`, `scene_get_hierarchy`, `scene_manage` | Open, save, create, close, inspect root hierarchies, and instantiate PackedScene prefabs. |
 | **script** | `script_create`, `script_patch`, `script_attach`, `script_manage` | Create, anchor-patch, read, detach, inspect symbols, validate syntax/compilation, and delete GDScript files. |
-| **filesystem** | `filesystem_manage` | List files and directories with UIDs, read/write text, delete, move, force reimport assets, and trigger editor scans. |
+| **filesystem** | `filesystem_manage` | List files, read/write text, delete, move, reimport, trigger scans, download assets from URL, and search free CC0 assets. |
 | **resource** | `resource_manage` | Search, load, assign, introspect, create, delete, and move .tres/.res assets, curve profiles, and environment setups. |
 | **screenshot** | `editor_screenshot`, `camera_manage` | High-fidelity captures of the 3D viewport, 2D viewport, active cameras, running game frames, and isolated node framing. |
 | **editor** | `editor_state`, `editor_manage`, `editor_reload_plugin` | Read editor lifecycle, inspect/set node selections, query performance monitors, clear logs, and execute safe restarts. |
 | **console** | `logs_read`, `editor_manage(logs_clear)` | Real-time structured log streaming from plugin events, editor output, debugger errors, and game runtime stdout/stderr. |
 | **reflection** | `omni_eval`, `omni_manage(call, get, set, inspect)` | Universal object reflection, dynamic method invocation, property getters/setters, and ClassDB discovery. |
-| **tilemap** | `tilemap_manage` | Paint cells, rotate tiles (90, 180, 270 degrees), flip horizontally/vertically, erase, query coordinates, and inspect layers. |
+| **tilemap** | `tilemap_manage` | Direct editor tile painting, D4 rotation (0, 90, 180, 270 deg), flips, layer queries, and smart multi-genre layout generation. |
 | **tileset** | `tileset_manage` | Inspect atlas source tiles, extract texture slices, and introspect physics and navigation layers. |
 | **animation** | `animation_create`, `animation_manage` | Create AnimationPlayers, add property/method tracks, insert keyframes, set autoplay, and apply procedural motion presets. |
 | **physics** | `collision_shape_create`, `physics_shape_autofit` | Generate 2D and 3D collision bodies, autofit shapes to visual mesh bounds, and configure collision layers. |
@@ -79,7 +79,7 @@ You do not need to register on any website or install any npm packages.
 
 ### Step 1: Download and Extract the Plugin
 
-1. Download the free release archive `godot-mcp-v5.0.4.zip` from [GitHub Releases](https://github.com/bebabinlarsson-blip/Godot-MCP/releases).
+1. Download the free release archive `godot-mcp-v5.0.5.zip` from [GitHub Releases](https://github.com/bebabinlarsson-blip/Godot-MCP/releases).
 2. Extract the archive into your Godot project root so that the `addons/` folder is placed directly in your project:
 
 ```text
@@ -197,6 +197,64 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 ```
 
 That is all. Start prompting your AI to build scenes, write scripts, paint tiles, or animate objects in Godot.
+
+---
+
+## TileMap Authoring and Direct Editor Placement Directive
+
+### The Direct Editor Placement Contract
+AI agents connected via Godot MCP follow a strict architectural rule:
+* **Always place tiles directly into the open editor scene**: Use `tilemap_manage` (`place_tile`, `set_cell`, `set_cells_rect`, `generate_layout`) to place tiles directly down into the `TileMap` or `TileMapLayer` node.
+* **Never write runtime procedural generation scripts in `_ready()`** unless the user explicitly requested runtime procedural level generation.
+* **Why this matters**: Direct placement in the editor gives immediate visual feedback, enables manual tweaking in the editor viewport, configures native Godot 2D physics collisions, and saves clean `.tscn` scene files without runtime overhead.
+
+### Dihedral D4 Rotation and Symmetry
+Tiles can be rotated clockwise by 90, 180, or 270 degrees and flipped horizontally or vertically with complete mathematical precision using an 8-state transition table that prevents bit-drift:
+* 0 degrees: Default orientation (alt = 0)
+* 90 degrees: Clockwise rotation (`transpose | flip_h`)
+* 180 degrees: Half rotation (`flip_h | flip_v`)
+* 270 degrees: Counter-clockwise rotation (`transpose | flip_v`)
+
+### Smart Genre Layout Generation
+The `generate_layout` operation can build complete genre-specific level layouts directly in the active editor scene:
+* `platformer`: Ground blocks with jump gaps, vertical boundary walls, stepping platforms at reachable jump heights, and floating challenge accents.
+* `topdown` / `rpg`: Perimeter stone walls with open doorway transitions, walkable floor tiles, and corner architectural accents.
+* `dungeon`: Thick perimeter walls with corridor access, walkable stone paths, and central structural columns.
+* `arena`: Symmetrical battle arena boundaries with strategic cover pillars.
+
+---
+
+## Asset Downloader and Free CC0 Search
+
+AI assistants and developers can search for free CC0 assets and download them directly into the Godot project with automatic editor reimport:
+
+### Search Free CC0 Game Assets
+Search the built-in catalog of curated CC0 public domain game packs (Kenney tilesets, retro sound effects, UI elements, textures, and 3D models):
+```json
+{
+  "op": "search_assets",
+  "params": {
+    "query": "platformer",
+    "category": "tileset",
+    "limit": 10
+  }
+}
+```
+
+### Download Assets into `res://`
+Download any asset from a direct URL (or archive package) straight into your project:
+```json
+{
+  "op": "download_asset",
+  "params": {
+    "url": "https://raw.githubusercontent.com/KenneyNL/Starter-Kits/master/2D%20Platformer/assets/tilemap-characters_packed.png",
+    "path": "res://assets/tilesets/platformer_packed.png",
+    "reimport": true
+  }
+}
+```
+* Single files are written directly and immediately queued for `reimport`.
+* ZIP archives (`extract: true`) are safely uncompressed into the destination folder, followed by a full `scan_filesystem` to index all unpacked assets.
 
 ---
 

@@ -188,3 +188,48 @@ async def tilemap_get_cell(
         },
     )
 
+
+async def tilemap_generate_layout(
+    runtime: DirectRuntime,
+    path: str,
+    genre: str = "platformer",
+    rect_w: int = 32,
+    rect_h: int = 18,
+    rect_x: int = 0,
+    rect_y: int = 0,
+    source_id: int = 0,
+    floor_col: int = 0,
+    floor_row: int = 0,
+    wall_col: int = 1,
+    wall_row: int = 0,
+    accent_col: int = 2,
+    accent_row: int = 0,
+    layer: int = 0,
+) -> dict:
+    """Generate a cohesive level layout placed directly into the editor TileMap/TileMapLayer.
+
+    Supported genres: 'platformer', 'topdown', 'rpg', 'dungeon', 'arena'.
+    Places all tiles directly down into the active editor scene with full Undo/Redo.
+    """
+    await require_writable_async(runtime)
+    return await runtime.send_command(
+        "tilemap_generate_layout",
+        {
+            "path": path,
+            "genre": genre,
+            "rect_w": rect_w,
+            "rect_h": rect_h,
+            "rect_x": rect_x,
+            "rect_y": rect_y,
+            "source_id": source_id,
+            "floor_col": floor_col,
+            "floor_row": floor_row,
+            "wall_col": wall_col,
+            "wall_row": wall_row,
+            "accent_col": accent_col,
+            "accent_row": accent_row,
+            "layer": layer,
+        },
+    )
+
+

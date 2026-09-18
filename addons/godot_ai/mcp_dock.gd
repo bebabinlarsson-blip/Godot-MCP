@@ -203,7 +203,7 @@ var _setup_container: VBoxContainer
 ## Developer controls are a view of the ordinary lifecycle owner. They never
 ## start a second process topology or kill an externally launched server.
 var _dev_primary_btn: Button
-## Small "✕" affordance next to the primary — enabled only for the exact
+## Small "X" affordance next to the primary — enabled only for the exact
 ## plugin-owned process grant.
 var _dev_stop_btn: Button
 var _log_viewer: LogViewerScript
@@ -1462,7 +1462,7 @@ func _refresh_setup_status() -> void:
 		btn_row.add_child(_dev_primary_btn)
 
 		_dev_stop_btn = Button.new()
-		_dev_stop_btn.text = "✕"
+		_dev_stop_btn.text = "Stop"
 		_dev_stop_btn.tooltip_text = "Stop the exact plugin-owned server."
 		_dev_stop_btn.pressed.connect(_on_dev_stop_pressed)
 		btn_row.add_child(_dev_stop_btn)

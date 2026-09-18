@@ -178,6 +178,7 @@ _CORE_VERB_LINES: tuple[str, ...] = (
     "  scene_get_hierarchy               — paginated scene tree walk\n",
     "  node_get_properties               — full property snapshot\n",
     "  session_activate                  — pin commands to one editor\n",
+    "  ping                              — lightweight engine and server probe\n",
 )
 
 ## Non-core named verbs, grouped into display lines: (separator, ((verb,

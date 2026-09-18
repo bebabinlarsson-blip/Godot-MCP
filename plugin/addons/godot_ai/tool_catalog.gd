@@ -27,6 +27,7 @@ const CORE_TOOLS := [
 ## Counted alongside CORE_TOOLS so the dock's totals match the real
 ## server surface.
 const ALWAYS_ON_TOOLS := [
+	"ping",
 	"session_manage",
 ]
 
