@@ -5,6 +5,26 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.10 (2026-09-18)
+
+The dock no longer strands a user in a blocked state when two editors launch
+at once: a server that loses the port-bind race is adopted instead of fought.
+
+### Fixed
+
+- When the launched server exits or changes identity before it proves (the
+  symptom of a concurrent editor winning the port race), the lifecycle now
+  automatically re-probes the endpoint on a bounded 1s/2s/4s/8s backoff and
+  **adopts the compatible server that won the port** — never killing another
+  editor's process and never spawning a second server. A free port still
+  launches only our own server.
+- The auto-recovery gives up after four attempts and leaves the dock blocked
+  until a manual Restart; a genuine Restart at any time supersedes the
+  scheduled timer. A fresh READY at any point earns a new budget, so a
+  one-off race self-heals and a flapping one cannot loop forever.
+- Incompatible version mismatches, proof timeouts, and genuine launch
+  failures keep the dock's explicit authority exactly as before.
+
 ## 5.0.9 (2026-09-18)
 
 Enabling the plugin now auto-configures every installed MCP client — Claude
