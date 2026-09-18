@@ -1,4 +1,4 @@
-﻿"""Package Godot MCP release zip for GitHub releases and Godot Asset Library.
+"""Package Godot MCP release zip for GitHub releases and Godot Asset Library.
 
 Usage: python script/package_release.py [--version 5.0.2]
 """
@@ -12,8 +12,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--version",
-        default="5.0.2",
-        help="Release version used in the zip file name (default: 5.0.2).",
+        default="5.0.3",
+        help="Release version used in the zip file name (default: 5.0.3).",
     )
     args = parser.parse_args()
 
