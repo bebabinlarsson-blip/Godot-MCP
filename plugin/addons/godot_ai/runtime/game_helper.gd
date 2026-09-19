@@ -1015,8 +1015,42 @@ func _run_playtest_suite(request_id: String, params: Dictionary) -> void:
 					var parts := prop.split(".")
 					var cur: Variant = node
 					for part in parts:
-						if cur != null and (part in cur or (cur is Object and cur.get(part) != null)):
-							cur = cur.get(part)
+						if cur == null:
+							prop_found = false
+							break
+						if cur is Dictionary:
+							if cur.has(part):
+								cur = cur[part]
+							else:
+								prop_found = false
+								break
+						elif cur is Object:
+							if cur.get(part) != null or part in cur:
+								cur = cur.get(part)
+							else:
+								prop_found = false
+								break
+						elif cur is Vector2 or cur is Vector2i:
+							if part == "x": cur = cur.x
+							elif part == "y": cur = cur.y
+							else:
+								prop_found = false
+								break
+						elif cur is Vector3 or cur is Vector3i:
+							if part == "x": cur = cur.x
+							elif part == "y": cur = cur.y
+							elif part == "z": cur = cur.z
+							else:
+								prop_found = false
+								break
+						elif cur is Color:
+							if part == "r": cur = cur.r
+							elif part == "g": cur = cur.g
+							elif part == "b": cur = cur.b
+							elif part == "a": cur = cur.a
+							else:
+								prop_found = false
+								break
 						else:
 							prop_found = false
 							break
