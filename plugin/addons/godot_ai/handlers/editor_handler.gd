@@ -1057,13 +1057,15 @@ func game_command(params: Dictionary) -> Dictionary:
 	## debugger-side pending timer (below) and the dispatcher-side deferred
 	## budget (via the sentinel's `_deferred_timeout_ms`). Every other op keeps
 	## request_game_command's tight default.
-	if op == "input_sequence":
+	if op == "input_sequence" or op == "run_playtest_suite":
+		var suite_timeout := float(command_params.get("timeout", INPUT_SEQUENCE_TIMEOUT_SEC))
+		if suite_timeout < 1.0: suite_timeout = INPUT_SEQUENCE_TIMEOUT_SEC
 		_debugger_plugin.request_game_command(
-			op, command_params, request_id, _connection, INPUT_SEQUENCE_TIMEOUT_SEC
+			op, command_params, request_id, _connection, suite_timeout
 		)
 		return {
 			"_deferred": true,
-			"_deferred_timeout_ms": int(INPUT_SEQUENCE_TIMEOUT_SEC * 1000.0),
+			"_deferred_timeout_ms": int(suite_timeout * 1000.0),
 		}
 
 	_debugger_plugin.request_game_command(op, command_params, request_id, _connection)

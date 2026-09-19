@@ -458,3 +458,25 @@ async def animation_scaffold_state_machine(
     return await runtime.send_command("animation_scaffold_state_machine", params)
 
 
+async def animation_scaffold_locomotion_tree(
+    runtime: DirectRuntime,
+    player_path: str,
+    states: dict[str, dict[str, str]] | None = None,
+    name: str = "AnimationTree",
+    blend_mode: str = "interpolated",
+) -> dict:
+    """Scaffold an AnimationTree with an AnimationNodeStateMachine and
+    AnimationNodeBlendSpace2D nodes.
+    """
+    await require_writable_async(runtime)
+    params: dict[str, Any] = {
+        "player_path": player_path,
+        "name": name,
+        "blend_mode": blend_mode,
+    }
+    if states is not None:
+        params["states"] = states
+    return await runtime.send_command("animation_scaffold_locomotion_tree", params)
+
+
+

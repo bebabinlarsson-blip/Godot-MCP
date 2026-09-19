@@ -125,6 +125,9 @@ func place_tile(params: Dictionary) -> Dictionary:
 		if flip_v:
 			alt ^= 8192
 
+	if alt > 0:
+		_sync_alternative_tile_collision(node, src, atlas, alt, rot, flip_h, flip_v)
+
 	var prev := _capture_cell_state(node, pos, layer_idx)
 	_undo_redo.create_action("MCP: TileMap place_tile")
 	_undo_redo.add_do_method(self, "_apply_cell", node, pos, src, atlas, alt, layer_idx)
@@ -179,6 +182,8 @@ func rotate_cell(params: Dictionary) -> Dictionary:
 			_: current_flags = 20480
 
 	var new_alt: int = base_id | current_flags
+	if new_alt > 0:
+		_sync_alternative_tile_collision(node, prev.source_id, Vector2i(prev.atlas_col, prev.atlas_row), new_alt, degrees)
 
 	_undo_redo.create_action("MCP: TileMap rotate_cell (%d, %d)" % [pos.x, pos.y])
 	_undo_redo.add_do_method(self, "_apply_cell", node, pos, prev.source_id, Vector2i(prev.atlas_col, prev.atlas_row), new_alt, layer_idx)
@@ -213,6 +218,9 @@ func flip_cell(params: Dictionary) -> Dictionary:
 	var alt: int = prev.get("alternative", 0)
 	if flip_h: alt ^= 4096
 	if flip_v: alt ^= 8192
+
+	if alt > 0:
+		_sync_alternative_tile_collision(node, prev.source_id, Vector2i(prev.atlas_col, prev.atlas_row), alt, 0, flip_h, flip_v)
 
 	_undo_redo.create_action("MCP: TileMap flip_cell (%d, %d)" % [pos.x, pos.y])
 	_undo_redo.add_do_method(self, "_apply_cell", node, pos, prev.source_id, Vector2i(prev.atlas_col, prev.atlas_row), alt, layer_idx)
@@ -528,6 +536,8 @@ func import_matrix(params: Dictionary) -> Dictionary:
 
 	_undo_redo.create_action("MCP: TileMap import_matrix (%d cells)" % placements.size())
 	for p in placements:
+		if p.alt > 0:
+			_sync_alternative_tile_collision(node, p.source_id, p.atlas, p.alt)
 		_undo_redo.add_do_method(self, "_apply_cell", node, p.pos, p.source_id, p.atlas, p.alt, layer_idx)
 	_undo_redo.add_undo_method(self, "_restore_rect_snapshot", node, snapshot)
 	_undo_redo.commit_action()
@@ -744,3 +754,81 @@ func _restore_cell_state(node: Node, pos: Vector2i, state: Dictionary) -> void:
 		int(state.get("alternative", 0)),
 		layer_idx
 	)
+
+
+func _sync_alternative_tile_collision(
+	node: Node,
+	source_id: int,
+	atlas_coords: Vector2i,
+	alt_id: int,
+	rot_degrees: int = 0,
+	flip_h: bool = false,
+	flip_v: bool = false
+) -> void:
+	if alt_id <= 0 or node == null:
+		return
+	var ts: TileSet = null
+	if node is TileMapLayer:
+		ts = node.tile_set
+	elif node.has_method("get_tileset"):
+		ts = node.call("get_tileset")
+	elif "tile_set" in node:
+		ts = node.tile_set
+	if ts == null or not ts.has_source(source_id):
+		return
+	var src_obj := ts.get_source(source_id)
+	if not src_obj is TileSetAtlasSource:
+		return
+	var atlas_source := src_obj as TileSetAtlasSource
+	if not atlas_source.has_tile(atlas_coords):
+		return
+	var base_data: TileData = atlas_source.get_tile_data(atlas_coords, 0)
+	if base_data == null:
+		return
+
+	var physics_layers := ts.get_physics_layers_count()
+	var has_polys := false
+	for l in range(physics_layers):
+		if base_data.get_collision_polygons_count(l) > 0:
+			has_polys = true
+			break
+	if not has_polys:
+		return
+
+	if not atlas_source.has_alternative_tile(atlas_coords, alt_id):
+		atlas_source.create_alternative_tile(atlas_coords, alt_id)
+	var alt_data: TileData = atlas_source.get_tile_data(atlas_coords, alt_id)
+	if alt_data == null:
+		return
+
+	var rot := rot_degrees % 360
+	if rot < 0: rot += 360
+	var flags := alt_id & (4096 | 8192 | 16384)
+	if rot == 0 and flags != 0:
+		if flags == 20480: rot = 90
+		elif flags == 12288: rot = 180
+		elif flags == 24576: rot = 270
+
+	for l in range(physics_layers):
+		while alt_data.get_collision_polygons_count(l) > 0:
+			alt_data.remove_collision_polygon(l, 0)
+		var poly_count := base_data.get_collision_polygons_count(l)
+		for p_idx in range(poly_count):
+			alt_data.add_collision_polygon(l)
+			var base_points := base_data.get_collision_polygon_points(l, p_idx)
+			var transformed_points := PackedVector2Array()
+			for pt in base_points:
+				var p := pt
+				match rot:
+					90: p = Vector2(-pt.y, pt.x)
+					180: p = Vector2(-pt.x, -pt.y)
+					270: p = Vector2(pt.y, -pt.x)
+				if flip_h: p.x = -p.x
+				if flip_v: p.y = -p.y
+				transformed_points.append(p)
+			alt_data.set_collision_polygon_points(l, p_idx, transformed_points)
+			alt_data.set_collision_polygon_one_way(l, p_idx, base_data.is_collision_polygon_one_way(l, p_idx))
+			alt_data.set_collision_polygon_one_way_margin(l, p_idx, base_data.get_collision_polygon_one_way_margin(l, p_idx))
+
+	if not ts.resource_path.is_empty():
+		ResourceSaver.save(ts, ts.resource_path)

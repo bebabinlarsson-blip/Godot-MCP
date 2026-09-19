@@ -87,6 +87,8 @@ def register_game_tools(mcp: FastMCP) -> None:
             "input_state": game_handlers.game_input_state,
             "simulate_input": game_handlers.game_simulate_input,
             "simulate": game_handlers.game_simulate_input,
+            "run_playtest_suite": game_handlers.game_run_playtest_suite,
+            "playtest": game_handlers.game_run_playtest_suite,
         },
         read_resource_forms={
             "get_scene_tree": None,

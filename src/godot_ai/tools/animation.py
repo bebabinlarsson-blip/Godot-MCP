@@ -134,6 +134,7 @@ def register_animation_tools(mcp: FastMCP) -> None:
             ),
             "create_animated_sprite": animation_handlers.animation_create_animated_sprite,
             "scaffold_state_machine": animation_handlers.animation_scaffold_state_machine,
+            "scaffold_locomotion_tree": animation_handlers.animation_scaffold_locomotion_tree,
         },
         read_resource_forms={
             ## No `godot://animations` resource exists. Animation reads are

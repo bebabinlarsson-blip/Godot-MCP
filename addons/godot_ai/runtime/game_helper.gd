@@ -425,6 +425,9 @@ func _handle_game_command(data: Array) -> void:
 			## screenshot capture paths.
 			_run_input_sequence(request_id, json.data)
 			return
+		"run_playtest_suite":
+			_run_playtest_suite(request_id, json.data)
+			return
 		_:
 			_reply_game_command_error(request_id, "Unknown game op: %s" % op)
 			return
@@ -925,6 +928,225 @@ func _reply_input_sequence_ok(request_id: String, result: Dictionary) -> void:
 
 func _reply_input_sequence_error(request_id: String, message: String) -> void:
 	_last_game_command_reply = {"kind": "error", "op": "input_sequence", "message": message}
+	if EngineDebugger.is_active():
+		EngineDebugger.send_message("mcp:game_command_error", [request_id, message])
+
+
+func _run_playtest_suite(request_id: String, params: Dictionary) -> void:
+	var raw_steps = params.get("steps", [])
+	if not (raw_steps is Array) or raw_steps.is_empty():
+		_reply_playtest_suite_error(request_id, "Parameter 'steps' must be a non-empty array")
+		return
+
+	var timeout: float = float(params.get("timeout", 10.0))
+	if timeout <= 0.0: timeout = 10.0
+	var tree := get_tree()
+	if tree == null:
+		_reply_playtest_suite_error(request_id, "No SceneTree available for playtest suite")
+		return
+
+	var start_msec := Time.get_ticks_msec()
+	var details: Array = []
+	var assertions_total := 0
+	var assertions_passed := 0
+	var assertions_failed := 0
+	var overall_passed := true
+
+	for i in range(raw_steps.size()):
+		var elapsed_so_far := (Time.get_ticks_msec() - start_msec) / 1000.0
+		if elapsed_so_far > timeout:
+			details.append({
+				"step_index": i,
+				"status": "timed_out",
+				"error": "Playtest suite timed out after %.2f seconds" % elapsed_so_far
+			})
+			overall_passed = false
+			break
+
+		var step = raw_steps[i]
+		if not (step is Dictionary):
+			continue
+
+		if step.has("action"):
+			var action_name: String = str(step.get("action", ""))
+			var duration: float = float(step.get("duration", 0.0))
+			var pressed: bool = bool(step.get("pressed", true))
+			var strength: float = float(step.get("strength", 1.0))
+			if not InputMap.has_action(action_name):
+				details.append({"step_index": i, "type": "action", "action": action_name, "status": "failed", "error": "Unknown action: %s" % action_name})
+				overall_passed = false
+			else:
+				_game_input_action({"action": action_name, "pressed": pressed, "strength": strength})
+				var frames := maxi(1, int(round(duration * 60.0))) if duration > 0.0 else 0
+				for _f in range(frames):
+					if _frame_waiter.is_valid():
+						await _frame_waiter.call()
+					else:
+						await tree.process_frame
+				if duration > 0.0 and pressed:
+					_game_input_action({"action": action_name, "pressed": false, "strength": 0.0})
+				details.append({"step_index": i, "type": "action", "action": action_name, "duration": duration, "status": "completed"})
+
+		elif step.has("wait") or step.has("wait_seconds"):
+			var wait_sec: float = float(step.get("wait", step.get("wait_seconds", 0.1)))
+			var frames := maxi(1, int(round(wait_sec * 60.0)))
+			for _f in range(frames):
+				if _frame_waiter.is_valid():
+					await _frame_waiter.call()
+				else:
+					await tree.process_frame
+			details.append({"step_index": i, "type": "wait", "duration": wait_sec, "status": "completed"})
+
+		elif step.has("assert_node_property"):
+			assertions_total += 1
+			var spec = step.get("assert_node_property")
+			if not (spec is Dictionary): spec = {}
+			var path: String = str(spec.get("path", ""))
+			var prop: String = str(spec.get("property", ""))
+			var node := _resolve_runtime_node(path)
+			if node == null:
+				assertions_failed += 1
+				overall_passed = false
+				details.append({"step_index": i, "type": "assert_node_property", "passed": false, "path": path, "property": prop, "error": "Node not found at '%s'" % path})
+			else:
+				var val: Variant = null
+				var prop_found := true
+				if prop.contains("."):
+					var parts := prop.split(".")
+					var cur: Variant = node
+					for part in parts:
+						if cur != null and (part in cur or (cur is Object and cur.get(part) != null)):
+							cur = cur.get(part)
+						else:
+							prop_found = false
+							break
+					val = cur
+				else:
+					if prop in node:
+						val = node.get(prop)
+					else:
+						prop_found = false
+
+				if not prop_found:
+					assertions_failed += 1
+					overall_passed = false
+					details.append({"step_index": i, "type": "assert_node_property", "passed": false, "path": path, "property": prop, "error": "Property '%s' not found on node" % prop})
+				else:
+					var check_passed := true
+					var cond := {}
+					if spec.has("equals"):
+						cond["equals"] = spec.get("equals")
+						check_passed = (val == spec.get("equals"))
+					elif spec.has("not_equals"):
+						cond["not_equals"] = spec.get("not_equals")
+						check_passed = (val != spec.get("not_equals"))
+					elif spec.has("greater_than"):
+						cond["greater_than"] = spec.get("greater_than")
+						check_passed = (float(val) > float(spec.get("greater_than")))
+					elif spec.has("less_than"):
+						cond["less_than"] = spec.get("less_than")
+						check_passed = (float(val) < float(spec.get("less_than")))
+					elif spec.has("greater_equal"):
+						cond["greater_equal"] = spec.get("greater_equal")
+						check_passed = (float(val) >= float(spec.get("greater_equal")))
+					elif spec.has("less_equal"):
+						cond["less_equal"] = spec.get("less_equal")
+						check_passed = (float(val) <= float(spec.get("less_equal")))
+					elif spec.has("is_not_null"):
+						cond["is_not_null"] = true
+						check_passed = (val != null)
+
+					if check_passed:
+						assertions_passed += 1
+					else:
+						assertions_failed += 1
+						overall_passed = false
+
+					details.append({
+						"step_index": i,
+						"type": "assert_node_property",
+						"passed": check_passed,
+						"path": path,
+						"property": prop,
+						"actual": _variant_to_json(val),
+						"condition": cond
+					})
+
+		elif step.has("assert_expression"):
+			assertions_total += 1
+			var expr_str: String = str(step.get("assert_expression", ""))
+			var expr := Expression.new()
+			var parse_err := expr.parse(expr_str)
+			if parse_err != OK:
+				assertions_failed += 1
+				overall_passed = false
+				details.append({
+					"step_index": i,
+					"type": "assert_expression",
+					"passed": false,
+					"expression": expr_str,
+					"error": "Expression parse error: %s" % expr.get_error_text()
+				})
+			else:
+				var eval_root = tree.root if tree != null else self
+				var eval_val = expr.execute([], eval_root)
+				if expr.has_execute_failed():
+					assertions_failed += 1
+					overall_passed = false
+					details.append({
+						"step_index": i,
+						"type": "assert_expression",
+						"passed": false,
+						"expression": expr_str,
+						"error": "Expression execute failed: %s" % expr.get_error_text()
+					})
+				else:
+					var is_true: bool = bool(eval_val)
+					if is_true:
+						assertions_passed += 1
+					else:
+						assertions_failed += 1
+						overall_passed = false
+					details.append({
+						"step_index": i,
+						"type": "assert_expression",
+						"passed": is_true,
+						"expression": expr_str,
+						"value": _variant_to_json(eval_val)
+					})
+
+		elif step.has("eval"):
+			var code_str: String = str(step.get("eval", ""))
+			var expr_eval := Expression.new()
+			if expr_eval.parse(code_str) == OK:
+				var eval_root2 = tree.root if tree != null else self
+				var res = expr_eval.execute([], eval_root2)
+				details.append({"step_index": i, "type": "eval", "code": code_str, "result": _variant_to_json(res)})
+
+	var total_time := (Time.get_ticks_msec() - start_msec) / 1000.0
+	_reply_playtest_suite_ok(request_id, {
+		"completed": true,
+		"passed": overall_passed and (assertions_failed == 0),
+		"total_steps": raw_steps.size(),
+		"assertions_total": assertions_total,
+		"assertions_passed": assertions_passed,
+		"assertions_failed": assertions_failed,
+		"time_elapsed": total_time,
+		"details": details,
+	})
+
+
+func _reply_playtest_suite_ok(request_id: String, result: Dictionary) -> void:
+	result["source"] = "game"
+	result["op"] = "run_playtest_suite"
+	_last_game_command_reply = {"kind": "response", "op": "run_playtest_suite", "result": result}
+	if EngineDebugger.is_active():
+		EngineDebugger.send_message("mcp:game_command_response",
+			[request_id, JSON.stringify(_variant_to_json(result))])
+
+
+func _reply_playtest_suite_error(request_id: String, message: String) -> void:
+	_last_game_command_reply = {"kind": "error", "op": "run_playtest_suite", "message": message}
 	if EngineDebugger.is_active():
 		EngineDebugger.send_message("mcp:game_command_error", [request_id, message])
 

@@ -90,3 +90,23 @@ async def particle_apply_preset(
     if overrides:
         params["overrides"] = overrides
     return await runtime.send_command("particle_apply_preset", params)
+
+
+async def particle_spawn_preset_2d(
+    runtime: DirectRuntime,
+    parent_path: str,
+    preset: str = "dust_puff",
+    emitting: bool = True,
+    name: str = "",
+) -> dict:
+    """Spawn a configured 2D particle preset using CPUParticles2D."""
+    await require_writable_async(runtime)
+    params: dict[str, Any] = {
+        "parent_path": parent_path,
+        "preset": preset,
+        "emitting": emitting,
+    }
+    if name:
+        params["name"] = name
+    return await runtime.send_command("particle_spawn_preset_2d", params)
+

@@ -67,6 +67,8 @@ def register_tileset_tools(mcp: FastMCP) -> None:
             "create_from_texture": tileset_handlers.tileset_create_from_texture,
             "tileset_create_collision_polygon": tileset_handlers.tileset_create_collision_polygon,
             "create_collision_polygon": tileset_handlers.tileset_create_collision_polygon,
+            "tileset_scaffold_terrain_bitmasks": tileset_handlers.tileset_scaffold_terrain_bitmasks,
+            "scaffold_terrain_bitmasks": tileset_handlers.tileset_scaffold_terrain_bitmasks,
         },
         read_resource_forms={
             "tileset_get_atlas_tiles": None,

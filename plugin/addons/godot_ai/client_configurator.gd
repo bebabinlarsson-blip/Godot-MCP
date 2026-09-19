@@ -1424,9 +1424,16 @@ static func _resolve_attach_launch_uncached(
 		uvx = find_uvx()
 	if not uvx.is_empty():
 		var uvx_args := UvResolution.args()
+		var repo_root := _find_local_repo_root()
+		var from_pkg := "godot-ai==%s" % _pypi_pin_version(plugin_version)
+		if is_dev_checkout() or not repo_root.is_empty():
+			if not repo_root.is_empty():
+				from_pkg = repo_root
+			else:
+				from_pkg = "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git"
 		uvx_args.append_array([
 			"--link-mode", "copy",
-			"--from", "godot-ai==%s" % _pypi_pin_version(plugin_version),
+			"--from", from_pkg,
 			"godot-ai",
 		])
 		uvx_args.append_array(common_args)
@@ -2024,6 +2031,52 @@ static func _find_venv_python() -> String:
 		var from_addons := _find_venv_python_in(addons_real)
 		if not from_addons.is_empty():
 			return from_addons
+	## 3) Check sibling directories of project root (e.g. adjacent Godot MCP clone).
+	var project_parent := ProjectSettings.globalize_path("res://").rstrip("/").rstrip("\\").get_base_dir()
+	if not project_parent.is_empty():
+		var d := DirAccess.open(project_parent)
+		if d != null:
+			d.list_dir_begin()
+			var item := d.get_next()
+			while not item.is_empty():
+				if d.current_is_dir() and not item.begins_with("."):
+					var candidate := project_parent.path_join(item)
+					var found := _find_venv_python_in(candidate)
+					if not found.is_empty():
+						return found
+				item = d.get_next()
+			d.list_dir_end()
+	return ""
+
+
+static func _find_local_repo_root() -> String:
+	var start_dirs: Array[String] = [
+		ProjectSettings.globalize_path("res://").rstrip("/").rstrip("\\"),
+		resolve_addons_realpath()
+	]
+	for s in start_dirs:
+		if s.is_empty(): continue
+		var dir := s
+		for i in 8:
+			if DirAccess.dir_exists_absolute(dir.path_join("src/godot_ai")) and FileAccess.file_exists(dir.path_join("pyproject.toml")):
+				return dir
+			var parent := dir.get_base_dir()
+			if parent == dir or parent.is_empty(): break
+			dir = parent
+
+	var project_parent := ProjectSettings.globalize_path("res://").rstrip("/").rstrip("\\").get_base_dir()
+	if not project_parent.is_empty():
+		var d := DirAccess.open(project_parent)
+		if d != null:
+			d.list_dir_begin()
+			var item := d.get_next()
+			while not item.is_empty():
+				if d.current_is_dir() and not item.begins_with("."):
+					var candidate := project_parent.path_join(item)
+					if DirAccess.dir_exists_absolute(candidate.path_join("src/godot_ai")) and FileAccess.file_exists(candidate.path_join("pyproject.toml")):
+						return candidate
+				item = d.get_next()
+			d.list_dir_end()
 	return ""
 
 

@@ -120,3 +120,30 @@ async def tileset_create_collision_polygon(
         params["points"] = points
     return await runtime.send_command("tileset_create_collision_polygon", params)
 
+
+async def tileset_scaffold_terrain_bitmasks(
+    runtime: DirectRuntime,
+    tileset_path: str,
+    source_id: int = 0,
+    terrain_set: int = 0,
+    terrain_id: int = 0,
+    template: str = "simple_box",
+    atlas_offset_col: int = 0,
+    atlas_offset_row: int = 0,
+    tiles: list[dict] | None = None,
+) -> dict:
+    """Scaffold terrain autotile peering bitmasks across an atlas region."""
+    await require_writable_async(runtime)
+    params: dict = {
+        "tileset_path": tileset_path,
+        "source_id": source_id,
+        "terrain_set": terrain_set,
+        "terrain_id": terrain_id,
+        "template": template,
+        "atlas_offset_col": atlas_offset_col,
+        "atlas_offset_row": atlas_offset_row,
+    }
+    if tiles is not None:
+        params["tiles"] = tiles
+    return await runtime.send_command("tileset_scaffold_terrain_bitmasks", params)
+

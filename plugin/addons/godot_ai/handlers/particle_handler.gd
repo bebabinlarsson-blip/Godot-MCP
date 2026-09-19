@@ -820,6 +820,106 @@ static func _instantiate_particle(type_str: String) -> Node:
 	return null
 
 
+## Spawn a configured 2D particle preset using CPUParticles2D.
+## params: {parent_path, preset="dust_puff"|"sparks"|"smoke"|"ambient_leaves", emitting=true, name?}
+func spawn_preset_2d(params: Dictionary) -> Dictionary:
+	var _scene_check := McpNodeValidator.require_scene_or_error()
+	if _scene_check.has("error"):
+		return _scene_check
+	var scene_root: Node = _scene_check.scene_root
+
+	var parent_path: String = params.get("parent_path", "")
+	var parent: Node = scene_root
+	if not parent_path.is_empty():
+		parent = McpScenePath.resolve(parent_path, scene_root)
+		if parent == null:
+			return ErrorCodes.make(ErrorCodes.NODE_NOT_FOUND, McpScenePath.format_parent_error(parent_path, scene_root))
+
+	var preset: String = str(params.get("preset", "dust_puff")).to_lower().strip_edges()
+	var emitting: bool = bool(params.get("emitting", true))
+	var node_name: String = str(params.get("name", ""))
+	if node_name.is_empty():
+		node_name = preset.capitalize().replace(" ", "") + "Particles"
+
+	var p := CPUParticles2D.new()
+	p.name = node_name
+
+	match preset:
+		"dust_puff":
+			p.amount = 16
+			p.lifetime = 0.4
+			p.one_shot = true
+			p.explosiveness = 0.85
+			p.direction = Vector2(0, -1)
+			p.spread = 60.0
+			p.gravity = Vector2(0, -10.0)
+			p.initial_velocity_min = 20.0
+			p.initial_velocity_max = 50.0
+			p.scale_amount_min = 2.0
+			p.scale_amount_max = 5.0
+			p.color = Color(0.85, 0.8, 0.7, 0.8)
+		"sparks":
+			p.amount = 24
+			p.lifetime = 0.5
+			p.one_shot = true
+			p.explosiveness = 0.95
+			p.direction = Vector2(0, -1)
+			p.spread = 180.0
+			p.gravity = Vector2(0, 98.0)
+			p.initial_velocity_min = 50.0
+			p.initial_velocity_max = 120.0
+			p.scale_amount_min = 1.5
+			p.scale_amount_max = 3.0
+			p.color = Color(1.0, 0.85, 0.2, 1.0)
+		"smoke":
+			p.amount = 20
+			p.lifetime = 1.2
+			p.one_shot = false
+			p.explosiveness = 0.0
+			p.direction = Vector2(0, -1)
+			p.spread = 30.0
+			p.gravity = Vector2(0, -15.0)
+			p.initial_velocity_min = 10.0
+			p.initial_velocity_max = 25.0
+			p.scale_amount_min = 3.0
+			p.scale_amount_max = 8.0
+			p.color = Color(0.55, 0.55, 0.55, 0.6)
+		"ambient_leaves":
+			p.amount = 12
+			p.lifetime = 3.0
+			p.one_shot = false
+			p.explosiveness = 0.0
+			p.direction = Vector2(1, 0.5)
+			p.spread = 45.0
+			p.gravity = Vector2(10.0, 20.0)
+			p.initial_velocity_min = 15.0
+			p.initial_velocity_max = 35.0
+			p.scale_amount_min = 2.0
+			p.scale_amount_max = 4.0
+			p.color = Color(0.4, 0.7, 0.25, 0.9)
+		_:
+			return ErrorCodes.make(ErrorCodes.VALUE_OUT_OF_RANGE, "Unknown 2D particle preset '%s'. Valid: dust_puff, sparks, smoke, ambient_leaves" % preset)
+
+	p.emitting = emitting
+
+	_undo_redo.create_action("MCP: Spawn 2D Particle Preset '%s'" % preset)
+	_undo_redo.add_do_method(parent, "add_child", p, true)
+	_undo_redo.add_do_method(p, "set_owner", scene_root)
+	_undo_redo.add_do_reference(p)
+	_undo_redo.add_undo_method(parent, "remove_child", p)
+	_undo_redo.commit_action()
+
+	return {"data": {
+		"path": McpScenePath.from_node(p, scene_root),
+		"name": String(p.name),
+		"preset": preset,
+		"emitting": emitting,
+		"amount": p.amount,
+		"type": "CPUParticles2D",
+		"undoable": true
+	}}
+
+
 func _resolve_particle(params: Dictionary) -> Dictionary:
 	var resolved := McpNodeValidator.resolve_or_error(
 		params.get("node_path", ""), "node_path",

@@ -5,6 +5,22 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.14 (2026-09-19)
+
+Autonomous 2D/3D development pipeline primitives: Alternative tile collision matrix synchronization, terrain bitmask scaffolder, multi-directional locomotion BlendSpace scaffolding, procedural particle presets, and in-engine automated playtest suite runner.
+
+### Added
+
+- **Alternative Tile Collision Matrix Synchronization**: Automatic cloning and rotation/flip transformation of 2D collision polygons onto alternative tiles when rotating or flipping tile cells (`rotate_cell`, `place_tile`, `flip_cell`, `import_matrix`). Prevents collisions from becoming misaligned or lost on rotated tiles.
+- **Terrain Bitmask Scaffolder**: Added `scaffold_terrain_bitmasks` to `tileset_manage` (and GDScript `TileSetHandler`) supporting standard autotile templates (`kenney_3x3_minimal`, `rpgmaker_47`, `simple_box`) to stamp terrain peering bits automatically onto TileSet atlas sources.
+- **8-Way Locomotion BlendSpace Generator**: Added `scaffold_locomotion_tree` to `animation_manage` (and GDScript `AnimationHandler`) to scaffold an `AnimationTree` with `AnimationNodeStateMachine` containing 2D directional blendspaces (`AnimationNodeBlendSpace2D`) for character locomotion states.
+- **Procedural Particle Presets**: Added `spawn_preset_2d` to `particle_manage` (and GDScript `ParticleHandler`) to spawn pre-configured `CPUParticles2D` nodes with physics, color ramps, and emission curves for common effects (`dust_puff`, `sparks`, `smoke`, `ambient_leaves`) without external asset dependencies.
+- **In-Engine Automated Playtest Runner**: Added `run_playtest_suite` to `game_manage` (and GDScript `game_helper.gd`) supporting sequential input holding, node property checks, GDScript expression evaluation, and waiting inside the live game loop at 60 FPS, returning detailed assertion logs.
+
+### Fixed
+
+- **Dev Environment uvx PyPI Lockout Prevention**: Enhanced `client_configurator.gd` to discover `.venv` in parent and sibling project directories and fallback to local repository root for `--from` during development, eliminating lockouts against unreleased PyPI versions.
+
 ## 5.0.13 (2026-09-19)
 
 Comprehensive 2D/3D generation enhancements: Terrain autotiling parameter unification, asset download and nearest-neighbor ingestion, multi-state spritesheet scaffolding, virtual input simulation, and single-call batch entity instancing.

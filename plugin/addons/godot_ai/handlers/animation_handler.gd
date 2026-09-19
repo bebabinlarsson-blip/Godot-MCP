@@ -1115,6 +1115,125 @@ func scaffold_state_machine(params: Dictionary) -> Dictionary:
 	}}
 
 
+## Scaffold an AnimationTree with an AnimationNodeStateMachine and AnimationNodeBlendSpace2D
+## nodes configured for 4-way or 8-way locomotion.
+## params: {player_path, states: {StateName: {pos: anim_name}}, name="AnimationTree", blend_mode="discrete"|"interpolated"}
+func scaffold_locomotion_tree(params: Dictionary) -> Dictionary:
+	var _scene_check := McpNodeValidator.require_scene_or_error()
+	if _scene_check.has("error"):
+		return _scene_check
+	var scene_root: Node = _scene_check.scene_root
+
+	var player_path: String = params.get("player_path", "")
+	if player_path.is_empty():
+		return ErrorCodes.make(ErrorCodes.MISSING_REQUIRED_PARAM, "Parameter 'player_path' is required")
+
+	var target_node := McpScenePath.resolve(player_path, scene_root)
+	if target_node == null:
+		return ErrorCodes.make(ErrorCodes.NODE_NOT_FOUND, McpScenePath.format_node_error(player_path, scene_root))
+
+	var anim_player: AnimationPlayer = null
+	if target_node is AnimationPlayer:
+		anim_player = target_node
+	else:
+		anim_player = target_node.find_child("AnimationPlayer", true, false) as AnimationPlayer
+		if anim_player == null and target_node.get_parent() != null:
+			anim_player = target_node.get_parent().find_child("AnimationPlayer", true, false) as AnimationPlayer
+
+	var parent: Node = target_node if not (target_node is AnimationPlayer) else target_node.get_parent()
+	if parent == null: parent = scene_root
+
+	var tree_name: String = params.get("name", "AnimationTree")
+	var blend_mode_str: String = str(params.get("blend_mode", "interpolated")).to_lower()
+	var blend_mode_val := AnimationNodeBlendSpace2D.BLEND_MODE_INTERPOLATED
+	if blend_mode_str == "discrete":
+		blend_mode_val = AnimationNodeBlendSpace2D.BLEND_MODE_DISCRETE
+
+	var raw_states: Dictionary = params.get("states", {})
+	if raw_states.is_empty():
+		raw_states = {
+			"Idle": {"(0, 1)": "idle_down", "(0, -1)": "idle_up", "(-1, 0)": "idle_left", "(1, 0)": "idle_right"},
+			"Walk": {"(0, 1)": "walk_down", "(0, -1)": "walk_up", "(-1, 0)": "walk_left", "(1, 0)": "walk_right"}
+		}
+
+	var tree := AnimationTree.new()
+	tree.name = tree_name
+
+	var state_machine := AnimationNodeStateMachine.new()
+	var configured_states: Array[String] = []
+
+	for s_name in raw_states.keys():
+		var state_str := str(s_name)
+		var blend_space := AnimationNodeBlendSpace2D.new()
+		blend_space.blend_mode = blend_mode_val
+
+		var blend_points: Dictionary = raw_states[s_name]
+		for key in blend_points.keys():
+			var anim_name: String = str(blend_points[key])
+			var pos := _parse_2d_coord(key)
+			var node_anim := AnimationNodeAnimation.new()
+			node_anim.animation = anim_name
+			blend_space.add_blend_point(node_anim, pos)
+
+		state_machine.add_node(state_str, blend_space)
+		configured_states.append(state_str)
+
+	if not configured_states.is_empty():
+		var first_state := configured_states[0]
+		var start_trans := AnimationNodeStateMachineTransition.new()
+		start_trans.advance_mode = AnimationNodeStateMachineTransition.ADVANCE_MODE_AUTO
+		state_machine.add_transition("Start", first_state, start_trans)
+
+	var idle_name := ""
+	var move_name := ""
+	for s in configured_states:
+		var s_lower := s.to_lower()
+		if s_lower == "idle": idle_name = s
+		elif s_lower == "walk" or s_lower == "run" or s_lower == "move": move_name = s
+
+	if not idle_name.is_empty() and not move_name.is_empty():
+		var t_to_move := AnimationNodeStateMachineTransition.new()
+		var t_to_idle := AnimationNodeStateMachineTransition.new()
+		state_machine.add_transition(idle_name, move_name, t_to_move)
+		state_machine.add_transition(move_name, idle_name, t_to_idle)
+
+	tree.tree_root = state_machine
+	if anim_player != null:
+		tree.anim_player = tree.get_path_to(anim_player)
+	tree.active = true
+
+	_undo_redo.create_action("MCP: Scaffold AnimationTree Locomotion")
+	_undo_redo.add_do_method(parent, "add_child", tree, true)
+	_undo_redo.add_do_method(tree, "set_owner", scene_root)
+	_undo_redo.add_do_reference(tree)
+	_undo_redo.add_do_reference(state_machine)
+	_undo_redo.add_undo_method(parent, "remove_child", tree)
+	_undo_redo.commit_action()
+
+	return {"data": {
+		"path": McpScenePath.from_node(tree, scene_root),
+		"name": String(tree.name),
+		"states": configured_states,
+		"player_path": McpScenePath.from_node(parent, scene_root),
+		"anim_player_path": McpScenePath.from_node(anim_player, scene_root) if anim_player != null else "",
+		"undoable": true
+	}}
+
+
+func _parse_2d_coord(key: Variant) -> Vector2:
+	if key is Vector2:
+		return key
+	if key is Array and key.size() >= 2:
+		return Vector2(float(key[0]), float(key[1]))
+	if key is Dictionary:
+		return Vector2(float(key.get("x", 0)), float(key.get("y", 0)))
+	var s := str(key).strip_edges().trim_prefix("(").trim_suffix(")").trim_prefix("[").trim_suffix("]")
+	var parts := s.split(",")
+	if parts.size() >= 2:
+		return Vector2(float(parts[0].strip_edges()), float(parts[1].strip_edges()))
+	return Vector2.ZERO
+
+
 # ============================================================================
 # Helpers — resolution
 # ============================================================================

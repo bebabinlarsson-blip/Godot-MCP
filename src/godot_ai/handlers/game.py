@@ -299,3 +299,24 @@ async def game_simulate_input(
             return await game_input_key(runtime, key=key, pressed=press)
 
     return {"simulated": True}
+
+
+async def game_run_playtest_suite(
+    runtime: DirectRuntime,
+    steps: list[dict[str, Any]],
+    timeout: float = 10.0,
+) -> dict:
+    """Execute an automated in-engine playtest suite at 60 FPS and return assertion results."""
+    if not isinstance(steps, list) or not steps:
+        raise _invalid_params("Parameter 'steps' must be a non-empty list")
+    suite_timeout = max(1.0, float(timeout))
+    client_timeout = max(suite_timeout + 5.0, INPUT_SEQUENCE_TIMEOUT_SEC)
+    return await runtime.send_command(
+        "game_command",
+        {
+            "op": "run_playtest_suite",
+            "params": {"steps": steps, "timeout": suite_timeout},
+        },
+        timeout=client_timeout,
+    )
+

@@ -62,6 +62,7 @@ def register_particle_tools(mcp: FastMCP) -> None:
             "restart": particle_handlers.particle_restart,
             "get": particle_handlers.particle_get,
             "apply_preset": particle_handlers.particle_apply_preset,
+            "spawn_preset_2d": particle_handlers.particle_spawn_preset_2d,
         },
         read_resource_forms={
             ## restart triggers a re-emit but skips require_writable; get is

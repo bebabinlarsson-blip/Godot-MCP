@@ -268,6 +268,130 @@ func create_collision_polygon(params: Dictionary) -> Dictionary:
 	}}
 
 
+## Scaffold terrain autotile peering bitmasks across an atlas region.
+## params: {tileset_path, source_id=0, terrain_set=0, terrain_id=0, template="simple_box"|"kenney_3x3_minimal"|"rpgmaker_47", offset_col=0, offset_row=0}
+func scaffold_terrain_bitmasks(params: Dictionary) -> Dictionary:
+	var resolved := _resolve_atlas_source(params)
+	if resolved.has("error"):
+		return resolved
+	var source_id: int = resolved.source_id
+	var src: TileSetAtlasSource = resolved.src
+	var tileset_path: String = params.get("tileset_path", "")
+
+	var ts: TileSet = load(tileset_path) as TileSet
+	if ts == null:
+		return ErrorCodes.make(ErrorCodes.WRONG_TYPE, "Resource at '%s' is not a TileSet" % tileset_path)
+
+	var terrain_set: int = int(params.get("terrain_set", 0))
+	var terrain_id: int = int(params.get("terrain_id", params.get("terrain", 0)))
+	var template: String = str(params.get("template", "simple_box")).to_lower().strip_edges()
+	var offset_col: int = int(params.get("atlas_offset_col", params.get("offset_col", 0)))
+	var offset_row: int = int(params.get("atlas_offset_row", params.get("offset_row", 0)))
+
+	while ts.get_terrain_sets_count() <= terrain_set:
+		ts.add_terrain_set()
+	while ts.get_terrains_count(terrain_set) <= terrain_id:
+		ts.add_terrain(terrain_set)
+
+	var template_map: Array[Dictionary] = []
+	match template:
+		"simple_box":
+			template_map = [
+				{"col": 0, "row": 0, "bits": [0, 1, 2]},
+				{"col": 1, "row": 0, "bits": [0, 1, 2, 3, 4]},
+				{"col": 2, "row": 0, "bits": [2, 3, 4]},
+				{"col": 0, "row": 1, "bits": [6, 7, 0, 1, 2]},
+				{"col": 1, "row": 1, "bits": [0, 1, 2, 3, 4, 5, 6, 7]},
+				{"col": 2, "row": 1, "bits": [6, 5, 4, 3, 2]},
+				{"col": 0, "row": 2, "bits": [6, 7, 0]},
+				{"col": 1, "row": 2, "bits": [4, 5, 6, 7, 0]},
+				{"col": 2, "row": 2, "bits": [6, 5, 4]},
+			]
+		"kenney_3x3_minimal":
+			template_map = [
+				{"col": 0, "row": 0, "bits": [0, 1, 2]},
+				{"col": 1, "row": 0, "bits": [0, 1, 2, 3, 4]},
+				{"col": 2, "row": 0, "bits": [2, 3, 4]},
+				{"col": 3, "row": 0, "bits": [2]},
+				{"col": 0, "row": 1, "bits": [6, 7, 0, 1, 2]},
+				{"col": 1, "row": 1, "bits": [0, 1, 2, 3, 4, 5, 6, 7]},
+				{"col": 2, "row": 1, "bits": [6, 5, 4, 3, 2]},
+				{"col": 3, "row": 1, "bits": [6, 2]},
+				{"col": 0, "row": 2, "bits": [6, 7, 0]},
+				{"col": 1, "row": 2, "bits": [4, 5, 6, 7, 0]},
+				{"col": 2, "row": 2, "bits": [6, 5, 4]},
+				{"col": 3, "row": 2, "bits": [6]},
+				{"col": 0, "row": 3, "bits": [0]},
+				{"col": 1, "row": 3, "bits": [4, 0]},
+				{"col": 2, "row": 3, "bits": [4]},
+				{"col": 3, "row": 3, "bits": []},
+			]
+		"rpgmaker_47":
+			template_map = [
+				{"col": 0, "row": 0, "bits": [0, 1, 2]},
+				{"col": 1, "row": 0, "bits": [0, 1, 2, 3, 4]},
+				{"col": 2, "row": 0, "bits": [2, 3, 4]},
+				{"col": 0, "row": 1, "bits": [6, 7, 0, 1, 2]},
+				{"col": 1, "row": 1, "bits": [0, 1, 2, 3, 4, 5, 6, 7]},
+				{"col": 2, "row": 1, "bits": [6, 5, 4, 3, 2]},
+				{"col": 0, "row": 2, "bits": [6, 7, 0]},
+				{"col": 1, "row": 2, "bits": [4, 5, 6, 7, 0]},
+				{"col": 2, "row": 2, "bits": [6, 5, 4]},
+				{"col": 3, "row": 0, "bits": [2]},
+				{"col": 3, "row": 1, "bits": [6, 2]},
+				{"col": 3, "row": 2, "bits": [6]},
+				{"col": 0, "row": 3, "bits": [0]},
+				{"col": 1, "row": 3, "bits": [4, 0]},
+				{"col": 2, "row": 3, "bits": [4]},
+				{"col": 3, "row": 3, "bits": []},
+				{"col": 4, "row": 0, "bits": [0, 1, 2, 3, 4, 6, 7]},
+				{"col": 5, "row": 0, "bits": [0, 1, 2, 3, 4, 5, 6]},
+				{"col": 4, "row": 1, "bits": [0, 2, 4, 5, 6, 7]},
+				{"col": 5, "row": 1, "bits": [0, 1, 2, 4, 5, 6]},
+			]
+		_:
+			var custom_tiles: Array = params.get("tiles", params.get("bitmasks", []))
+			if not custom_tiles.is_empty():
+				for item in custom_tiles:
+					if item is Dictionary:
+						template_map.append(item)
+			else:
+				return ErrorCodes.make(ErrorCodes.VALUE_OUT_OF_RANGE, "Unknown template '%s'. Valid: simple_box, kenney_3x3_minimal, rpgmaker_47" % template)
+
+	var configured_count := 0
+	for entry in template_map:
+		var c: int = int(entry.get("col", 0)) + offset_col
+		var r: int = int(entry.get("row", 0)) + offset_row
+		var coords := Vector2i(c, r)
+		if not src.has_tile(coords):
+			src.create_tile(coords)
+		var tile_data: TileData = src.get_tile_data(coords, 0)
+		if tile_data == null:
+			continue
+		tile_data.set_terrain_set(terrain_set)
+		tile_data.set_terrain(terrain_id)
+		for b in range(8):
+			tile_data.set_terrain_peering_bit(b, -1)
+		var bits: Array = entry.get("bits", [])
+		for b in bits:
+			tile_data.set_terrain_peering_bit(int(b), terrain_id)
+		configured_count += 1
+
+	var save_err := ResourceSaver.save(ts, tileset_path)
+	if save_err != OK:
+		return ErrorCodes.make(ErrorCodes.INTERNAL_ERROR, "Failed to save TileSet terrain configuration: %s" % error_string(save_err))
+
+	return {"data": {
+		"tileset_path": tileset_path,
+		"source_id": source_id,
+		"terrain_set": terrain_set,
+		"terrain_id": terrain_id,
+		"template": template,
+		"tiles_configured": configured_count,
+		"offset": {"col": offset_col, "row": offset_row}
+	}}
+
+
 func _resolve_atlas_source(params: Dictionary) -> Dictionary:
 	var tileset_path: String = params.get("tileset_path", "")
 	if tileset_path.is_empty():
