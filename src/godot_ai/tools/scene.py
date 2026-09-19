@@ -29,6 +29,9 @@ Ops:
         Save the currently edited scene to a new file path.
   • get_roots()
         List scenes currently open in the editor; flag the edited one.
+  • instantiate_batch(instances, parent_path="")
+        Instantiate multiple PackedScenes into the active scene in a single UndoRedo action.
+        instances: [{scene_path, name?, position?, rotation?, scale?, properties?}].
 """
 
 
@@ -120,6 +123,7 @@ def register_scene_tools(mcp: FastMCP, *, include_non_core: bool = True) -> None
             "create": scene_handlers.scene_create,
             "save_as": scene_handlers.scene_save_as,
             "get_roots": scene_handlers.scene_get_roots,
+            "instantiate_batch": scene_handlers.scene_instantiate_batch,
         },
         read_resource_forms={
             ## get_roots lists root nodes of every open scene; the

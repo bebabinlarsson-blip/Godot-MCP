@@ -5,6 +5,18 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.13 (2026-09-19)
+
+Comprehensive 2D/3D generation enhancements: Terrain autotiling parameter unification, asset download and nearest-neighbor ingestion, multi-state spritesheet scaffolding, virtual input simulation, and single-call batch entity instancing.
+
+### Added
+
+- **Spritesheet Animation Scaffolding**: Added `create_spritesheet_animation` to `animation_manage` (and GDScript `AnimationHandler`) allowing agents to configure `Sprite2D` (texture, hframes, vframes, nearest filter) and generate complete `AnimationPlayer` discrete keyframe tracks for multiple animation states in a single atomic UndoRedo call.
+- **Batch Prop & Entity Spawning**: Added `instantiate_batch` to `scene_manage` and `node_manage` (and GDScript `SceneHandler`), enabling single-call bulk instancing of packed scenes with custom names, transforms (position, rotation, scale), and properties under an atomic UndoRedo transaction.
+- **Virtual Input Simulation**: Added `simulate_input` to `game_manage` for frame-accurate action and key holding with automatic release after a specified duration, eliminating stuck keys during autonomous testing.
+- **Asset Ingestion Pipeline**: Added `download_and_import` to `filesystem_manage` supporting `dest` path specification, automatic extraction, project-wide nearest-neighbor texture filtering configuration (`filter="nearest"`), and filesystem reimport/scan triggers.
+- **Terrain Parameter Compatibility**: Added `terrain` parameter alias support alongside `terrain_id` for `tilemap_manage(op="paint_terrain")` in both Python handlers and GDScript `TileMapHandler`.
+
 ## 5.0.12 (2026-09-19)
 
 Hotfix release resolving GDScript parse and type inference errors in the Godot plugin.

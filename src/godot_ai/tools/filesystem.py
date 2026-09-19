@@ -51,11 +51,14 @@ Ops:
   • search(name="", type="", path="", offset=0, limit=100)
         Find files by name, resource type, or path substring. At least one
         filter must be set. Paginated.
-  • download_asset(url, path, extract=False, reimport=True)
+  • download_and_import(url, dest="", path="", extract=False, filter="", reimport=True)
+        Download an asset or archive, optionally unpack, configure filter
+        ("nearest" for pixel art), and trigger Godot reimport and scan.
+  • download_asset(url, path="", dest="", extract=False, filter="", reimport=True)
         Download an asset or zip archive from the internet directly into the
         Godot project (res:// path). If extract=True or archive is zip, extracts
         into target directory. Automatically triggers editor reimport and scan.
-        Returns: {url, path, size_bytes, is_archive, extracted_files, reimport_result}
+        Returns: {url, path, size_bytes, is_archive, extracted_files, filter_applied}
   • search_assets(query="", category="all", limit=20)
         Search curated free/CC0 game assets (tilesets, audio, textures, UI, 3D models).
         Categories: "all", "tileset", "audio", "texture", "ui".
@@ -77,6 +80,7 @@ def register_filesystem_tools(mcp: FastMCP) -> None:
             "reimport": filesystem_handlers.filesystem_reimport,
             "scan": filesystem_handlers.filesystem_scan,
             "search": filesystem_handlers.filesystem_search,
+            "download_and_import": filesystem_handlers.filesystem_download_asset,
             "download_asset": filesystem_handlers.filesystem_download_asset,
             "download_file": filesystem_handlers.filesystem_download_asset,
             "search_assets": filesystem_handlers.filesystem_search_assets,

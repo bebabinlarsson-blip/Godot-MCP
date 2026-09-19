@@ -806,6 +806,163 @@ func create_spritesheet_track(params: Dictionary) -> Dictionary:
 	}}
 
 
+## Scaffold complete spritesheet animations on a target node or scene.
+## Configures Sprite2D (hframes, vframes, texture) and AnimationPlayer tracks for all states.
+## params: {
+##   target: String (scene path or node path),
+##   texture: String (res:// path to spritesheet texture),
+##   hframes: int,
+##   vframes: int,
+##   animations: Dictionary { "idle": [0,1,2,3], "walk_down": [4,5,6,7], ... },
+##   fps: float (default 8.0),
+##   loop: bool (default true),
+##   sprite_name: String (default "Sprite2D"),
+##   player_name: String (default "AnimationPlayer")
+## }
+func create_spritesheet_animation(params: Dictionary) -> Dictionary:
+	var target_spec: String = params.get("target", params.get("target_path", ""))
+	if target_spec.ends_with(".tscn") and ResourceLoader.exists(target_spec):
+		var cur_root := EditorInterface.get_edited_scene_root()
+		if cur_root == null or cur_root.scene_file_path != target_spec:
+			EditorInterface.open_scene_from_path(target_spec)
+
+	var _scene_check := McpNodeValidator.require_scene_or_error()
+	if _scene_check.has("error"): return _scene_check
+	var scene_root: Node = _scene_check.scene_root
+
+	var target_node: Node = scene_root
+	if not target_spec.is_empty() and not target_spec.ends_with(".tscn"):
+		target_node = McpScenePath.resolve(target_spec, scene_root)
+		if target_node == null:
+			return ErrorCodes.make(ErrorCodes.NODE_NOT_FOUND, McpScenePath.format_node_error(target_spec, scene_root))
+
+	var texture_path: String = params.get("texture", params.get("texture_path", ""))
+	var hframes: int = int(params.get("hframes", 1))
+	var vframes: int = int(params.get("vframes", 1))
+	var anim_defs: Dictionary = params.get("animations", {})
+	var fps: float = float(params.get("fps", 8.0))
+	var loop: bool = bool(params.get("loop", true))
+	var sprite_name: String = params.get("sprite_name", params.get("sprite_node_name", "Sprite2D"))
+	var player_name: String = params.get("player_name", params.get("player_node_name", "AnimationPlayer"))
+
+	# Find or instantiate Sprite2D
+	var sprite: Sprite2D = null
+	var sprite_created := false
+	if target_node.has_node(sprite_name):
+		var candidate = target_node.get_node(sprite_name)
+		if candidate is Sprite2D:
+			sprite = candidate
+	if sprite == null:
+		if target_node is Sprite2D:
+			sprite = target_node
+		else:
+			for child in target_node.get_children():
+				if child is Sprite2D:
+					sprite = child
+					break
+	if sprite == null:
+		sprite = Sprite2D.new()
+		sprite.name = sprite_name
+		sprite_created = true
+
+	if not texture_path.is_empty() and ResourceLoader.exists(texture_path):
+		var tex = load(texture_path)
+		if tex is Texture2D:
+			sprite.texture = tex
+	if hframes > 0:
+		sprite.hframes = hframes
+	if vframes > 0:
+		sprite.vframes = vframes
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+
+	# Find or instantiate AnimationPlayer
+	var player: AnimationPlayer = null
+	var player_created := false
+	if target_node.has_node(player_name):
+		var candidate = target_node.get_node(player_name)
+		if candidate is AnimationPlayer:
+			player = candidate
+	if player == null:
+		for child in target_node.get_children():
+			if child is AnimationPlayer:
+				player = child
+				break
+	if player == null:
+		player = AnimationPlayer.new()
+		player.name = player_name
+		player_created = true
+
+	var lib: AnimationLibrary = null
+	if player.has_animation_library(""):
+		lib = player.get_animation_library("")
+	else:
+		lib = AnimationLibrary.new()
+		player.add_animation_library("", lib)
+
+	var created_anims: Array = []
+	var root_target: Node = target_node
+	if not player.root_node.is_empty():
+		var explicit_root = player.get_node_or_null(player.root_node)
+		if explicit_root != null:
+			root_target = explicit_root
+	var rel_sprite_path := String(root_target.get_path_to(sprite))
+	var track_path := "%s:frame" % rel_sprite_path
+
+	for anim_name_key in anim_defs.keys():
+		var anim_name := String(anim_name_key)
+		var raw_frames: Variant = anim_defs[anim_name_key]
+		var frames: Array = []
+		if raw_frames is Array:
+			frames = raw_frames
+		var anim := Animation.new()
+		var duration := maxf(0.05, float(frames.size()) / maxf(1.0, fps))
+		anim.length = duration
+		anim.loop_mode = Animation.LOOP_LINEAR if loop else Animation.LOOP_NONE
+
+		var track_idx := anim.add_track(Animation.TYPE_VALUE)
+		anim.track_set_path(track_idx, track_path)
+		anim.value_track_set_update_mode(track_idx, Animation.UPDATE_DISCRETE)
+		anim.track_set_interpolation_type(track_idx, Animation.INTERPOLATION_NEAREST)
+
+		for i in range(frames.size()):
+			var t: float = float(i) / maxf(1.0, fps)
+			var frame_val: int = int(frames[i])
+			anim.track_insert_key(track_idx, t, frame_val)
+
+		if lib.has_animation(anim_name):
+			lib.remove_animation(anim_name)
+		lib.add_animation(anim_name, anim)
+		created_anims.append({
+			"name": anim_name,
+			"frames": frames.size(),
+			"duration": duration,
+			"loop": loop
+		})
+
+	_undo_redo.create_action("MCP: Create spritesheet animation (%d animations)" % created_anims.size())
+	if sprite_created:
+		_undo_redo.add_do_method(target_node, "add_child", sprite, true)
+		_undo_redo.add_do_method(sprite, "set_owner", scene_root)
+		_undo_redo.add_do_reference(sprite)
+		_undo_redo.add_undo_method(target_node, "remove_child", sprite)
+	if player_created:
+		_undo_redo.add_do_method(target_node, "add_child", player, true)
+		_undo_redo.add_do_method(player, "set_owner", scene_root)
+		_undo_redo.add_do_reference(player)
+		_undo_redo.add_undo_method(target_node, "remove_child", player)
+	_undo_redo.commit_action()
+
+	return {"data": {
+		"target": McpScenePath.from_node(target_node, scene_root),
+		"sprite_path": McpScenePath.from_node(sprite, scene_root),
+		"player_path": McpScenePath.from_node(player, scene_root),
+		"animations": created_anims,
+		"fps": fps,
+		"loop": loop,
+		"undoable": true
+	}}
+
+
 ## Create an AnimatedSprite2D node and slice frames into a SpriteFrames resource.
 func create_animated_sprite(params: Dictionary) -> Dictionary:
 	var _scene_check := McpNodeValidator.require_scene_or_error()

@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import io
-from pathlib import Path
 import zipfile
+from pathlib import Path
 
 import httpx
 
@@ -201,14 +201,17 @@ CC0_ASSET_CATALOG: list[dict] = [
 async def filesystem_download_asset(
     runtime: DirectRuntime,
     url: str,
-    path: str,
+    path: str = "",
+    dest: str = "",
     extract: bool = False,
+    filter: str = "",
     reimport: bool = True,
 ) -> dict:
     """Download an asset from the internet directly into the Godot project.
 
-    Writes the asset to `path` (must be a res:// path).
-    If extract is True (or if URL/path ends in .zip), extracts the archive into `path`.
+    Writes the asset to `path` or `dest` (must be a res:// path).
+    If extract is True (or if URL/path ends in .zip), extracts the archive into the target folder.
+    If filter is 'nearest', configures project-wide nearest-neighbor texture filtering.
     Automatically triggers Godot's reimport and scan so the editor immediately indexes it.
     """
     await require_writable_async(runtime)
@@ -216,8 +219,24 @@ async def filesystem_download_asset(
     if not url.startswith(("http://", "https://")):
         raise ValueError(f"Invalid URL scheme, must be http:// or https://: {url}")
 
-    if not path.startswith("res://"):
-        raise ValueError(f"Path must be a 'res://' path, got: {path}")
+    effective_path = path or dest
+    if not effective_path:
+        url_file = Path(url.split("?")[0]).name or "downloaded_asset"
+        effective_path = f"res://assets/{url_file}"
+
+    if not effective_path.startswith("res://"):
+        raise ValueError(f"Path must be a 'res://' path, got: {effective_path}")
+
+    filter_applied = None
+    if filter and filter.lower() in ("nearest", "pixel", "nearest_neighbor"):
+        try:
+            await runtime.send_command(
+                "set_project_setting",
+                {"key": "rendering/textures/canvas_textures/default_texture_filter", "value": 0},
+            )
+            filter_applied = "nearest"
+        except Exception:
+            filter_applied = "nearest (fallback)"
 
     active = runtime._registry.get_active()
     if active and active.project_path:
@@ -225,7 +244,7 @@ async def filesystem_download_asset(
     else:
         project_root = Path.cwd()
 
-    rel_subpath = path[6:].lstrip("/\\")
+    rel_subpath = effective_path[6:].lstrip("/\\")
     dest_path = project_root / rel_subpath
 
     async with httpx.AsyncClient(follow_redirects=True, timeout=60.0) as client:
@@ -233,7 +252,7 @@ async def filesystem_download_asset(
         response.raise_for_status()
         content = response.content
 
-    is_zip = extract or url.lower().endswith(".zip") or path.lower().endswith(".zip")
+    is_zip = extract or url.lower().endswith(".zip") or effective_path.lower().endswith(".zip")
     extracted_files: list[str] = []
 
     if is_zip:
@@ -258,7 +277,9 @@ async def filesystem_download_asset(
     if reimport:
         try:
             if not is_zip:
-                reimported_info = await runtime.send_command("reimport", {"paths": [path]})
+                reimported_info = await runtime.send_command(
+                    "reimport", {"paths": [effective_path]}
+                )
             else:
                 reimported_info = await runtime.send_command("scan_filesystem", {})
         except Exception:
@@ -266,10 +287,12 @@ async def filesystem_download_asset(
 
     return {
         "url": url,
-        "path": path,
+        "path": effective_path,
+        "dest": effective_path,
         "size_bytes": len(content),
         "is_archive": is_zip,
         "extracted_files": extracted_files,
+        "filter_applied": filter_applied,
         "reimport_result": reimported_info,
     }
 
@@ -292,7 +315,8 @@ def filesystem_search_assets(
         if cat != "all" and item["category"].lower() != cat:
             continue
         if q:
-            searchable = f"{item['id']} {item['title']} {item['description']} {' '.join(item['tags'])}".lower()
+            tags_str = " ".join(item["tags"])
+            searchable = f"{item['id']} {item['title']} {item['description']} {tags_str}".lower()
             if q not in searchable:
                 tokens = q.split()
                 if not all(t in searchable for t in tokens):

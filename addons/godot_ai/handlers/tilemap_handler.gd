@@ -453,7 +453,7 @@ func paint_terrain(params: Dictionary) -> Dictionary:
 	var layer_idx: int = resolved.layer
 
 	var terrain_set: int = int(params.get("terrain_set", 0))
-	var terrain_id: int = int(params.get("terrain_id", 0))
+	var terrain_id: int = int(params.get("terrain_id", params.get("terrain", 0)))
 	var raw_cells: Array = params.get("cells", [])
 	var cells := _parse_cells_array(raw_cells)
 

@@ -56,6 +56,23 @@ async def scene_save_as(runtime: DirectRuntime, path: str) -> dict:
     return await runtime.send_command("save_scene_as", {"path": path})
 
 
+async def scene_instantiate_batch(
+    runtime: DirectRuntime,
+    instances: list[dict],
+    parent_path: str = "",
+) -> dict:
+    """Instantiate multiple PackedScenes into the active scene in a single UndoRedo action.
+
+    instances is a list of objects with scene_path (res:// path) and optional name, position,
+    rotation, scale, and properties.
+    """
+    await require_writable_async(runtime)
+    return await runtime.send_command(
+        "instantiate_batch",
+        {"instances": instances, "parent_path": parent_path},
+    )
+
+
 async def current_scene_resource_data(runtime: DirectRuntime) -> dict:
     state = await runtime.send_command("get_editor_state")
     return {

@@ -358,7 +358,7 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	## _exit_tree.
 	var undo := get_undo_redo()
 	_dispatcher.register_lazy_handler("editor", HANDLERS_DIR + "editor_handler.gd", [_log_buffer, _connection, _debugger_plugin, _game_log_buffer, _editor_log_buffer, null, _surfaced_error_tracker, _vision_routing])
-	_dispatcher.register_lazy_handler("scene", HANDLERS_DIR + "scene_handler.gd", [_connection])
+	_dispatcher.register_lazy_handler("scene", HANDLERS_DIR + "scene_handler.gd", [_connection, undo])
 	_dispatcher.register_lazy_handler("node", HANDLERS_DIR + "node_handler.gd", [undo])
 	_dispatcher.register_lazy_handler("project", HANDLERS_DIR + "project_handler.gd", [_connection, _debugger_plugin, _editor_log_buffer])
 	_dispatcher.register_lazy_handler(
@@ -403,6 +403,8 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy("open_scene", "scene", &"open_scene")
 	_dispatcher.register_lazy("save_scene", "scene", &"save_scene")
 	_dispatcher.register_lazy("save_scene_as", "scene", &"save_scene_as")
+	_dispatcher.register_lazy("instantiate_batch", "scene", &"instantiate_batch")
+	_dispatcher.register_lazy("scene_instantiate_batch", "scene", &"instantiate_batch")
 	_dispatcher.register_lazy("get_selection", "editor", &"get_selection")
 	_dispatcher.register_lazy("create_node", "node", &"create_node")
 	_dispatcher.register_lazy("delete_node", "node", &"delete_node")
@@ -502,6 +504,8 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy("animation_preset_spin", "animation", &"preset_spin")
 	_dispatcher.register_lazy("animation_preset_bounce", "animation", &"preset_bounce")
 	_dispatcher.register_lazy("animation_create_spritesheet_track", "animation", &"create_spritesheet_track")
+	_dispatcher.register_lazy("animation_create_spritesheet_animation", "animation", &"create_spritesheet_animation")
+	_dispatcher.register_lazy("create_spritesheet_animation", "animation", &"create_spritesheet_animation")
 	_dispatcher.register_lazy("animation_create_animated_sprite", "animation", &"create_animated_sprite")
 	_dispatcher.register_lazy("animation_scaffold_state_machine", "animation", &"scaffold_state_machine")
 	_dispatcher.register_lazy("material_create", "material", &"create_material")

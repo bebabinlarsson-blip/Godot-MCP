@@ -256,3 +256,46 @@ async def game_input_sequence(
         },
         timeout=INPUT_SEQUENCE_TIMEOUT_SEC,
     )
+
+
+async def game_simulate_input(
+    runtime: DirectRuntime,
+    action: str = "",
+    key: str = "",
+    duration: float = 0.5,
+    press: bool = True,
+    strength: float = 1.0,
+    settle_frames: int = 5,
+) -> dict:
+    """Simulate virtual hardware or action input with duration and clean release.
+
+    For action inputs with duration > 0, constructs an input_sequence timeline that
+    holds the action for the duration (assuming 60 FPS) and automatically releases it.
+    For key inputs with duration > 0, presses the key, sleeps, and cleanly releases it.
+    """
+    if not action and not key:
+        raise _invalid_params("Either 'action' or 'key' must be provided")
+
+    if action:
+        if duration > 0.0 and press:
+            max_frames = MAX_SEQUENCE_FRAMES - settle_frames - 5
+            duration_frames = max(1, min(int(round(duration * 60.0)), max_frames))
+            steps = [
+                {"at_frame": 0, "action": action, "pressed": True, "strength": strength},
+                {"at_frame": duration_frames, "action": action, "pressed": False, "strength": 0.0},
+            ]
+            return await game_input_sequence(runtime, steps=steps, settle_frames=settle_frames)
+        else:
+            return await game_input_action(runtime, action=action, pressed=press, strength=strength)
+
+    if key:
+        if duration > 0.0 and press:
+            await game_input_key(runtime, key=key, pressed=True)
+            import asyncio
+            await asyncio.sleep(duration)
+            await game_input_key(runtime, key=key, pressed=False)
+            return {"key": key, "duration": duration, "released": True, "pressed": False}
+        else:
+            return await game_input_key(runtime, key=key, pressed=press)
+
+    return {"simulated": True}

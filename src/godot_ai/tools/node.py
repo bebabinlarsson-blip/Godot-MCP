@@ -11,6 +11,7 @@ from __future__ import annotations
 from fastmcp import Context, FastMCP
 
 from godot_ai.handlers import node as node_handlers
+from godot_ai.handlers import scene as scene_handlers
 from godot_ai.runtime.direct import DirectRuntime
 from godot_ai.tools import DEFER_META
 from godot_ai.tools._meta_tool import register_manage_tool
@@ -239,6 +240,7 @@ def register_node_tools(mcp: FastMCP, *, include_non_core: bool = True) -> None:
             "rotate": node_handlers.node_rotate,
             "scale": node_handlers.node_scale,
             "translate": node_handlers.node_translate,
+            "instantiate_batch": scene_handlers.scene_instantiate_batch,
         },
         read_resource_forms={
             "get_children": "godot://node/{path*}/children",

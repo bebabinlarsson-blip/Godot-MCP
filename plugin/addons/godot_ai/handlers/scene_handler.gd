@@ -6,12 +6,20 @@ const ErrorCodes := preload("res://addons/godot_ai/utils/error_codes.gd")
 ## Handles scene tree reading and node search.
 
 var _connection: McpConnection
+var _undo_redo: EditorUndoRedoManager
 var _save_scene_callable: Callable = Callable()
 var _save_scene_as_callable: Callable = Callable()
 
 
-func _init(connection: McpConnection = null) -> void:
+func _init(connection: McpConnection = null, undo_redo: EditorUndoRedoManager = null) -> void:
 	_connection = connection
+	_undo_redo = undo_redo
+
+
+func _get_undo_redo() -> EditorUndoRedoManager:
+	if _undo_redo != null:
+		return _undo_redo
+	return EditorInterface.get_editor_undo_redo()
 
 
 func get_scene_tree(params: Dictionary) -> Dictionary:
@@ -427,3 +435,162 @@ func _walk_tree(node: Node, out: Array[Dictionary], depth: int, max_depth: int, 
 	for child in node.get_children():
 		var child_path := (node_path + "/" + String(child.name)) if incremental else ""
 		_walk_tree(child, out, depth + 1, max_depth, scene_root, offset, limit, index_ref, child_path)
+
+
+func _apply_transform_properties(node: Node, inst_data: Dictionary) -> void:
+	# Position
+	if inst_data.has("position"):
+		var p_val = inst_data.get("position")
+		if p_val is Dictionary:
+			if node is Node2D:
+				node.position = Vector2(float(p_val.get("x", 0.0)), float(p_val.get("y", 0.0)))
+			elif node is Node3D:
+				node.position = Vector3(float(p_val.get("x", 0.0)), float(p_val.get("y", 0.0)), float(p_val.get("z", 0.0)))
+		elif p_val is Array:
+			if node is Node2D and p_val.size() >= 2:
+				node.position = Vector2(float(p_val[0]), float(p_val[1]))
+			elif node is Node3D and p_val.size() >= 3:
+				node.position = Vector3(float(p_val[0]), float(p_val[1]), float(p_val[2]))
+		elif p_val is Vector2 or p_val is Vector3:
+			node.set("position", p_val)
+
+	# Rotation
+	if inst_data.has("rotation_degrees"):
+		var rd = inst_data.get("rotation_degrees")
+		if node is Node2D:
+			node.rotation_degrees = float(rd)
+		elif node is Node3D:
+			if rd is Dictionary:
+				node.rotation_degrees = Vector3(float(rd.get("x", 0.0)), float(rd.get("y", 0.0)), float(rd.get("z", 0.0)))
+			elif rd is Vector3:
+				node.rotation_degrees = rd
+			elif rd is float or rd is int:
+				node.rotation_degrees = Vector3(0.0, float(rd), 0.0)
+	elif inst_data.has("rotation"):
+		var rot = inst_data.get("rotation")
+		if node is Node2D:
+			node.rotation = float(rot)
+		elif node is Node3D:
+			if rot is Dictionary:
+				node.rotation = Vector3(float(rot.get("x", 0.0)), float(rot.get("y", 0.0)), float(rot.get("z", 0.0)))
+			elif rot is Vector3:
+				node.rotation = rot
+			elif rot is float or rot is int:
+				node.rotation = Vector3(0.0, float(rot), 0.0)
+
+	# Scale
+	if inst_data.has("scale"):
+		var s_val = inst_data.get("scale")
+		if s_val is Dictionary:
+			if node is Node2D:
+				node.scale = Vector2(float(s_val.get("x", 1.0)), float(s_val.get("y", 1.0)))
+			elif node is Node3D:
+				node.scale = Vector3(float(s_val.get("x", 1.0)), float(s_val.get("y", 1.0)), float(s_val.get("z", 1.0)))
+		elif s_val is Array:
+			if node is Node2D and s_val.size() >= 2:
+				node.scale = Vector2(float(s_val[0]), float(s_val[1]))
+			elif node is Node3D and s_val.size() >= 3:
+				node.scale = Vector3(float(s_val[0]), float(s_val[1]), float(s_val[2]))
+		elif s_val is float or s_val is int:
+			var s_num := float(s_val)
+			if node is Node2D:
+				node.scale = Vector2(s_num, s_num)
+			elif node is Node3D:
+				node.scale = Vector3(s_num, s_num, s_num)
+		elif s_val is Vector2 or s_val is Vector3:
+			node.set("scale", s_val)
+
+	# Extra properties
+	if inst_data.has("properties") and inst_data.get("properties") is Dictionary:
+		var props: Dictionary = inst_data.get("properties")
+		for k in props.keys():
+			node.set(str(k), props[k])
+
+
+## Batch-instantiate multiple PackedScenes into the active scene under parent_path in a single UndoRedo action.
+## params: {
+##   parent_path: String (optional, defaults to scene root or opened scene),
+##   instances: Array [ { scene_path: String, name?: String, position?: ..., rotation?: ..., scale?: ..., properties?: ... } ]
+## }
+func instantiate_batch(params: Dictionary) -> Dictionary:
+	var raw_instances = params.get("instances", [])
+	if not raw_instances is Array or raw_instances.is_empty():
+		return ErrorCodes.make(ErrorCodes.MISSING_REQUIRED_PARAM, "Parameter 'instances' must be a non-empty array")
+
+	var _scene_check := McpNodeValidator.require_scene_or_error()
+	if _scene_check.has("error"): return _scene_check
+	var scene_root: Node = _scene_check.scene_root
+
+	var parent_path: String = params.get("parent_path", "")
+	var parent: Node = scene_root
+	if not parent_path.is_empty():
+		if parent_path.ends_with(".tscn"):
+			if scene_root.scene_file_path != parent_path:
+				EditorInterface.open_scene_from_path(parent_path)
+				scene_root = EditorInterface.get_edited_scene_root()
+			parent = scene_root
+		else:
+			parent = McpScenePath.resolve(parent_path, scene_root)
+			if parent == null:
+				return ErrorCodes.make(ErrorCodes.NODE_NOT_FOUND, McpScenePath.format_parent_error(parent_path, scene_root))
+
+	var undo_mgr := _get_undo_redo()
+	if undo_mgr != null:
+		undo_mgr.create_action("MCP: Instantiate batch (%d instances)" % raw_instances.size())
+
+	var scene_cache: Dictionary = {}
+	var created_nodes: Array = []
+
+	for item in raw_instances:
+		if not item is Dictionary:
+			continue
+		var scene_path: String = item.get("scene_path", "")
+		if scene_path.is_empty() or not ResourceLoader.exists(scene_path):
+			continue
+
+		var packed: PackedScene = null
+		if scene_cache.has(scene_path):
+			packed = scene_cache[scene_path]
+		else:
+			var res = load(scene_path)
+			if res is PackedScene:
+				packed = res
+				scene_cache[scene_path] = packed
+
+		if packed == null:
+			continue
+
+		var inst := packed.instantiate(PackedScene.GEN_EDIT_STATE_INSTANCE)
+		if inst == null:
+			continue
+
+		var inst_name: String = item.get("name", "")
+		if not inst_name.is_empty():
+			inst.name = inst_name
+
+		_apply_transform_properties(inst, item)
+
+		if undo_mgr != null:
+			undo_mgr.add_do_method(parent, "add_child", inst, true)
+			undo_mgr.add_do_method(inst, "set_owner", scene_root)
+			undo_mgr.add_do_reference(inst)
+			undo_mgr.add_undo_method(parent, "remove_child", inst)
+		else:
+			parent.add_child(inst, true)
+			inst.owner = scene_root
+
+		created_nodes.append({
+			"name": String(inst.name),
+			"path": McpScenePath.from_node(inst, scene_root),
+			"scene_path": scene_path
+		})
+
+	if undo_mgr != null:
+		undo_mgr.commit_action()
+
+	return {"data": {
+		"count": created_nodes.size(),
+		"parent_path": McpScenePath.from_node(parent, scene_root),
+		"instances": created_nodes,
+		"undoable": undo_mgr != null
+	}}

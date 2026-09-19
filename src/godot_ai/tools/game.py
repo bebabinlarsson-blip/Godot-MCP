@@ -59,6 +59,9 @@ Ops:
         be ordered by non-decreasing at_frame; frames (not ms) are the timing
         basis. Action-based input is focus-independent, so it works on a
         backgrounded game window. Cannot run inside batch_execute.
+  - simulate_input(action="", key="", duration=0.5, press=True, strength=1.0)
+        Simulate hardware or action input with duration and automatic clean release.
+        For actions, executes a timed sequence and releases after duration seconds.
   - input_state(actions=None)
         Read current action pressed states. Empty actions = all project actions."""
 
@@ -82,6 +85,8 @@ def register_game_tools(mcp: FastMCP) -> None:
             "input_action": game_handlers.game_input_action,
             "input_sequence": game_handlers.game_input_sequence,
             "input_state": game_handlers.game_input_state,
+            "simulate_input": game_handlers.game_simulate_input,
+            "simulate": game_handlers.game_simulate_input,
         },
         read_resource_forms={
             "get_scene_tree": None,

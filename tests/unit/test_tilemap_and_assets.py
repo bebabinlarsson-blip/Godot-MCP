@@ -154,10 +154,14 @@ async def test_download_asset_validations():
     runtime = DirectRuntime(registry=SessionRegistry(), client=StubClient())
 
     with pytest.raises(ValueError, match="Invalid URL scheme"):
-        await filesystem_handlers.filesystem_download_asset(runtime, "ftp://example.com/asset.png", "res://asset.png")
+        await filesystem_handlers.filesystem_download_asset(
+            runtime, "ftp://example.com/asset.png", "res://asset.png"
+        )
 
     with pytest.raises(ValueError, match="Path must be a 'res://' path"):
-        await filesystem_handlers.filesystem_download_asset(runtime, "https://example.com/asset.png", "/tmp/asset.png")
+        await filesystem_handlers.filesystem_download_asset(
+            runtime, "https://example.com/asset.png", "/tmp/asset.png"
+        )
 
 
 async def test_tilemap_paint_terrain_import_matrix_scatter():
@@ -260,4 +264,97 @@ async def test_animation_and_tileset_new_handlers():
     )
     assert client.calls[-1]["command"] == "tileset_create_collision_polygon"
     assert client.calls[-1]["params"]["shape_type"] == "box"
+
+
+async def test_tilemap_paint_terrain_alias():
+    client = StubClient()
+    runtime = DirectRuntime(registry=SessionRegistry(), client=client)
+
+    await tilemap_handlers.tilemap_paint_terrain(
+        runtime,
+        path="/Main/TileMapLayer",
+        terrain_set=0,
+        terrain=2,
+        cells=[[1, 2], [3, 4]],
+    )
+    assert client.calls[-1]["command"] == "tilemap_paint_terrain"
+    assert client.calls[-1]["params"]["terrain_id"] == 2
+    assert client.calls[-1]["params"]["terrain"] == 2
+    assert client.calls[-1]["params"]["cells"] == [[1, 2], [3, 4]]
+
+
+async def test_spritesheet_animation_scaffolding():
+    from godot_ai.handlers import animation as animation_handlers
+
+    client = StubClient()
+    runtime = DirectRuntime(registry=SessionRegistry(), client=client)
+
+    await animation_handlers.animation_create_spritesheet_animation(
+        runtime,
+        target="/Player",
+        texture="res://assets/player_sheet.png",
+        animations={
+            "idle": [0, 1, 2, 3],
+            "walk": [4, 5, 6, 7],
+        },
+        hframes=4,
+        vframes=2,
+        fps=12.0,
+        loop=True,
+    )
+    assert client.calls[-1]["command"] == "create_spritesheet_animation"
+    assert client.calls[-1]["params"]["target"] == "/Player"
+    assert client.calls[-1]["params"]["texture"] == "res://assets/player_sheet.png"
+    assert client.calls[-1]["params"]["hframes"] == 4
+    assert client.calls[-1]["params"]["vframes"] == 2
+    assert client.calls[-1]["params"]["fps"] == 12.0
+    assert client.calls[-1]["params"]["animations"] == {
+        "idle": [0, 1, 2, 3],
+        "walk": [4, 5, 6, 7],
+    }
+
+
+async def test_scene_instantiate_batch():
+    from godot_ai.handlers import scene as scene_handlers
+
+    client = StubClient()
+    runtime = DirectRuntime(registry=SessionRegistry(), client=client)
+
+    instances = [
+        {"scene_path": "res://scenes/tree.tscn", "position": {"x": 100, "y": 200}},
+        {"scene_path": "res://scenes/enemy.tscn", "position": {"x": 300, "y": 400}},
+    ]
+    await scene_handlers.scene_instantiate_batch(
+        runtime,
+        instances=instances,
+        parent_path="/World/Props",
+    )
+    assert client.calls[-1]["command"] == "instantiate_batch"
+    assert client.calls[-1]["params"]["parent_path"] == "/World/Props"
+    assert client.calls[-1]["params"]["instances"] == instances
+
+
+async def test_game_simulate_input():
+    from godot_ai.handlers import game as game_handlers
+
+    client = StubClient()
+    runtime = DirectRuntime(registry=SessionRegistry(), client=client)
+
+    # Test action simulation with duration -> maps to input_sequence
+    await game_handlers.game_simulate_input(
+        runtime,
+        action="move_right",
+        duration=1.0,
+        strength=1.0,
+    )
+    assert client.calls[-1]["command"] == "game_command"
+    assert client.calls[-1]["params"]["op"] == "input_sequence"
+    steps = client.calls[-1]["params"]["params"]["steps"]
+    assert len(steps) == 2
+    assert steps[0]["action"] == "move_right"
+    assert steps[0]["pressed"] is True
+    assert steps[0]["at_frame"] == 0
+    assert steps[1]["action"] == "move_right"
+    assert steps[1]["pressed"] is False
+    assert steps[1]["at_frame"] == 60
 

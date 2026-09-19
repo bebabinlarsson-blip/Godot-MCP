@@ -129,6 +129,9 @@ def register_animation_tools(mcp: FastMCP) -> None:
             "preset_spin": animation_handlers.animation_preset_spin,
             "preset_bounce": animation_handlers.animation_preset_bounce,
             "create_spritesheet_track": animation_handlers.animation_create_spritesheet_track,
+            "create_spritesheet_animation": (
+                animation_handlers.animation_create_spritesheet_animation
+            ),
             "create_animated_sprite": animation_handlers.animation_create_animated_sprite,
             "scaffold_state_machine": animation_handlers.animation_scaffold_state_machine,
         },

@@ -371,6 +371,40 @@ async def animation_create_spritesheet_track(
     )
 
 
+async def animation_create_spritesheet_animation(
+    runtime: DirectRuntime,
+    target: str,
+    texture: str,
+    animations: dict[str, list[int]],
+    hframes: int = 1,
+    vframes: int = 1,
+    fps: float = 8.0,
+    loop: bool = True,
+    sprite_name: str = "Sprite2D",
+    player_name: str = "AnimationPlayer",
+) -> dict:
+    """Scaffold complete spritesheet animations on a target node or scene.
+
+    Configures Sprite2D (texture, hframes, vframes, nearest filter) and builds
+    discrete keyframe tracks in AnimationPlayer for all animation states in one atomic call.
+    """
+    await require_writable_async(runtime)
+    return await runtime.send_command(
+        "create_spritesheet_animation",
+        {
+            "target": target,
+            "texture": texture,
+            "animations": animations,
+            "hframes": hframes,
+            "vframes": vframes,
+            "fps": fps,
+            "loop": loop,
+            "sprite_name": sprite_name,
+            "player_name": player_name,
+        },
+    )
+
+
 async def animation_create_animated_sprite(
     runtime: DirectRuntime,
     parent_path: str,

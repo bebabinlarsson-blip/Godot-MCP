@@ -236,24 +236,30 @@ async def tilemap_generate_layout(
 async def tilemap_paint_terrain(
     runtime: DirectRuntime,
     path: str,
-    terrain_id: int,
-    cells: list[dict | list | tuple],
+    terrain_id: int | None = None,
+    cells: list[dict | list | tuple] | None = None,
     terrain_set: int = 0,
     layer: int = 0,
+    terrain: int | None = None,
 ) -> dict:
     """Paint autotiling terrain using TileMapLayer.set_cells_terrain_connect().
 
     Connects corner/edge transition tiles automatically.
     cells is a list of coordinates, e.g. [{"x": 0, "y": 0}, {"x": 1, "y": 0}] or [[0, 0], [1, 0]].
     """
+    resolved_terrain = (
+        terrain_id if terrain_id is not None else (terrain if terrain is not None else 0)
+    )
+    resolved_cells = cells if cells is not None else []
     await require_writable_async(runtime)
     return await runtime.send_command(
         "tilemap_paint_terrain",
         {
             "path": path,
             "terrain_set": terrain_set,
-            "terrain_id": terrain_id,
-            "cells": cells,
+            "terrain_id": resolved_terrain,
+            "terrain": resolved_terrain,
+            "cells": resolved_cells,
             "layer": layer,
         },
     )
@@ -271,8 +277,9 @@ async def tilemap_import_matrix(
     """Stamp an ASCII or 2D matrix layout directly into the editor TileMap/TileMapLayer.
 
     map_array is a list of strings (e.g. ["####", "#..#", "####"]) or a 2D array.
-    legend maps characters or values to tile specs, e.g.
-    {"#": {"source_id": 0, "atlas_col": 1, "atlas_row": 0}, ".": {"source_id": 0, "atlas_col": 0, "atlas_row": 0}}.
+    legend maps characters or values to tile specs, e.g.:
+    {"#": {"source_id": 0, "atlas_col": 1, "atlas_row": 0},
+     ".": {"source_id": 0, "atlas_col": 0, "atlas_row": 0}}.
     """
     await require_writable_async(runtime)
     return await runtime.send_command(
