@@ -22,7 +22,7 @@ enum LifecycleAction { RECOVER_INCOMPATIBLE = 0, RESTART_SERVER = 1 }
 
 var vision_routing = null
 
-const McpEventBusScript := preload("res://addons/godot_ai/utils/mcp_event_bus.gd")
+const McpEventBusScript := preload("res://addons/godot_omni/mcp_event_bus.gd")
 
 # UI controls
 var _status_badge: Label
