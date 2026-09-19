@@ -233,3 +233,88 @@ async def tilemap_generate_layout(
     )
 
 
+async def tilemap_paint_terrain(
+    runtime: DirectRuntime,
+    path: str,
+    terrain_id: int,
+    cells: list[dict | list | tuple],
+    terrain_set: int = 0,
+    layer: int = 0,
+) -> dict:
+    """Paint autotiling terrain using TileMapLayer.set_cells_terrain_connect().
+
+    Connects corner/edge transition tiles automatically.
+    cells is a list of coordinates, e.g. [{"x": 0, "y": 0}, {"x": 1, "y": 0}] or [[0, 0], [1, 0]].
+    """
+    await require_writable_async(runtime)
+    return await runtime.send_command(
+        "tilemap_paint_terrain",
+        {
+            "path": path,
+            "terrain_set": terrain_set,
+            "terrain_id": terrain_id,
+            "cells": cells,
+            "layer": layer,
+        },
+    )
+
+
+async def tilemap_import_matrix(
+    runtime: DirectRuntime,
+    path: str,
+    map_array: list[str] | list[list],
+    legend: dict,
+    origin_x: int = 0,
+    origin_y: int = 0,
+    layer: int = 0,
+) -> dict:
+    """Stamp an ASCII or 2D matrix layout directly into the editor TileMap/TileMapLayer.
+
+    map_array is a list of strings (e.g. ["####", "#..#", "####"]) or a 2D array.
+    legend maps characters or values to tile specs, e.g.
+    {"#": {"source_id": 0, "atlas_col": 1, "atlas_row": 0}, ".": {"source_id": 0, "atlas_col": 0, "atlas_row": 0}}.
+    """
+    await require_writable_async(runtime)
+    return await runtime.send_command(
+        "tilemap_import_matrix",
+        {
+            "path": path,
+            "map_array": map_array,
+            "legend": legend,
+            "origin_x": origin_x,
+            "origin_y": origin_y,
+            "layer": layer,
+        },
+    )
+
+
+async def tilemap_scatter_props(
+    runtime: DirectRuntime,
+    parent_path: str,
+    prop_scenes: list[str],
+    region_rect: dict,
+    count: int = 0,
+    density: float = 0.05,
+    seed: int = 0,
+) -> dict:
+    """Procedurally scatter scene instances (trees, rocks, chests) in a region.
+
+    region_rect is {x, y, w, h}.
+    prop_scenes is a list of res:// scene paths (e.g. ["res://tree.tscn"]).
+    All instances are added in a single undo action.
+    """
+    await require_writable_async(runtime)
+    return await runtime.send_command(
+        "tilemap_scatter_props",
+        {
+            "parent_path": parent_path,
+            "prop_scenes": prop_scenes,
+            "region_rect": region_rect,
+            "count": count,
+            "density": density,
+            "seed": seed,
+        },
+    )
+
+
+

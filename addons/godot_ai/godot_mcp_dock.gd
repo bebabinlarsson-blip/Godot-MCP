@@ -112,7 +112,7 @@ func _build_ui() -> void:
 	header_bar.add_child(title)
 
 	var version_badge := Label.new()
-	version_badge.text = "v5.0.10"
+	version_badge.text = "v5.0.11"
 	version_badge.modulate = Color(0.45, 0.75, 1.0)
 	version_badge.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header_bar.add_child(version_badge)
@@ -494,7 +494,7 @@ func present_lifecycle_snapshot(snapshot: Dictionary) -> void:
 	_blocked_message = str(snapshot.get("message", ""))
 	if not is_instance_valid(_blocked_box):
 		return
-	if _is_connected:
+	if _is_connected or _server_state == "READY":
 		_blocked_box.visible = false
 		_blocked_message = ""
 	elif not _blocked_message.is_empty() and str(snapshot.get("episode_state", "")) == "BLOCKED":
@@ -523,10 +523,15 @@ func _update_ui_state() -> void:
 			_port_label.text = "HTTP: %d | WebSocket: %d" % [_http_port, _ws_port]
 		return
 
-	if _blocked_box.visible:
-		return
-
-	if _server_state == "READY" or _server_state == "STARTING":
+	if _server_state == "READY":
+		if is_instance_valid(_blocked_box):
+			_blocked_box.visible = false
+			_blocked_message = ""
+		_status_badge.text = "[ACTIVE]"
+		_status_badge.modulate = Color(0.3, 1.0, 0.4)
+		if _status_desc.text.is_empty() or _status_desc.text == "Server stopped":
+			_status_desc.text = "Server Ready"
+	elif _server_state == "STARTING":
 		_status_badge.text = "[STARTING]"
 		_status_badge.modulate = Color(1.0, 0.75, 0.25)
 		if _status_desc.text != "HTTP server reachable":

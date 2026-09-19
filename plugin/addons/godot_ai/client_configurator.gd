@@ -195,6 +195,7 @@ static func ensure_settings_registered() -> void:
 	_register_string_setting(es, McpSettings.SETTING_EXCLUDED_DOMAINS, "")
 	_register_bool_setting(es, McpSettings.SETTING_TELEMETRY_ENABLED, true)
 	_register_string_setting(es, McpSettings.SETTING_ALLOW_HOSTS, "")
+	_register_bool_setting(es, McpSettings.SETTING_AUTO_CONFIGURE_CLIENTS, true)
 	_register_client_scope_setting(es)
 	_register_string_setting(es, SETTING_EXTERNAL_CLIENT_CWD, "")
 
@@ -575,6 +576,40 @@ static func has_client(id: String) -> bool:
 static func client_display_name(id: String) -> String:
 	var c := ClientRegistry.get_by_id(id)
 	return c.display_name if c != null else id
+
+
+## Whether the client's Configure verb edits its config file directly. Clients
+## with `automatic_config_edits = false` return manual instructions instead of
+## writing a file, so they are excluded from automatic configuration.
+static func client_automatic_edits(id: String) -> bool:
+	var c := ClientRegistry.get_by_id(id)
+	return c.automatic_config_edits if c != null else false
+
+
+## Auto-configure candidates for a fresh plugin enable: installed clients that
+## are configurable by file edit and not already pointing at the current
+## server. Mirrors the dock's "Configure all" semantics (every client that
+## isn't already pointing at this server) restricted to installed, automatic
+## clients, so no config file is written for software the user doesn't have
+## and manual-only clients (Zed) are not surfaced. Pure function of the status
+## results (`client_id -> {status, installed, error_msg}`) so it is
+## unit-testable without touching EditorInterface.
+static func auto_configure_candidates(status_results: Dictionary) -> Array[String]:
+	var ids: Array[String] = []
+	for client_id in status_results:
+		var entry: Variant = status_results[client_id]
+		if not (entry is Dictionary):
+			continue
+		var details := entry as Dictionary
+		if int(details.get("status", Client.Status.ERROR)) == Client.Status.CONFIGURED:
+			continue
+		if not bool(details.get("installed", false)):
+			continue
+		if not client_automatic_edits(String(client_id)):
+			continue
+		ids.append(String(client_id))
+	ids.sort()
+	return ids
 
 
 ## Pass an explicit `url` when calling from a worker thread: `http_url()`

@@ -63,6 +63,10 @@ def register_tileset_tools(mcp: FastMCP) -> None:
         ops={
             "tileset_get_atlas_tiles": tileset_handlers.tileset_get_atlas_tiles,
             "tileset_get_atlas_image": tileset_handlers.tileset_get_atlas_image,
+            "tileset_create_from_texture": tileset_handlers.tileset_create_from_texture,
+            "create_from_texture": tileset_handlers.tileset_create_from_texture,
+            "tileset_create_collision_polygon": tileset_handlers.tileset_create_collision_polygon,
+            "create_collision_polygon": tileset_handlers.tileset_create_collision_polygon,
         },
         read_resource_forms={
             "tileset_get_atlas_tiles": None,

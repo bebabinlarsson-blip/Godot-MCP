@@ -125,6 +125,148 @@ func get_atlas_image(params: Dictionary) -> Dictionary:
 	}
 
 
+## Generate an atlas TileSet resource (.tres) sliced from a texture.
+## params: {texture_path, save_path, tile_width=16, tile_height=16, separation_x=0, separation_y=0, margin_x=0, margin_y=0}
+func create_from_texture(params: Dictionary) -> Dictionary:
+	var texture_path: String = params.get("texture_path", "")
+	var save_path: String = params.get("save_path", "")
+	if texture_path.is_empty():
+		return ErrorCodes.make(ErrorCodes.MISSING_REQUIRED_PARAM, "Parameter 'texture_path' is required")
+	if save_path.is_empty():
+		return ErrorCodes.make(ErrorCodes.MISSING_REQUIRED_PARAM, "Parameter 'save_path' is required")
+
+	var tex_err = McpPathValidator.loadable_error(texture_path, "texture_path")
+	if tex_err != null: return tex_err
+	if not ResourceLoader.exists(texture_path):
+		return ErrorCodes.make(ErrorCodes.RESOURCE_NOT_FOUND, "Texture resource not found: %s" % texture_path)
+
+	var tex = load(texture_path)
+	if not tex is Texture2D:
+		return ErrorCodes.make(ErrorCodes.WRONG_TYPE, "Resource at '%s' is not a Texture2D" % texture_path)
+
+	var tw: int = int(params.get("tile_width", 16))
+	var th: int = int(params.get("tile_height", 16))
+	var sep_x: int = int(params.get("separation_x", 0))
+	var sep_y: int = int(params.get("separation_y", 0))
+	var mar_x: int = int(params.get("margin_x", 0))
+	var mar_y: int = int(params.get("margin_y", 0))
+
+	if tw <= 0 or th <= 0:
+		return ErrorCodes.make(ErrorCodes.VALUE_OUT_OF_RANGE, "tile_width and tile_height must be > 0")
+
+	var tileset := TileSet.new()
+	tileset.tile_size = Vector2i(tw, th)
+
+	var src := TileSetAtlasSource.new()
+	src.texture = tex
+	src.texture_region_size = Vector2i(tw, th)
+	src.separation = Vector2i(sep_x, sep_y)
+	src.margins = Vector2i(mar_x, mar_y)
+
+	var tex_w: int = tex.get_width()
+	var tex_h: int = tex.get_height()
+	var cols: int = maxi(1, int((tex_w - mar_x) / (tw + sep_x)))
+	var rows: int = maxi(1, int((tex_h - mar_y) / (th + sep_y)))
+
+	var total_tiles := 0
+	for c in range(cols):
+		for r in range(rows):
+			src.create_tile(Vector2i(c, r))
+			total_tiles += 1
+
+	tileset.add_source(src, 0)
+
+	var dir := save_path.get_base_dir()
+	if not dir.is_empty() and not DirAccess.dir_exists_absolute(dir):
+		DirAccess.make_dir_recursive_absolute(dir)
+
+	var save_err := ResourceSaver.save(tileset, save_path)
+	if save_err != OK:
+		return ErrorCodes.make(ErrorCodes.INTERNAL_ERROR, "Failed to save TileSet to %s: %s" % [save_path, error_string(save_err)])
+
+	return {"data": {
+		"save_path": save_path,
+		"source_id": 0,
+		"tiles_count": total_tiles,
+		"cols": cols,
+		"rows": rows,
+		"tile_size": {"width": tw, "height": th}
+	}}
+
+
+## Set collision shape for a tile in a TileSet resource.
+## params: {tileset_path, source_id=0, atlas_col=0, atlas_row=0, shape_type="box"|"polygon", points=[...], physics_layer=0}
+func create_collision_polygon(params: Dictionary) -> Dictionary:
+	var resolved := _resolve_atlas_source(params)
+	if resolved.has("error"):
+		return resolved
+	var source_id: int = resolved.source_id
+	var src: TileSetAtlasSource = resolved.src
+	var tileset_path: String = params.get("tileset_path", "")
+
+	var ts = load(tileset_path)
+	if not ts is TileSet:
+		return ErrorCodes.make(ErrorCodes.WRONG_TYPE, "Resource at '%s' is not a TileSet" % tileset_path)
+
+	var physics_layer: int = int(params.get("physics_layer", 0))
+	while ts.get_physics_layers_count() <= physics_layer:
+		ts.add_physics_layer()
+
+	var col: int = int(params.get("atlas_col", 0))
+	var row: int = int(params.get("atlas_row", 0))
+	var tile_coords := Vector2i(col, row)
+
+	if not src.has_tile(tile_coords):
+		src.create_tile(tile_coords)
+
+	var tile_data: TileData = src.get_tile_data(tile_coords, 0)
+	if tile_data == null:
+		return ErrorCodes.make(ErrorCodes.INTERNAL_ERROR, "Could not obtain TileData for tile at (%d, %d)" % [col, row])
+
+	var shape_type: String = str(params.get("shape_type", "box")).to_lower()
+	var poly_points := PackedVector2Array()
+
+	if shape_type == "box":
+		var tile_size := ts.tile_size
+		var hx: float = tile_size.x / 2.0
+		var hy: float = tile_size.y / 2.0
+		poly_points.append(Vector2(-hx, -hy))
+		poly_points.append(Vector2(hx, -hy))
+		poly_points.append(Vector2(hx, hy))
+		poly_points.append(Vector2(-hx, hy))
+	else:
+		var raw_points: Array = params.get("points", [])
+		for pt in raw_points:
+			if pt is Vector2:
+				poly_points.append(pt)
+			elif pt is Dictionary:
+				poly_points.append(Vector2(float(pt.get("x", 0)), float(pt.get("y", 0))))
+			elif pt is Array and pt.size() >= 2:
+				poly_points.append(Vector2(float(pt[0]), float(pt[1])))
+
+	if poly_points.size() < 3:
+		return ErrorCodes.make(ErrorCodes.VALUE_OUT_OF_RANGE, "Collision polygon requires at least 3 points (got %d)" % poly_points.size())
+
+	tile_data.add_collision_polygon(physics_layer)
+	var poly_idx := tile_data.get_collision_polygons_count(physics_layer) - 1
+	tile_data.set_collision_polygon_points(physics_layer, poly_idx, poly_points)
+
+	var save_err := ResourceSaver.save(ts, tileset_path)
+	if save_err != OK:
+		return ErrorCodes.make(ErrorCodes.INTERNAL_ERROR, "Failed to save TileSet changes: %s" % error_string(save_err))
+
+	return {"data": {
+		"tileset_path": tileset_path,
+		"source_id": source_id,
+		"atlas_col": col,
+		"atlas_row": row,
+		"physics_layer": physics_layer,
+		"polygon_index": poly_idx,
+		"points_count": poly_points.size(),
+		"shape_type": shape_type
+	}}
+
+
 func _resolve_atlas_source(params: Dictionary) -> Dictionary:
 	var tileset_path: String = params.get("tileset_path", "")
 	if tileset_path.is_empty():

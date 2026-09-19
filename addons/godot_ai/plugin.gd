@@ -501,6 +501,9 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy("animation_preset_pulse", "animation", &"preset_pulse")
 	_dispatcher.register_lazy("animation_preset_spin", "animation", &"preset_spin")
 	_dispatcher.register_lazy("animation_preset_bounce", "animation", &"preset_bounce")
+	_dispatcher.register_lazy("animation_create_spritesheet_track", "animation", &"create_spritesheet_track")
+	_dispatcher.register_lazy("animation_create_animated_sprite", "animation", &"create_animated_sprite")
+	_dispatcher.register_lazy("animation_scaffold_state_machine", "animation", &"scaffold_state_machine")
 	_dispatcher.register_lazy("material_create", "material", &"create_material")
 	_dispatcher.register_lazy("material_set_param", "material", &"set_param")
 	_dispatcher.register_lazy("material_set_shader_param", "material", &"set_shader_param")
@@ -547,8 +550,13 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy("tilemap_erase_cell", "tilemap", &"erase_cell")
 	_dispatcher.register_lazy("tilemap_get_cell", "tilemap", &"get_cell")
 	_dispatcher.register_lazy("tilemap_generate_layout", "tilemap", &"generate_layout")
+	_dispatcher.register_lazy("tilemap_paint_terrain", "tilemap", &"paint_terrain")
+	_dispatcher.register_lazy("tilemap_import_matrix", "tilemap", &"import_matrix")
+	_dispatcher.register_lazy("tilemap_scatter_props", "tilemap", &"scatter_props")
 	_dispatcher.register_lazy("tileset_get_atlas_tiles", "tileset", &"get_atlas_tiles")
 	_dispatcher.register_lazy("tileset_get_atlas_image", "tileset", &"get_atlas_image")
+	_dispatcher.register_lazy("tileset_create_from_texture", "tileset", &"create_from_texture")
+	_dispatcher.register_lazy("tileset_create_collision_polygon", "tileset", &"create_collision_polygon")
 	_dispatcher.register_lazy("gridmap_set_item", "gridmap", &"set_item")
 	_dispatcher.register_lazy("gridmap_fill", "gridmap", &"fill")
 	_dispatcher.register_lazy("gridmap_clear", "gridmap", &"clear_layer")
@@ -849,13 +857,14 @@ func _publish_dock_status_snapshots() -> void:
 
 func _on_dock_status_snapshot_requested() -> void:
 	if _lifecycle != null and str(_lifecycle.get_status_dict().get("episode_state", "")) == "BLOCKED":
-		var port := ClientConfigurator.http_port()
-		var probe := ServerLifecycleManager.probe_live_server_status(
-			port, ServerLifecycleManager.DEFAULT_PROBE_TIMEOUT_MS,
-			str(_endpoint_policy.get("capability_path", ""))
-		)
-		if bool(probe.get("reachable", false)):
-			_lifecycle.start_server()
+		if _connection == null or not _connection.is_connected:
+			var port := ClientConfigurator.http_port()
+			var probe := ServerLifecycleManager.probe_live_server_status(
+				port, ServerLifecycleManager.DEFAULT_PROBE_TIMEOUT_MS,
+				str(_endpoint_policy.get("capability_path", ""))
+			)
+			if bool(probe.get("reachable", false)):
+				_lifecycle.start_server()
 	_publish_dock_status_snapshots()
 
 

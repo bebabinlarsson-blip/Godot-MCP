@@ -565,21 +565,28 @@ func _complete_prove(result: Dictionary) -> void:
 		if not _begin_launch_race_recovery(str(result.get("reason", "proof_failed")), message):
 			_block(str(result.get("reason", "proof_failed")), message)
 		return
-	var launch: Dictionary = _episode.get("launch", {})
+	var transport = result.get("transport")
+	var version := str(result.get("version", ""))
 	var pid := int(result.get("pid", 0))
 	var fingerprint := str(result.get("fingerprint", ""))
-	var exact_grant = _owned_process_grant(pid, fingerprint)
-	if not exact_grant.is_valid():
-		if not _begin_launch_race_recovery(
-			"process_proof_failed", "The server process identity changed before proof completed."
-		):
-			_block("process_proof_failed", "The server process identity changed before proof completed.")
+	var is_adopted := bool(result.get("adopted", false))
+
+	if is_adopted or transport == null or not transport.is_valid():
+		_process_grant = null
+		_ready("adopted", transport, version)
 		return
-	_process_grant = exact_grant
-	launch["pid"] = pid
-	launch["fingerprint"] = fingerprint
-	_episode["launch"] = launch
-	_ready("owned", result.get("transport"), str(result.get("version", "")))
+
+	var exact_grant = _owned_process_grant(pid, fingerprint)
+	if exact_grant != null and exact_grant.is_valid():
+		_process_grant = exact_grant
+		var launch: Dictionary = _episode.get("launch", {})
+		launch["pid"] = pid
+		launch["fingerprint"] = fingerprint
+		_episode["launch"] = launch
+		_ready("owned", transport, version)
+	else:
+		_process_grant = null
+		_ready("adopted", transport, version)
 
 
 func _complete_replace(result: Dictionary) -> void:
@@ -1342,6 +1349,7 @@ func _prove_payload() -> Dictionary:
 		"ws_capability": str(launch.get("ws_capability", "")),
 		"baseline_instance_id": str(launch.get("baseline_instance_id", "")),
 		"grant": _process_grant,
+		"prove_deadline_msec": int(_episode.get("prove_deadline_msec", 0)),
 	}
 
 

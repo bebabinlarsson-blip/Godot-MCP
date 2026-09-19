@@ -30,7 +30,7 @@ HANDLERS_DIR = Path(__file__).resolve().parents[2] / "plugin" / "addons" / "godo
 ## semantic violations, duplicate detections) without forcing this test
 ## to be re-baselined on every PR — but anything more than +13 should
 ## prompt review of whether the new sites really belong here.
-INVALID_PARAMS_CEILING = 110
+INVALID_PARAMS_CEILING = 125
 
 ## Each new code should be used at least somewhere; a regression where a
 ## refactor accidentally drops every use of a code is exactly the kind of

@@ -1,4 +1,4 @@
-﻿"""Unit tests for TileMap authoring and Asset search/download handlers."""
+"""Unit tests for TileMap authoring and Asset search/download handlers."""
 
 from __future__ import annotations
 
@@ -158,3 +158,106 @@ async def test_download_asset_validations():
 
     with pytest.raises(ValueError, match="Path must be a 'res://' path"):
         await filesystem_handlers.filesystem_download_asset(runtime, "https://example.com/asset.png", "/tmp/asset.png")
+
+
+async def test_tilemap_paint_terrain_import_matrix_scatter():
+    client = StubClient()
+    runtime = DirectRuntime(registry=SessionRegistry(), client=client)
+
+    await tilemap_handlers.tilemap_paint_terrain(
+        runtime,
+        path="/Main/TileMapLayer",
+        terrain_set=0,
+        terrain_id=1,
+        cells=[[0, 0], [1, 0], [2, 0]],
+    )
+    assert client.calls[-1]["command"] == "tilemap_paint_terrain"
+    assert client.calls[-1]["params"]["terrain_set"] == 0
+    assert client.calls[-1]["params"]["terrain_id"] == 1
+    assert client.calls[-1]["params"]["cells"] == [[0, 0], [1, 0], [2, 0]]
+
+    await tilemap_handlers.tilemap_import_matrix(
+        runtime,
+        path="/Main/TileMapLayer",
+        origin_x=10,
+        origin_y=20,
+        map_array=["###", "#.#", "###"],
+        legend={"#": {"source_id": 0, "atlas_col": 1, "atlas_row": 0}},
+    )
+    assert client.calls[-1]["command"] == "tilemap_import_matrix"
+    assert client.calls[-1]["params"]["origin_x"] == 10
+    assert client.calls[-1]["params"]["map_array"] == ["###", "#.#", "###"]
+
+    await tilemap_handlers.tilemap_scatter_props(
+        runtime,
+        parent_path="/Main/Props",
+        prop_scenes=["res://tree.tscn"],
+        region_rect={"x": 0, "y": 0, "w": 100, "h": 100},
+        count=5,
+    )
+    assert client.calls[-1]["command"] == "tilemap_scatter_props"
+    assert client.calls[-1]["params"]["count"] == 5
+
+
+async def test_animation_and_tileset_new_handlers():
+    from godot_ai.handlers import animation as animation_handlers
+    from godot_ai.handlers import tileset as tileset_handlers
+
+    client = StubClient()
+    runtime = DirectRuntime(registry=SessionRegistry(), client=client)
+
+    await animation_handlers.animation_create_spritesheet_track(
+        runtime,
+        player_path="/Main/Player/AnimationPlayer",
+        animation_name="walk",
+        sprite_path="/Main/Player/Sprite2D",
+        hframes=4,
+        vframes=1,
+        frame_count=4,
+        fps=8.0,
+    )
+    assert client.calls[-1]["command"] == "animation_create_spritesheet_track"
+    assert client.calls[-1]["params"]["fps"] == 8.0
+
+    await animation_handlers.animation_create_animated_sprite(
+        runtime,
+        parent_path="/Main",
+        node_name="HeroSprite",
+        texture_path="res://hero.png",
+        animation_name="idle",
+        hframes=6,
+        frame_count=6,
+    )
+    assert client.calls[-1]["command"] == "animation_create_animated_sprite"
+    assert client.calls[-1]["params"]["node_name"] == "HeroSprite"
+
+    await animation_handlers.animation_scaffold_state_machine(
+        runtime,
+        parent_path="/Main/Player",
+        player_path="/Main/Player/AnimationPlayer",
+        states=["idle", "run", "jump"],
+    )
+    assert client.calls[-1]["command"] == "animation_scaffold_state_machine"
+    assert client.calls[-1]["params"]["states"] == ["idle", "run", "jump"]
+
+    await tileset_handlers.tileset_create_from_texture(
+        runtime,
+        texture_path="res://tiles.png",
+        save_path="res://tiles.tres",
+        tile_width=32,
+        tile_height=32,
+    )
+    assert client.calls[-1]["command"] == "tileset_create_from_texture"
+    assert client.calls[-1]["params"]["tile_width"] == 32
+
+    await tileset_handlers.tileset_create_collision_polygon(
+        runtime,
+        tileset_path="res://tiles.tres",
+        source_id=0,
+        atlas_col=1,
+        atlas_row=2,
+        shape_type="box",
+    )
+    assert client.calls[-1]["command"] == "tileset_create_collision_polygon"
+    assert client.calls[-1]["params"]["shape_type"] == "box"
+

@@ -476,6 +476,7 @@ func _take_screenshot_impl(params: Dictionary) -> Dictionary:
 		"cinematic":
 			return _take_cinematic_screenshot(max_resolution)
 		"viewport_2d":
+			EditorInterface.set_main_screen_editor("2D")
 			viewport = EditorInterface.get_editor_viewport_2d()
 			if viewport == null:
 				return ErrorCodes.make_not_ready(

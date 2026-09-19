@@ -220,7 +220,18 @@ class SessionRegistry:
         return entry.session if entry is not None else None
 
     def get_active(self) -> Session | None:
-        return self.get(self._active_session_id) if self._active_session_id else None
+        if self._active_session_id:
+            s = self.get(self._active_session_id)
+            if s is not None:
+                return s
+        all_active = self.list_all()
+        if len(all_active) == 1:
+            return all_active[0]
+        return None
+
+    @property
+    def active_session(self) -> Session | None:
+        return self.get_active()
 
     def set_active(self, session_id: str) -> None:
         if self._active_entry(session_id) is None:

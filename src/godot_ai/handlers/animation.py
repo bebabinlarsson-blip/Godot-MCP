@@ -340,3 +340,87 @@ async def animation_preset_bounce(
         params["overwrite"] = True
     return await runtime.send_command("animation_preset_bounce", params)
 
+
+async def animation_create_spritesheet_track(
+    runtime: DirectRuntime,
+    player_path: str,
+    animation_name: str,
+    sprite_path: str,
+    hframes: int = 1,
+    vframes: int = 1,
+    start_frame: int = 0,
+    frame_count: int = 1,
+    fps: float = 10.0,
+    loop: bool = True,
+) -> dict:
+    """Create a discrete keyframe track for Sprite2D frame stepping from a spritesheet."""
+    await require_writable_async(runtime)
+    return await runtime.send_command(
+        "animation_create_spritesheet_track",
+        {
+            "player_path": player_path,
+            "animation_name": animation_name,
+            "sprite_path": sprite_path,
+            "hframes": hframes,
+            "vframes": vframes,
+            "start_frame": start_frame,
+            "frame_count": frame_count,
+            "fps": fps,
+            "loop": loop,
+        },
+    )
+
+
+async def animation_create_animated_sprite(
+    runtime: DirectRuntime,
+    parent_path: str,
+    node_name: str = "AnimatedSprite2D",
+    texture_path: str = "",
+    animation_name: str = "default",
+    hframes: int = 1,
+    vframes: int = 1,
+    start_frame: int = 0,
+    frame_count: int = 1,
+    fps: float = 10.0,
+    loop: bool = True,
+    save_frames_path: str = "",
+) -> dict:
+    """Create an AnimatedSprite2D node and slice frames into a SpriteFrames resource."""
+    await require_writable_async(runtime)
+    return await runtime.send_command(
+        "animation_create_animated_sprite",
+        {
+            "parent_path": parent_path,
+            "node_name": node_name,
+            "texture_path": texture_path,
+            "animation_name": animation_name,
+            "hframes": hframes,
+            "vframes": vframes,
+            "start_frame": start_frame,
+            "frame_count": frame_count,
+            "fps": fps,
+            "loop": loop,
+            "save_frames_path": save_frames_path,
+        },
+    )
+
+
+async def animation_scaffold_state_machine(
+    runtime: DirectRuntime,
+    parent_path: str,
+    player_path: str = "",
+    name: str = "AnimationTree",
+    states: list[str] | None = None,
+) -> dict:
+    """Scaffold an AnimationTree with an AnimationNodeStateMachine preset."""
+    await require_writable_async(runtime)
+    params: dict[str, Any] = {
+        "parent_path": parent_path,
+        "name": name,
+        "player_path": player_path,
+    }
+    if states is not None:
+        params["states"] = states
+    return await runtime.send_command("animation_scaffold_state_machine", params)
+
+

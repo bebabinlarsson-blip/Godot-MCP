@@ -118,6 +118,20 @@ var _custom_tool_service_locator
 ## a self-update.
 var _client_jobs
 var _update_manager
+## One-shot per session: once a server transport is ready and a status refresh
+## completes, installed-but-unconfigured clients are configured automatically
+## (see ClientConfigurator.auto_configure_candidates). Reset on plugin
+## reload/boot, so a manual Configure/Remove stays authoritative mid-session.
+var _auto_configure_clients_attempted := false
+## Serialized sweep state. Automatic client mutations share one global safety
+## lock (see client_mutation_lock.gd), so concurrent fan-out makes every worker
+## but the first fail closed — the sweep runs at most one configure at a time
+## and starts the next on completion. `_auto_configure_in_flight` names the
+## client whose configure worker is running; completion of any other action is
+## ignored so a manual/dock/MCP action can't advance the queue early.
+var _auto_configure_queue: Array[String] = []
+var _auto_configure_pending := false
+var _auto_configure_in_flight := ""
 ## Process identity continuity and the immutable terminal outcome cross only
 ## as values. The coordinator retains neither this plugin nor its objects.
 var _post_update_outcome: Dictionary = {}
@@ -487,6 +501,9 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy("animation_preset_pulse", "animation", &"preset_pulse")
 	_dispatcher.register_lazy("animation_preset_spin", "animation", &"preset_spin")
 	_dispatcher.register_lazy("animation_preset_bounce", "animation", &"preset_bounce")
+	_dispatcher.register_lazy("animation_create_spritesheet_track", "animation", &"create_spritesheet_track")
+	_dispatcher.register_lazy("animation_create_animated_sprite", "animation", &"create_animated_sprite")
+	_dispatcher.register_lazy("animation_scaffold_state_machine", "animation", &"scaffold_state_machine")
 	_dispatcher.register_lazy("material_create", "material", &"create_material")
 	_dispatcher.register_lazy("material_set_param", "material", &"set_param")
 	_dispatcher.register_lazy("material_set_shader_param", "material", &"set_shader_param")
@@ -533,8 +550,13 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy("tilemap_erase_cell", "tilemap", &"erase_cell")
 	_dispatcher.register_lazy("tilemap_get_cell", "tilemap", &"get_cell")
 	_dispatcher.register_lazy("tilemap_generate_layout", "tilemap", &"generate_layout")
+	_dispatcher.register_lazy("tilemap_paint_terrain", "tilemap", &"paint_terrain")
+	_dispatcher.register_lazy("tilemap_import_matrix", "tilemap", &"import_matrix")
+	_dispatcher.register_lazy("tilemap_scatter_props", "tilemap", &"scatter_props")
 	_dispatcher.register_lazy("tileset_get_atlas_tiles", "tileset", &"get_atlas_tiles")
 	_dispatcher.register_lazy("tileset_get_atlas_image", "tileset", &"get_atlas_image")
+	_dispatcher.register_lazy("tileset_create_from_texture", "tileset", &"create_from_texture")
+	_dispatcher.register_lazy("tileset_create_collision_polygon", "tileset", &"create_collision_polygon")
 	_dispatcher.register_lazy("gridmap_set_item", "gridmap", &"set_item")
 	_dispatcher.register_lazy("gridmap_fill", "gridmap", &"fill")
 	_dispatcher.register_lazy("gridmap_clear", "gridmap", &"clear_layer")
@@ -691,6 +713,52 @@ func _on_client_work_snapshot_changed(snapshot: Dictionary) -> void:
 func _on_client_status_refresh_completed(results: Dictionary) -> void:
 	if _dock != null:
 		_dock.present_client_status_refresh_results(results)
+	_auto_configure_clients_on_ready(results)
+
+
+## Enabling the plugin auto-configures every installed client that isn't
+## already pointing at this server — Claude Code, Codex, Antigravity, OpenCode
+## and any other registered client get their `godot-ai` attach entry without
+## a manual "Configure all" click. Runs once per session on the first
+## health-unblocked completed refresh — the one `_on_lifecycle_transport_ready`
+## requested — after the server transport is live. When nothing can be
+## admitted (setting disabled, no candidates), a later completed refresh gets
+## another chance; once the queue is admitted, `_start_next_auto_configure`
+## drains it one client at a time on every `action_completed`.
+func _auto_configure_clients_on_ready(results: Dictionary) -> void:
+	if _auto_configure_clients_attempted:
+		return
+	if _client_jobs == null or _client_health_is_blocked():
+		return
+	if not McpSettings.auto_configure_clients_enabled():
+		_auto_configure_clients_attempted = true
+		return
+	if not _auto_configure_pending:
+		var candidates := ClientConfigurator.auto_configure_candidates(results)
+		if candidates.is_empty():
+			return
+		_auto_configure_queue.assign(candidates)
+		_auto_configure_pending = true
+	_start_next_auto_configure()
+
+
+## Automatic client mutations take one global safety lock, so a concurrent
+## fan-out is self-defeating: the first worker wins the directory-creation
+## race and every other acquire fails closed with the recovery message. The
+## sweep therefore starts at most one configure at a time and relies on
+## `_on_client_action_completed` to advance the queue. Starting is skipped
+## for clients whose slot is already busy (a concurrent manual action) or
+## whose termination is unproven; the queue simply moves past them.
+func _start_next_auto_configure() -> void:
+	if not _auto_configure_pending or not _auto_configure_in_flight.is_empty():
+		return
+	while not _auto_configure_queue.is_empty():
+		var client_id := String(_auto_configure_queue.pop_front())
+		if _client_jobs.request_action(client_id, "configure"):
+			_auto_configure_in_flight = client_id
+			return
+	_auto_configure_pending = false
+	_auto_configure_clients_attempted = true
 
 
 func _on_mcp_client_status_completed(
@@ -710,6 +778,18 @@ func _on_mcp_client_action_completed(request_id: String, payload: Dictionary) ->
 func _on_client_action_completed(
 	client_id: String, action: String, result: Dictionary, prewarm: Dictionary
 ) -> void:
+	## Advance the auto-configure queue BEFORE any presentation: the sweep must
+	## flow even if the dock's completion painting aborts. A script error in
+	## dock presentation must never strand the queue (it aborts this handler,
+	## which previously sat before the advancement and killed the sweep after
+	## every first completion).
+	if _auto_configure_pending and _auto_configure_in_flight == client_id:
+		_auto_configure_in_flight = ""
+		## Defer the kick: the completion signal is emitted from inside the job
+		## owner's `_poll_actions` (mid-`_process`), and starting the next worker
+		## reentrantly from that frame aborts the handler. Running at end of
+		## frame keeps the sweep on entirely settled job-owner state.
+		_start_next_auto_configure.call_deferred()
 	if _dock != null:
 		_dock.present_client_action_result(client_id, action, result, prewarm)
 
@@ -717,6 +797,16 @@ func _on_client_action_completed(
 func _on_client_action_timed_out(client_id: String, action: String, detail: String) -> void:
 	if _dock != null:
 		_dock.present_client_action_timeout(client_id, action, detail)
+	## A worker that outlives its watchdog must not deadlock the sweep: the job
+	## owner keeps the thread slot until the worker actually finishes (and
+	## finally emits `action_completed`), so advance the queue now. While the
+	## straggler still holds the global safety lock, the next acquire fails
+	## fast with the recovery message — bounded, self-terminating, never
+	## stranding the session. The straggler's eventual completion is ignored
+	## because `_auto_configure_in_flight` moved on.
+	if _auto_configure_pending and _auto_configure_in_flight == client_id:
+		_auto_configure_in_flight = ""
+		_start_next_auto_configure.call_deferred()
 
 
 func _transport_snapshot_for_dock() -> Dictionary:
@@ -767,13 +857,14 @@ func _publish_dock_status_snapshots() -> void:
 
 func _on_dock_status_snapshot_requested() -> void:
 	if _lifecycle != null and str(_lifecycle.get_status_dict().get("episode_state", "")) == "BLOCKED":
-		var port := ClientConfigurator.http_port()
-		var probe := ServerLifecycleManager.probe_live_server_status(
-			port, ServerLifecycleManager.DEFAULT_PROBE_TIMEOUT_MS,
-			str(_endpoint_policy.get("capability_path", ""))
-		)
-		if bool(probe.get("reachable", false)):
-			_lifecycle.start_server()
+		if _connection == null or not _connection.is_connected:
+			var port := ClientConfigurator.http_port()
+			var probe := ServerLifecycleManager.probe_live_server_status(
+				port, ServerLifecycleManager.DEFAULT_PROBE_TIMEOUT_MS,
+				str(_endpoint_policy.get("capability_path", ""))
+			)
+			if bool(probe.get("reachable", false)):
+				_lifecycle.start_server()
 	_publish_dock_status_snapshots()
 
 

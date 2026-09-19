@@ -26,6 +26,11 @@ const SETTING_MCP_LOGGING := "godot_ai/mcp_logging"
 ## entry travels with the project. Defaults to `user` to preserve the
 ## historical behaviour for existing installs.
 const SETTING_CLIENT_SCOPE := "godot_ai/mcp_client_scope"
+## Whether the plugin auto-configures installed-but-unconfigured MCP clients
+## (Claude Code, Codex, Antigravity, OpenCode, …) once when a server transport
+## first becomes ready in a session. One-shot per session; entries that
+## already point at the current server are never rewritten.
+const SETTING_AUTO_CONFIGURE_CLIENTS := "godot_ai/auto_configure_clients"
 
 ## Scopes accepted for SETTING_CLIENT_SCOPE. These are the values the Claude
 ## Code CLI's `--scope` flag takes; an unrecognised setting falls back to
@@ -125,6 +130,17 @@ static func mcp_logging_enabled() -> bool:
 	var es := EditorInterface.get_editor_settings()
 	if es != null and es.has_setting(SETTING_MCP_LOGGING):
 		return bool(es.get_setting(SETTING_MCP_LOGGING))
+	return true
+
+
+## Returns whether transport-ready auto-configuration of installed clients is
+## enabled. Defaults to true when the user has never touched the setting —
+## the plugin writes the `godot-ai` attach entry for each installed client
+## that isn't already pointing at the current server on plugin enable.
+static func auto_configure_clients_enabled() -> bool:
+	var es := EditorInterface.get_editor_settings()
+	if es != null and es.has_setting(SETTING_AUTO_CONFIGURE_CLIENTS):
+		return bool(es.get_setting(SETTING_AUTO_CONFIGURE_CLIENTS))
 	return true
 
 

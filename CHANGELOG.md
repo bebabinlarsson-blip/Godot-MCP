@@ -5,6 +5,23 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.11 (2026-09-19)
+
+Lifecycle capability adoption reliability fix, single-editor auto-routing, and comprehensive 2D open-world, animation, and tileset authoring tools.
+
+### Added
+
+- **TileMap Open-World Tools**: Added `paint_terrain` (`TileMapLayer.set_cells_terrain_connect()`) for automated terrain autotiling, `import_matrix` for stamping large ASCII or 2D array tile layouts, and `scatter_props` for procedural scene prop scattering with random offset, rotation, and scaling.
+- **2D Sprite Animation & State Machine Scaffolding**: Added `create_spritesheet_track` for discrete step keyframing on `Sprite2D` frame properties, `create_animated_sprite` to build `AnimatedSprite2D` nodes with sliced `SpriteFrames` resources, and `scaffold_state_machine` to construct `AnimationTree` nodes with root `AnimationNodeStateMachine` and automated transitions.
+- **TileSet & Asset Authoring**: Added `create_from_texture` to automatically slice texture atlases into ready-to-use `TileSet` resources saved as `.tres`, and `create_collision_polygon` to generate custom collision shapes for tile physics layers.
+- **Session Auto-Routing**: Single active editor instances automatically route tool calls in `SessionRegistry.get_active()` without requiring manual `session_activate` calls.
+- **CC0 Asset Catalog Updates**: Updated asset URLs to verified 200 OK sources and added automatic 2D workspace viewport switching for 2D screenshots.
+
+### Fixed
+
+- **Server Lifecycle Adoption**: Fixed premature `launch_gone` dock blocking on Windows where process detachment or launch race conditions caused false-positive blockages. Capability probing now runs prior to process disposition checks and cleanly adopts compatible running servers within the proof deadline.
+- **Dock Status Guard**: Guarded dock status snapshot requests against re-triggering server launches when WebSocket transport is already active.
+
 ## 5.0.10 (2026-09-18)
 
 The dock no longer strands a user in a blocked state when two editors launch

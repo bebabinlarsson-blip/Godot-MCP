@@ -325,8 +325,9 @@ func list_files(params: Dictionary) -> Dictionary:
 	var recursive: bool = params.get("recursive", false)
 	var max_depth: int = int(params.get("max_depth", 1 if not recursive else 10))
 
-	if not path.begins_with("res://"):
-		path = "res://" + path.trim_prefix("/")
+	var path_err = McpPathValidator.path_error(path, "path")
+	if path_err != null:
+		return path_err
 
 	var dir := DirAccess.open(path)
 	if dir == null:

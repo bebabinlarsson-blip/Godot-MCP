@@ -1,4 +1,4 @@
-﻿@tool
+@tool
 extends "res://addons/godot_ai/handlers/command_handler.gd"
 
 ## TileMap / TileMapLayer authoring — set, fill, clear, place, rotate, and generate
@@ -442,6 +442,216 @@ func generate_layout(params: Dictionary) -> Dictionary:
 			"undoable": true
 		}
 	}
+
+
+## Paint terrain using autotiling connect rules.
+## params: {path, terrain_set=0, terrain_id=0, cells=[...], layer?}
+func paint_terrain(params: Dictionary) -> Dictionary:
+	var resolved := _resolve_layer(params)
+	if resolved.has("error"): return resolved
+	var node: Node = resolved.node
+	var layer_idx: int = resolved.layer
+
+	var terrain_set: int = int(params.get("terrain_set", 0))
+	var terrain_id: int = int(params.get("terrain_id", 0))
+	var raw_cells: Array = params.get("cells", [])
+	var cells := _parse_cells_array(raw_cells)
+
+	if cells.is_empty():
+		return ErrorCodes.make(ErrorCodes.MISSING_REQUIRED_PARAM, "Parameter 'cells' must be a non-empty array of cell coordinates")
+
+	var snapshot := _capture_used_cells_snapshot(node, layer_idx)
+
+	_undo_redo.create_action("MCP: TileMap paint_terrain (set %d, terrain %d, %d cells)" % [terrain_set, terrain_id, cells.size()])
+	if node is TileMapLayer:
+		_undo_redo.add_do_method(node, "set_cells_terrain_connect", cells, terrain_set, terrain_id, true)
+	elif node.has_method("set_cells_terrain_connect"):
+		_undo_redo.add_do_method(node, "set_cells_terrain_connect", layer_idx, cells, terrain_set, terrain_id, true)
+	_undo_redo.add_undo_method(self, "_restore_rect_snapshot", node, snapshot)
+	_undo_redo.commit_action()
+
+	return {"data": {
+		"cells_painted": cells.size(),
+		"terrain_set": terrain_set,
+		"terrain_id": terrain_id,
+		"layer": layer_idx,
+		"undoable": true
+	}}
+
+
+## Bulk import ASCII or 2D matrix layout with symbol legend in a single undo action.
+## params: {path, origin_x=0, origin_y=0, map_array=[...], legend={...}, layer?}
+func import_matrix(params: Dictionary) -> Dictionary:
+	var resolved := _resolve_layer(params)
+	if resolved.has("error"): return resolved
+	var node: Node = resolved.node
+	var layer_idx: int = resolved.layer
+
+	var origin_x: int = int(params.get("origin_x", params.get("origin", {}).get("x", 0) if params.get("origin") is Dictionary else 0))
+	var origin_y: int = int(params.get("origin_y", params.get("origin", {}).get("y", 0) if params.get("origin") is Dictionary else 0))
+	var map_array: Array = params.get("map_array", params.get("matrix", []))
+	var legend: Dictionary = params.get("legend", {})
+
+	if map_array.is_empty():
+		return ErrorCodes.make(ErrorCodes.MISSING_REQUIRED_PARAM, "Parameter 'map_array' or 'matrix' must be non-empty")
+
+	var placements: Array[Dictionary] = []
+	var row_idx := 0
+	for row in map_array:
+		var col_idx := 0
+		if row is String:
+			for ch in row:
+				if legend.has(ch):
+					var tile_info = legend[ch]
+					var pos := Vector2i(origin_x + col_idx, origin_y + row_idx)
+					placements.append(_build_placement(pos, tile_info))
+				col_idx += 1
+		elif row is Array:
+			for item in row:
+				var key = str(item)
+				if legend.has(key):
+					var tile_info = legend[key]
+					var pos := Vector2i(origin_x + col_idx, origin_y + row_idx)
+					placements.append(_build_placement(pos, tile_info))
+				elif item is Dictionary and item.has("source_id"):
+					var pos := Vector2i(origin_x + col_idx, origin_y + row_idx)
+					placements.append(_build_placement(pos, item))
+				col_idx += 1
+		row_idx += 1
+
+	if placements.is_empty():
+		return ErrorCodes.make(ErrorCodes.VALUE_OUT_OF_RANGE, "No matching legend entries found in map matrix")
+
+	var snapshot: Array[Dictionary] = []
+	for p in placements:
+		snapshot.append({"pos": p.pos, "state": _capture_cell_state(node, p.pos, layer_idx)})
+
+	_undo_redo.create_action("MCP: TileMap import_matrix (%d cells)" % placements.size())
+	for p in placements:
+		_undo_redo.add_do_method(self, "_apply_cell", node, p.pos, p.source_id, p.atlas, p.alt, layer_idx)
+	_undo_redo.add_undo_method(self, "_restore_rect_snapshot", node, snapshot)
+	_undo_redo.commit_action()
+
+	return {"data": {
+		"cells_placed": placements.size(),
+		"rows": row_idx,
+		"origin": {"x": origin_x, "y": origin_y},
+		"layer": layer_idx,
+		"undoable": true
+	}}
+
+
+## Procedurally scatter prop scene instances across a bounding rectangle.
+## params: {parent_path, prop_scenes=[...], region_rect={x, y, w, h}, count?, density?, seed?}
+func scatter_props(params: Dictionary) -> Dictionary:
+	var _scene_check := McpNodeValidator.require_scene_or_error()
+	if _scene_check.has("error"): return _scene_check
+	var scene_root: Node = _scene_check.scene_root
+
+	var parent_path: String = params.get("parent_path", "")
+	var parent: Node = scene_root
+	if not parent_path.is_empty():
+		parent = McpScenePath.resolve(parent_path, scene_root)
+		if parent == null:
+			return ErrorCodes.make(ErrorCodes.NODE_NOT_FOUND, McpScenePath.format_parent_error(parent_path, scene_root))
+
+	var prop_scenes: Array = params.get("prop_scenes", [])
+	if prop_scenes.is_empty():
+		return ErrorCodes.make(ErrorCodes.MISSING_REQUIRED_PARAM, "Parameter 'prop_scenes' must be a non-empty array of scene paths")
+
+	var region: Dictionary = params.get("region_rect", {})
+	var rx: float = float(region.get("x", 0))
+	var ry: float = float(region.get("y", 0))
+	var rw: float = float(region.get("w", 100))
+	var rh: float = float(region.get("h", 100))
+
+	var count: int = int(params.get("count", 0))
+	if count <= 0:
+		var density: float = float(params.get("density", 0.05))
+		count = clampi(int(rw * rh * density / 100.0), 1, 250)
+
+	var rng := RandomNumberGenerator.new()
+	var seed_val: int = int(params.get("seed", 0))
+	if seed_val != 0:
+		rng.seed = seed_val
+	else:
+		rng.randomize()
+
+	var loaded_scenes: Array[PackedScene] = []
+	for p_path in prop_scenes:
+		var s = load(str(p_path))
+		if s is PackedScene:
+			loaded_scenes.append(s)
+
+	if loaded_scenes.is_empty():
+		return ErrorCodes.make(ErrorCodes.RESOURCE_NOT_FOUND, "Could not load any valid PackedScene from prop_scenes")
+
+	var instances: Array[Node] = []
+	for i in range(count):
+		var scene_idx := rng.randi_range(0, loaded_scenes.size() - 1)
+		var inst = loaded_scenes[scene_idx].instantiate()
+		if inst == null:
+			continue
+		var px := rx + rng.randf_range(0, rw)
+		var py := ry + rng.randf_range(0, rh)
+		if inst is Node2D:
+			inst.position = Vector2(px, py)
+		elif inst is Control:
+			inst.position = Vector2(px, py)
+		instances.append(inst)
+
+	_undo_redo.create_action("MCP: TileMap scatter_props (%d instances)" % instances.size())
+	for inst in instances:
+		_undo_redo.add_do_method(parent, "add_child", inst, true)
+		_undo_redo.add_do_method(inst, "set_owner", scene_root)
+		_undo_redo.add_do_reference(inst)
+		_undo_redo.add_undo_method(parent, "remove_child", inst)
+	_undo_redo.commit_action()
+
+	return {"data": {
+		"props_placed": instances.size(),
+		"parent_path": McpScenePath.from_node(parent, scene_root),
+		"count": instances.size(),
+		"undoable": true
+	}}
+
+
+func _parse_cells_array(raw_cells: Array) -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	for item in raw_cells:
+		if item is Vector2i:
+			result.append(item)
+		elif item is Vector2:
+			result.append(Vector2i(int(item.x), int(item.y)))
+		elif item is Dictionary:
+			result.append(Vector2i(int(item.get("x", item.get("col", 0))), int(item.get("y", item.get("row", 0)))))
+		elif item is Array and item.size() >= 2:
+			result.append(Vector2i(int(item[0]), int(item[1])))
+	return result
+
+
+func _build_placement(pos: Vector2i, tile_info) -> Dictionary:
+	var src := 0
+	var atlas := Vector2i(0, 0)
+	var alt := 0
+	if tile_info is Dictionary:
+		src = int(tile_info.get("source_id", 0))
+		atlas = Vector2i(int(tile_info.get("atlas_col", 0)), int(tile_info.get("atlas_row", 0)))
+		var base_alt: int = int(tile_info.get("alternative_tile", -1))
+		var rot: int = int(tile_info.get("rotation_degrees", 0)) % 360
+		if rot < 0: rot += 360
+		var flip_h: bool = bool(tile_info.get("flip_h", false))
+		var flip_v: bool = bool(tile_info.get("flip_v", false))
+		var flags := 0
+		if rot == 90: flags = 20480
+		elif rot == 180: flags = 12288
+		elif rot == 270: flags = 24576
+		if flip_h: flags ^= 4096
+		if flip_v: flags ^= 8192
+		alt = (0 if base_alt < 0 else base_alt) ^ flags
+	elif tile_info is int or tile_info is float:
+		src = int(tile_info)
+	return {"pos": pos, "source_id": src, "atlas": atlas, "alt": alt}
 
 
 ## Internal helper functions

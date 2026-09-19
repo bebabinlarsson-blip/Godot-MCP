@@ -723,6 +723,242 @@ func _create_scene_pinned_action(action_label: String) -> void:
 
 
 # ============================================================================
+# High-Level 2D Animation & Character State Tools
+# ============================================================================
+
+## Create a discrete keyframe track for Sprite2D frame stepping from a spritesheet.
+func create_spritesheet_track(params: Dictionary) -> Dictionary:
+	var player_path: String = params.get("player_path", "")
+	var anim_name: String = params.get("animation_name", params.get("name", ""))
+	var sprite_path: String = params.get("sprite_path", "")
+	var hframes: int = int(params.get("hframes", 1))
+	var vframes: int = int(params.get("vframes", 1))
+	var start_frame: int = int(params.get("start_frame", 0))
+	var frame_count: int = int(params.get("frame_count", 1))
+	var fps: float = float(params.get("fps", 10.0))
+	var loop: bool = bool(params.get("loop", true))
+
+	if player_path.is_empty():
+		return ErrorCodes.make(ErrorCodes.MISSING_REQUIRED_PARAM, "Missing required param: player_path")
+	if anim_name.is_empty():
+		return ErrorCodes.make(ErrorCodes.MISSING_REQUIRED_PARAM, "Missing required param: animation_name")
+	if sprite_path.is_empty():
+		return ErrorCodes.make(ErrorCodes.MISSING_REQUIRED_PARAM, "Missing required param: sprite_path")
+	if frame_count <= 0 or fps <= 0.0:
+		return ErrorCodes.make(ErrorCodes.VALUE_OUT_OF_RANGE, "frame_count and fps must be > 0")
+
+	var resolved := _resolve_player(player_path, true)
+	if resolved.has("error"):
+		return resolved
+	var player: AnimationPlayer = resolved.player
+	var library: AnimationLibrary = resolved.library
+	var created_player: bool = resolved.get("player_created", false)
+	var player_parent: Node = resolved.get("player_parent", null)
+	var created_library := false
+	if library == null:
+		library = AnimationLibrary.new()
+		created_library = true
+
+	var old_anim: Animation = null
+	if library.has_animation(anim_name):
+		old_anim = library.get_animation(anim_name)
+
+	var duration: float = maxf(0.01, float(frame_count) / fps)
+	var anim := Animation.new()
+	anim.length = duration
+	anim.loop_mode = Animation.LOOP_LINEAR if loop else Animation.LOOP_NONE
+
+	var scene_root := EditorInterface.get_edited_scene_root()
+	var sprite_node := McpScenePath.resolve(sprite_path, scene_root) if scene_root else null
+	if sprite_node != null and (sprite_node is Sprite2D or sprite_node.has_method("set_hframes")):
+		if hframes > 1:
+			sprite_node.set("hframes", hframes)
+		if vframes > 1:
+			sprite_node.set("vframes", vframes)
+
+	var rel_path := McpScenePath.path_relative_to(sprite_node, player) if sprite_node != null else sprite_path
+	var track_path := "%s:frame" % rel_path
+
+	var track_idx := anim.add_track(Animation.TYPE_VALUE)
+	anim.track_set_path(track_idx, track_path)
+	anim.value_track_set_update_mode(track_idx, Animation.UPDATE_DISCRETE)
+	anim.track_set_interpolation_type(track_idx, Animation.INTERPOLATION_NEAREST)
+
+	for i in range(frame_count):
+		var t: float = float(i) / fps
+		var frame_val: int = start_frame + i
+		anim.track_insert_key(track_idx, t, frame_val)
+
+	_commit_animation_add("MCP: Create spritesheet track %s" % anim_name,
+		player, library, created_library, anim_name, anim, old_anim,
+		created_player, player_parent)
+
+	return {"data": {
+		"animation_name": anim_name,
+		"player_path": player_path,
+		"sprite_path": sprite_path,
+		"track_path": track_path,
+		"frames": frame_count,
+		"fps": fps,
+		"duration": duration,
+		"loop": loop,
+		"undoable": true
+	}}
+
+
+## Create an AnimatedSprite2D node and slice frames into a SpriteFrames resource.
+func create_animated_sprite(params: Dictionary) -> Dictionary:
+	var _scene_check := McpNodeValidator.require_scene_or_error()
+	if _scene_check.has("error"): return _scene_check
+	var scene_root: Node = _scene_check.scene_root
+
+	var parent_path: String = params.get("parent_path", "")
+	var parent: Node = scene_root
+	if not parent_path.is_empty():
+		parent = McpScenePath.resolve(parent_path, scene_root)
+		if parent == null:
+			return ErrorCodes.make(ErrorCodes.NODE_NOT_FOUND, McpScenePath.format_parent_error(parent_path, scene_root))
+
+	var node_name: String = params.get("node_name", params.get("name", "AnimatedSprite2D"))
+	var texture_path: String = params.get("texture_path", "")
+	var anim_name: String = params.get("animation_name", "default")
+	var hframes: int = int(params.get("hframes", 1))
+	var vframes: int = int(params.get("vframes", 1))
+	var start_frame: int = int(params.get("start_frame", 0))
+	var frame_count: int = int(params.get("frame_count", 1))
+	var fps: float = float(params.get("fps", 10.0))
+	var loop: bool = bool(params.get("loop", true))
+	var save_frames_path: String = params.get("save_frames_path", "")
+
+	var sprite := AnimatedSprite2D.new()
+	sprite.name = node_name
+	var sprite_frames := SpriteFrames.new()
+
+	if not texture_path.is_empty() and ResourceLoader.exists(texture_path):
+		var tex = load(texture_path)
+		if tex is Texture2D:
+			var tex_w: int = tex.get_width()
+			var tex_h: int = tex.get_height()
+			var cell_w: float = float(tex_w) / maxf(1.0, float(hframes))
+			var cell_h: float = float(tex_h) / maxf(1.0, float(vframes))
+
+			if not sprite_frames.has_animation(anim_name):
+				sprite_frames.add_animation(anim_name)
+			sprite_frames.set_animation_speed(anim_name, fps)
+			sprite_frames.set_animation_loop(anim_name, loop)
+
+			for i in range(frame_count):
+				var f_idx := start_frame + i
+				var col: int = f_idx % hframes
+				var row: int = int(f_idx / hframes)
+				var atlas_tex := AtlasTexture.new()
+				atlas_tex.atlas = tex
+				atlas_tex.region = Rect2(col * cell_w, row * cell_h, cell_w, cell_h)
+				sprite_frames.add_frame(anim_name, atlas_tex)
+
+	sprite.sprite_frames = sprite_frames
+	sprite.animation = anim_name
+
+	if not save_frames_path.is_empty():
+		ResourceSaver.save(sprite_frames, save_frames_path)
+
+	_undo_redo.create_action("MCP: Create AnimatedSprite2D %s" % sprite.name)
+	_undo_redo.add_do_method(parent, "add_child", sprite, true)
+	_undo_redo.add_do_method(sprite, "set_owner", scene_root)
+	_undo_redo.add_do_reference(sprite)
+	_undo_redo.add_do_reference(sprite_frames)
+	_undo_redo.add_undo_method(parent, "remove_child", sprite)
+	_undo_redo.commit_action()
+
+	return {"data": {
+		"path": McpScenePath.from_node(sprite, scene_root),
+		"name": String(sprite.name),
+		"animation": anim_name,
+		"frames": frame_count,
+		"fps": fps,
+		"undoable": true
+	}}
+
+
+## Scaffold an AnimationTree with an AnimationNodeStateMachine preset.
+func scaffold_state_machine(params: Dictionary) -> Dictionary:
+	var _scene_check := McpNodeValidator.require_scene_or_error()
+	if _scene_check.has("error"): return _scene_check
+	var scene_root: Node = _scene_check.scene_root
+
+	var parent_path: String = params.get("parent_path", "")
+	var parent: Node = scene_root
+	if not parent_path.is_empty():
+		parent = McpScenePath.resolve(parent_path, scene_root)
+		if parent == null:
+			return ErrorCodes.make(ErrorCodes.NODE_NOT_FOUND, McpScenePath.format_parent_error(parent_path, scene_root))
+
+	var player_path: String = params.get("player_path", "")
+	var states: Array = params.get("states", ["idle", "run", "jump", "fall"])
+	var tree_name: String = params.get("name", "AnimationTree")
+
+	var tree := AnimationTree.new()
+	tree.name = tree_name
+
+	var state_machine := AnimationNodeStateMachine.new()
+	for s_name in states:
+		var node_anim := AnimationNodeAnimation.new()
+		node_anim.animation = str(s_name)
+		state_machine.add_node(str(s_name), node_anim)
+
+	if not states.is_empty():
+		var start_trans := AnimationNodeStateMachineTransition.new()
+		start_trans.advance_mode = AnimationNodeStateMachineTransition.ADVANCE_MODE_AUTO
+		state_machine.add_transition("Start", str(states[0]), start_trans)
+
+	if states.has("idle") and states.has("run"):
+		var t_ir := AnimationNodeStateMachineTransition.new()
+		var t_ri := AnimationNodeStateMachineTransition.new()
+		state_machine.add_transition("idle", "run", t_ir)
+		state_machine.add_transition("run", "idle", t_ri)
+
+	if states.has("idle") and states.has("jump"):
+		var t_ij := AnimationNodeStateMachineTransition.new()
+		state_machine.add_transition("idle", "jump", t_ij)
+
+	if states.has("run") and states.has("jump"):
+		var t_rj := AnimationNodeStateMachineTransition.new()
+		state_machine.add_transition("run", "jump", t_rj)
+
+	if states.has("jump") and states.has("fall"):
+		var t_jf := AnimationNodeStateMachineTransition.new()
+		t_jf.advance_mode = AnimationNodeStateMachineTransition.ADVANCE_MODE_AUTO
+		state_machine.add_transition("jump", "fall", t_jf)
+
+	if states.has("fall") and states.has("idle"):
+		var t_fi := AnimationNodeStateMachineTransition.new()
+		state_machine.add_transition("fall", "idle", t_fi)
+
+	tree.tree_root = state_machine
+	if not player_path.is_empty():
+		var player_node := McpScenePath.resolve(player_path, scene_root)
+		if player_node != null:
+			tree.anim_player = tree.get_path_to(player_node)
+	tree.active = true
+
+	_undo_redo.create_action("MCP: Scaffold AnimationTree State Machine")
+	_undo_redo.add_do_method(parent, "add_child", tree, true)
+	_undo_redo.add_do_method(tree, "set_owner", scene_root)
+	_undo_redo.add_do_reference(tree)
+	_undo_redo.add_do_reference(state_machine)
+	_undo_redo.add_undo_method(parent, "remove_child", tree)
+	_undo_redo.commit_action()
+
+	return {"data": {
+		"path": McpScenePath.from_node(tree, scene_root),
+		"name": String(tree.name),
+		"states": states,
+		"player_path": player_path,
+		"undoable": true
+	}}
+
+
+# ============================================================================
 # Helpers — resolution
 # ============================================================================
 
