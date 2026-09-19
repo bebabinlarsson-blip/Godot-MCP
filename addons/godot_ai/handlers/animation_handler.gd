@@ -776,7 +776,7 @@ func create_spritesheet_track(params: Dictionary) -> Dictionary:
 		if vframes > 1:
 			sprite_node.set("vframes", vframes)
 
-	var rel_path := McpScenePath.path_relative_to(sprite_node, player) if sprite_node != null else sprite_path
+	var rel_path: String = McpScenePath.path_relative_to(sprite_node, player) if sprite_node != null else sprite_path
 	var track_path := "%s:frame" % rel_path
 
 	var track_idx := anim.add_track(Animation.TYPE_VALUE)

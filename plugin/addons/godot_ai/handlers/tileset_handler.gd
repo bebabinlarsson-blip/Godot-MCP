@@ -204,8 +204,8 @@ func create_collision_polygon(params: Dictionary) -> Dictionary:
 	var src: TileSetAtlasSource = resolved.src
 	var tileset_path: String = params.get("tileset_path", "")
 
-	var ts = load(tileset_path)
-	if not ts is TileSet:
+	var ts: TileSet = load(tileset_path) as TileSet
+	if ts == null:
 		return ErrorCodes.make(ErrorCodes.WRONG_TYPE, "Resource at '%s' is not a TileSet" % tileset_path)
 
 	var physics_layer: int = int(params.get("physics_layer", 0))
@@ -227,7 +227,8 @@ func create_collision_polygon(params: Dictionary) -> Dictionary:
 	var poly_points := PackedVector2Array()
 
 	if shape_type == "box":
-		var tile_size := ts.tile_size
+		var tile_size: Vector2i = ts.tile_size
+
 		var hx: float = tile_size.x / 2.0
 		var hy: float = tile_size.y / 2.0
 		poly_points.append(Vector2(-hx, -hy))

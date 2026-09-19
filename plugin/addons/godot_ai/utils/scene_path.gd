@@ -23,6 +23,19 @@ static func from_node(node: Node, scene_root: Node) -> String:
 	return "/" + scene_root.name + "/" + str(relative)
 
 
+## Return a path from `from_node` (or its root_node if AnimationPlayer) to `target`.
+static func path_relative_to(target: Node, from_node: Node) -> String:
+	if target == null or from_node == null:
+		return ""
+	if from_node is AnimationPlayer:
+		var ap := from_node as AnimationPlayer
+		var root_node: Node = ap.get_node_or_null(ap.root_node) if not ap.root_node.is_empty() else ap.get_parent()
+		if root_node != null:
+			return str(root_node.get_path_to(target))
+	return str(from_node.get_path_to(target))
+
+
+
 ## Resolve a clean scene path like "/Main/Camera3D" to the actual node.
 ##
 ## Accepts forms relative to the edited scene root:

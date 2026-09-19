@@ -5,7 +5,17 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.12 (2026-09-19)
+
+Hotfix release resolving GDScript parse and type inference errors in the Godot plugin.
+
+### Fixed
+
+- **Animation Track Path Resolution**: Added `McpScenePath.path_relative_to()` static helper in `utils/scene_path.gd` to resolve `AnimationPlayer.root_node`-relative paths for `create_spritesheet_track`, and explicitly typed `rel_path: String` to eliminate compile errors.
+- **TileSet Type Inference**: Explicitly typed loaded TileSet resource (`ts: TileSet = load(...) as TileSet`) and `tile_size: Vector2i` in `tileset_handler.gd` to eliminate GDScript 4 parse errors under strict type inference (`:=`).
+
 ## 5.0.11 (2026-09-19)
+
 
 Lifecycle capability adoption reliability fix, single-editor auto-routing, and comprehensive 2D open-world, animation, and tileset authoring tools.
 
