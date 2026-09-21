@@ -5,6 +5,50 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.22 (2026-09-21)
+
+Paths and curves spline automation, procedural 3D mesh synthesis and deformation, WorldEnvironment lighting and post-processing, skeletal rigging and ragdoll scaffolding, cryptography and secure hashing, and editor plugin lifecycle management: Curve2D/Curve3D and spline generation in path_manage, SurfaceTool and MeshDataTool procedural meshes in mesh_manage, post-processing and visual presets in rendering_manage, bone poses and ragdolls in skeleton_manage, secure hashing and TLS certificates in crypto_manage, and addon discovery and EditorPlugin scaffolding in plugin_manage.
+
+### Added
+
+- **Paths and Curve Spline Automation (`path_manage`)**:
+  - Introduced `path_manage` tool and `PathHandler` for programmatic curve and spline workflows.
+  - `create_curve_2d` / `create_curve_3d`: Construct Curve2D or Curve3D resources with Bezier control points and optional file persistence.
+  - `scaffold_path`: Instantiate Path2D or Path3D nodes with optional PathFollow child, configuring progress, loop, and rotation flags.
+  - `sample_baked_points`: Sample baked positions, lengths, and intervals along paths for precision AI navigation, camera rails, or projectile paths.
+  - `generate_spline`: Procedurally generate common spline shapes (circle loop, S-curve, sine wave, rectangular patrol route, spiral).
+- **Procedural 3D Mesh Synthesis and Manipulation (`mesh_manage`)**:
+  - Introduced `mesh_manage` tool and `MeshHandler` interfacing with SurfaceTool, MeshDataTool, and PrimitiveMesh.
+  - `generate_surface_mesh`: Construct custom ArrayMesh geometry via SurfaceTool with vertices, normals, UVs, vertex colors, indices, and automatic normal/tangent calculation.
+  - `deform_mesh`: Inspect and transform existing mesh vertices via MeshDataTool, applying height displacement, tapering, or axis scaling, and re-committing to ArrayMesh.
+  - `create_primitive`: Generate parameterized PrimitiveMesh resources (BoxMesh, SphereMesh, CylinderMesh, CapsuleMesh, TorusMesh, PlaneMesh, PrismMesh) with custom subdivisions and materials.
+  - `get_mesh_info`: Inspect mesh surface count, vertex count, face count, and AABB bounds.
+- **World Environment and Lighting Post-Processing (`rendering_manage`)**:
+  - Introduced `rendering_manage` tool and `RenderingHandler` managing environments and post-processing.
+  - `scaffold_world_environment`: Create WorldEnvironment nodes with procedural/physical skies, ambient lighting, and tonemapping modes.
+  - `set_environment_effects`: Configure Glow/Bloom, SSR, SSAO, SSIL, SDFGI, and Volumetric Fog.
+  - `set_camera_attributes`: Configure CameraAttributesPractical / CameraAttributesPhysical (Auto Exposure, Depth of Field near/far blur).
+  - `apply_lighting_preset`: Apply curated visual presets ("outdoor_sunny", "dungeon_dark", "scifi_cyberpunk", "retro_pixel", "cinematic_moody").
+  - `get_environment_info`: Query current active environment properties, background mode, and active post-processing toggles.
+- **Skeletal Rigging, Sockets, and Ragdolls (`skeleton_manage`)**:
+  - Introduced `skeleton_manage` tool and `SkeletonHandler` connecting to Skeleton3D systems.
+  - `get_skeleton_info`: Inspect bone hierarchy, bone names, parent indices, rest transforms, and current pose transforms.
+  - `set_bone_pose`: Modify position, rotation (quaternion or euler), or scale for specific bones.
+  - `scaffold_bone_attachment`: Instantiate BoneAttachment3D nodes linked to designated bones for equipment and weapon sockets.
+  - `scaffold_ragdoll`: Automatically generate PhysicalBone3D hierarchies and collision shapes for a Skeleton3D.
+- **Cryptography and Secure Hashing (`crypto_manage`)**:
+  - Introduced `crypto_manage` tool and `CryptoHandler` integrating Godot's Crypto singleton and HashingContext.
+  - `hash_file` / `hash_string`: Compute SHA-256, SHA-1, or MD5 checksums of files or string payloads.
+  - `generate_random_bytes`: Generate cryptographically secure random bytes or hex tokens.
+  - `generate_rsa_key`: Generate RSA key pairs for asymmetric encryption and signing.
+  - `generate_self_signed_cert`: Generate self-signed X509 certificates for local HTTPS, WSS, or multiplayer authentication.
+  - `hmac_digest`: Compute HMAC authentication digests.
+- **Editor Plugin and Addon Lifecycle (`plugin_manage`)**:
+  - Introduced `plugin_manage` tool and `PluginHandler` managing project addons.
+  - `list_plugins`: Scan res://addons/ for all plugin.cfg descriptors and report name, description, author, version, script, and enabled state.
+  - `set_plugin_enabled`: Enable or disable an addon in editor_plugins/enabled within ProjectSettings.
+  - `scaffold_plugin`: Generate complete boilerplate for a new custom EditorPlugin (manifest plugin.cfg, main plugin script with _enter_tree / _exit_tree, and dock UI scaffolding).
+
 ## 5.0.21 (2026-09-21)
 
 DisplayServer and Window management, background threaded resource loading, GPU compute shaders, project export automation, OpenXR AR/VR rigging, and editor undo/redo transactions: DisplayServer geometry and sub-window scaffolding in display_manage, background resource streaming and loading screens in loader_manage, RenderingDevice compute shader dispatch in compute_manage, export preset inspection and automated builds in export_manage, OpenXR rigging and tracking in xr_manage, and EditorUndoRedoManager history introspection in undo_redo_manage.

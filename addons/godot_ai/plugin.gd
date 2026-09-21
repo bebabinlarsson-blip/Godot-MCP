@@ -413,6 +413,12 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy_handler("export", HANDLERS_DIR + "export_handler.gd", [undo, _connection])
 	_dispatcher.register_lazy_handler("xr", HANDLERS_DIR + "xr_handler.gd", [undo, _connection])
 	_dispatcher.register_lazy_handler("undo_redo", HANDLERS_DIR + "undo_redo_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("path", HANDLERS_DIR + "path_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("mesh", HANDLERS_DIR + "mesh_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("rendering", HANDLERS_DIR + "rendering_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("skeleton", HANDLERS_DIR + "skeleton_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("crypto", HANDLERS_DIR + "crypto_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("plugin", HANDLERS_DIR + "plugin_handler.gd", [undo, _connection])
 
 	_dispatcher.register_lazy("get_editor_state", "editor", &"get_editor_state")
 	_dispatcher.register_lazy("get_scene_tree", "scene", &"get_scene_tree")
@@ -727,6 +733,39 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy("undo_redo_get_history", "undo_redo", &"get_history")
 	_dispatcher.register_lazy("undo_redo_undo", "undo_redo", &"undo")
 	_dispatcher.register_lazy("undo_redo_redo", "undo_redo", &"redo")
+
+	_dispatcher.register_lazy("path_create_curve_2d", "path", &"create_curve_2d")
+	_dispatcher.register_lazy("path_create_curve_3d", "path", &"create_curve_3d")
+	_dispatcher.register_lazy("path_scaffold_path", "path", &"scaffold_path")
+	_dispatcher.register_lazy("path_sample_baked_points", "path", &"sample_baked_points")
+	_dispatcher.register_lazy("path_generate_spline", "path", &"generate_spline")
+
+	_dispatcher.register_lazy("mesh_generate_surface_mesh", "mesh", &"generate_surface_mesh")
+	_dispatcher.register_lazy("mesh_deform_mesh", "mesh", &"deform_mesh")
+	_dispatcher.register_lazy("mesh_create_primitive", "mesh", &"create_primitive")
+	_dispatcher.register_lazy("mesh_get_mesh_info", "mesh", &"get_mesh_info")
+
+	_dispatcher.register_lazy("rendering_scaffold_world_environment", "rendering", &"scaffold_world_environment")
+	_dispatcher.register_lazy("rendering_set_environment_effects", "rendering", &"set_environment_effects")
+	_dispatcher.register_lazy("rendering_set_camera_attributes", "rendering", &"set_camera_attributes")
+	_dispatcher.register_lazy("rendering_apply_lighting_preset", "rendering", &"apply_lighting_preset")
+	_dispatcher.register_lazy("rendering_get_environment_info", "rendering", &"get_environment_info")
+
+	_dispatcher.register_lazy("skeleton_get_skeleton_info", "skeleton", &"get_skeleton_info")
+	_dispatcher.register_lazy("skeleton_set_bone_pose", "skeleton", &"set_bone_pose")
+	_dispatcher.register_lazy("skeleton_scaffold_bone_attachment", "skeleton", &"scaffold_bone_attachment")
+	_dispatcher.register_lazy("skeleton_scaffold_ragdoll", "skeleton", &"scaffold_ragdoll")
+
+	_dispatcher.register_lazy("crypto_hash_file", "crypto", &"hash_file")
+	_dispatcher.register_lazy("crypto_hash_string", "crypto", &"hash_string")
+	_dispatcher.register_lazy("crypto_generate_random_bytes", "crypto", &"generate_random_bytes")
+	_dispatcher.register_lazy("crypto_generate_rsa_key", "crypto", &"generate_rsa_key")
+	_dispatcher.register_lazy("crypto_generate_self_signed_cert", "crypto", &"generate_self_signed_cert")
+	_dispatcher.register_lazy("crypto_hmac_digest", "crypto", &"hmac_digest")
+
+	_dispatcher.register_lazy("plugin_list_plugins", "plugin", &"list_plugins")
+	_dispatcher.register_lazy("plugin_set_plugin_enabled", "plugin", &"set_plugin_enabled")
+	_dispatcher.register_lazy("plugin_scaffold_plugin", "plugin", &"scaffold_plugin")
 
 	_connection.dispatcher = _dispatcher
 	add_child(_connection)

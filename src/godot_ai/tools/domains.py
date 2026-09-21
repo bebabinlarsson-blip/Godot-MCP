@@ -74,6 +74,12 @@ DOMAINS: tuple[str, ...] = (
     "export",
     "xr",
     "undo_redo",
+    "path",
+    "mesh",
+    "rendering",
+    "skeleton",
+    "crypto",
+    "plugin",
 )
 
 ## Domains that contain at least one core (always-loaded) tool. When the

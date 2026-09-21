@@ -82,6 +82,7 @@ from godot_ai.tools.camera import register_camera_tools
 from godot_ai.tools.character import register_character_tools
 from godot_ai.tools.client import register_client_tools
 from godot_ai.tools.compute import register_compute_tools
+from godot_ai.tools.crypto import register_crypto_tools
 from godot_ai.tools.csg import register_csg_tools
 from godot_ai.tools.custom import register_custom_tools
 from godot_ai.tools.dialogue import register_dialogue_tools
@@ -98,14 +99,18 @@ from godot_ai.tools.input_map import register_input_map_tools
 from godot_ai.tools.loader import register_loader_tools
 from godot_ai.tools.localization import register_localization_tools
 from godot_ai.tools.material import register_material_tools
+from godot_ai.tools.mesh import register_mesh_tools
 from godot_ai.tools.multiplayer import register_multiplayer_tools
 from godot_ai.tools.navigation import register_navigation_tools
 from godot_ai.tools.node import register_node_tools
 from godot_ai.tools.omni import register_omni_tools
 from godot_ai.tools.particle import register_particle_tools
+from godot_ai.tools.path import register_path_tools
 from godot_ai.tools.physics import register_physics_tools
+from godot_ai.tools.plugin import register_plugin_tools
 from godot_ai.tools.profiler import register_profiler_tools
 from godot_ai.tools.project import register_project_tools
+from godot_ai.tools.rendering import register_rendering_tools
 from godot_ai.tools.resource import register_resource_tools
 from godot_ai.tools.save import register_save_tools
 from godot_ai.tools.scene import register_scene_tools
@@ -113,6 +118,7 @@ from godot_ai.tools.script import register_script_tools
 from godot_ai.tools.session import register_session_tools
 from godot_ai.tools.shader import register_shader_tools
 from godot_ai.tools.signal import register_signal_tools
+from godot_ai.tools.skeleton import register_skeleton_tools
 from godot_ai.tools.testing import register_testing_tools
 from godot_ai.tools.theme import register_theme_tools
 from godot_ai.tools.tilemap import register_tilemap_tools
@@ -421,6 +427,37 @@ _ROLLUP_BLOCKS: tuple[tuple[str | None, str], ...] = (
     (
         "undo_redo",
         "  undo_redo_manage get_history, undo, redo\n",
+    ),
+    (
+        "path",
+        "  path_manage      create_curve_2d, create_curve_3d, scaffold_path,\n"
+        "                   sample_baked_points, generate_spline\n",
+    ),
+    (
+        "mesh",
+        "  mesh_manage      generate_surface_mesh, deform_mesh, create_primitive,\n"
+        "                   get_mesh_info\n",
+    ),
+    (
+        "rendering",
+        "  rendering_manage scaffold_world_environment, set_environment_effects,\n"
+        "                   set_camera_attributes, apply_lighting_preset,\n"
+        "                   get_environment_info\n",
+    ),
+    (
+        "skeleton",
+        "  skeleton_manage  get_skeleton_info, set_bone_pose,\n"
+        "                   scaffold_bone_attachment, scaffold_ragdoll\n",
+    ),
+    (
+        "crypto",
+        "  crypto_manage    hash_file, hash_string, generate_random_bytes,\n"
+        "                   generate_rsa_key, generate_self_signed_cert,\n"
+        "                   hmac_digest\n",
+    ),
+    (
+        "plugin",
+        "  plugin_manage    list_plugins, set_plugin_enabled, scaffold_plugin\n",
     ),
 )
 
@@ -1051,6 +1088,18 @@ def create_server(
         register_xr_tools(mcp)
     if "undo_redo" not in exclude:
         register_undo_redo_tools(mcp)
+    if "path" not in exclude:
+        register_path_tools(mcp)
+    if "mesh" not in exclude:
+        register_mesh_tools(mcp)
+    if "rendering" not in exclude:
+        register_rendering_tools(mcp)
+    if "skeleton" not in exclude:
+        register_skeleton_tools(mcp)
+    if "crypto" not in exclude:
+        register_crypto_tools(mcp)
+    if "plugin" not in exclude:
+        register_plugin_tools(mcp)
 
 
     register_session_resources(mcp)
