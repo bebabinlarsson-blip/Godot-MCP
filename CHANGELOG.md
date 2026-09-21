@@ -5,6 +5,31 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.18 (2026-09-21)
+
+Universal Godot engine access, reflection, and total automation expansion: Universal engine control and arbitrary GDScript evaluation in the editor process via omni_manage, complete visual shader synthesis with production game presets via shader_manage, direct space-state physics queries and sensor scaffolding via physics_manage, editor-process GDScript evaluation in editor_manage, and universal node method invocation in node_manage.
+
+### Added
+
+- **Universal Godot Control and Reflection Domain (`omni_manage`)**:
+  - Full server wiring and dispatch for `omni_manage` supporting universal engine control across the entire C++ ClassDB, engine singletons, editor UI, and runtime.
+  - Operations include `eval` (arbitrary GDScript execution with full EditorInterface permissions), `call` (invoke any method on any Node, Resource, Singleton, or RefCounted object with arbitrary arguments), `get` (read any property), `set` (write any property), `inspect` (full inspection of methods, properties, and signals), `instantiate` (instantiate any engine class or script), `ui_tree` (hierarchical semantic editor UI control tree), `ui_click` (simulate click on editor controls), `ui_type` (type text into editor text inputs), `instantiate_prefab` (instantiate scene prefabs), `shader_create`, `mesh_primitive`, `collision_shape`, `preset_motion`, and `ping`.
+  - Enhanced object resolution supporting scene-root relative node paths, EditorInterface, engine singletons, res:// resources, and object instance IDs.
+- **Shader System and Visual Effect Management (`shader_manage`)**:
+  - Introduced `shader_manage` tool and `ShaderHandler` supporting programmatic shader creation, compilation, uniform parameter tuning, and production shader presets.
+  - Shader presets include `outline_2d` (sprite border outline with width and color), `hit_flash` (damage flash with color and modifier), `dissolve_2d` (noise-based burning dissolve with glowing edge border), `water_2d` (wave distortion and reflection), `foliage_wind` (vertex-displacement wind sway), `crt_scanline` (retro CRT curvature, scanlines, and vignette), and `hologram_glitch` (holographic scanline glitch).
+  - Operations include `create`, `apply_preset`, `set_param`, and `get_params`.
+- **Physics Queries and Sensor Scaffolding (`physics_manage`)**:
+  - Introduced `physics_manage` tool and `PhysicsHandler` providing direct space-state raycasting, collision queries, and sensor generation.
+  - `raycast_2d`: Performs 2D direct raycasts via PhysicsServer2D space state returning hit status, collision position, surface normal, collider node path, and shape.
+  - `raycast_3d`: Performs 3D direct raycasts via PhysicsServer3D space state returning hit status, collision position, surface normal, collider node path, and shape.
+  - `query_point_2d`: Queries physics bodies and areas intersecting a given 2D world coordinate.
+  - `scaffold_sensor`: Instantiates and attaches RayCast2D or RayCast3D sensor nodes with target positions, collision masks, and auto-wiring.
+- **Editor-Process Script Evaluation (`editor_manage`)**:
+  - Added `eval` and `execute_script` operations to `editor_manage` allowing execution of GDScript code expressions and script files directly in the editor process context.
+- **Universal Node Method Invocation (`node_manage`)**:
+  - Added `call_method` operation to `node_manage` allowing invocation of any method on any node in the active scene tree with arbitrary arguments.
+
 ## 5.0.17 (2026-09-21)
 
 Autonomous game systems and persistence expansion: Dialogue and branching narrative system scaffolding with typewriter effects, corruption-resistant atomic save and load persistence with group-based state serialization, modular node-based finite state machines with character and enemy AI presets, single-call UI theme presets across classic and modern aesthetics, multi-channel sound effect manager with audio player pooling, and test instructions parity hardening.

@@ -104,5 +104,9 @@ def register_game_tools(mcp: FastMCP) -> None:
             "input_action": None,
             "input_sequence": None,
             "input_state": None,
+            "simulate_input": None,
+            "simulate": None,
+            "run_playtest_suite": None,
+            "playtest": None,
         },
     )

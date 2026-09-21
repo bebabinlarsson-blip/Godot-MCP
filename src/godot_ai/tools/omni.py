@@ -1,12 +1,10 @@
-"""MCP tools for Godot Omni: Arbitrary GDScript evaluation, Reflection, and UI Automation."""
+"""MCP tool for Godot Omni: Universal engine access, reflection, and UI automation."""
 
 from __future__ import annotations
 
-from fastmcp import Context, FastMCP
+from fastmcp import FastMCP
 
 from godot_ai.handlers import omni as omni_handlers
-from godot_ai.runtime.direct import DirectRuntime
-from godot_ai.tools import DEFER_META
 from godot_ai.tools._meta_tool import register_manage_tool
 
 _OMNI_MANAGE_DESCRIPTION = """\
@@ -50,98 +48,9 @@ Ops:
 
 
 def register_omni_tools(mcp: FastMCP) -> None:
-    @mcp.tool(meta=DEFER_META)
-    async def omni_eval(
-        ctx: Context,
-        code: str,
-        mode: str = "auto",
-        session_id: str = "",
-    ) -> dict:
-        """Execute arbitrary GDScript code in the Godot editor process.
-
-        Gives the AI direct, omnipotent execution capability within Godot:
-        access EditorInterface, ProjectSettings, singletons, ClassDB, create nodes,
-        instantiate resources, or manipulate scenes on the fly.
-
-        Args:
-            code: GDScript code to execute (e.g.
-                'EditorInterface.get_editor_settings().get_setting(...)').
-            mode: 'auto', 'expression', or 'block'.
-            session_id: Optional session ID to target.
-        """
-        runtime = DirectRuntime.from_context(ctx, session_id=session_id or None)
-        return await omni_handlers.omni_eval(runtime, code=code, mode=mode)
-
-    @mcp.tool(meta=DEFER_META)
-    async def scene_instantiate_prefab(
-        ctx: Context,
-        scene_path: str,
-        parent_path: str = "",
-        node_name: str = "",
-        position: list[float] | None = None,
-        session_id: str = "",
-    ) -> dict:
-        """Instantiate a .tscn scene file directly into the active scene hierarchy."""
-        runtime = DirectRuntime.from_context(ctx, session_id=session_id or None)
-        return await omni_handlers.scene_instantiate_prefab(
-            runtime,
-            scene_path=scene_path,
-            parent_path=parent_path,
-            node_name=node_name,
-            position=position,
-        )
-
-    @mcp.tool(meta=DEFER_META)
-    async def mesh_create_primitive(
-        ctx: Context,
-        primitive_type: str = "box",
-        node_name: str = "",
-        parent_path: str = "",
-        size: list[float] | None = None,
-        albedo_color: list[float] | None = None,
-        position: list[float] | None = None,
-        session_id: str = "",
-    ) -> dict:
-        """Create a 3D PrimitiveMesh (box, sphere, cylinder, plane, capsule, prism)."""
-        runtime = DirectRuntime.from_context(ctx, session_id=session_id or None)
-        return await omni_handlers.mesh_create_primitive(
-            runtime,
-            primitive_type=primitive_type,
-            node_name=node_name,
-            parent_path=parent_path,
-            size=size,
-            albedo_color=albedo_color,
-            position=position,
-        )
-
-    @mcp.tool(meta=DEFER_META)
-    async def collision_shape_create(
-        ctx: Context,
-        parent_path: str,
-        shape_type: str = "box",
-        is_2d: bool = True,
-        size: list[float] | None = None,
-        radius: float = 16.0,
-        height: float = 32.0,
-        node_name: str = "CollisionShape",
-        session_id: str = "",
-    ) -> dict:
-        """Create and attach a 2D or 3D CollisionShape with geometry to a physics body."""
-        runtime = DirectRuntime.from_context(ctx, session_id=session_id or None)
-        return await omni_handlers.collision_shape_create(
-            runtime,
-            parent_path=parent_path,
-            shape_type=shape_type,
-            is_2d=is_2d,
-            size=size,
-            radius=radius,
-            height=height,
-            node_name=node_name,
-        )
-
     register_manage_tool(
         mcp,
-        domain="omni",
+        tool_name="omni_manage",
         description=_OMNI_MANAGE_DESCRIPTION,
         ops={
             "eval": omni_handlers.omni_eval,
@@ -159,5 +68,11 @@ def register_omni_tools(mcp: FastMCP) -> None:
             "collision_shape": omni_handlers.collision_shape_create,
             "preset_motion": omni_handlers.animation_preset_motion,
             "ping": omni_handlers.mcp_ping,
+        },
+        read_resource_forms={
+            "get": None,
+            "inspect": None,
+            "ui_tree": None,
+            "ping": None,
         },
     )

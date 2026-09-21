@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from godot_ai.handlers._readiness import require_writable_async
 from godot_ai.runtime.direct import DirectRuntime
 
 
@@ -14,6 +15,7 @@ async def omni_eval(
     inputs: dict[str, Any] | None = None,
 ) -> dict:
     """Execute arbitrary GDScript code in the Godot editor process."""
+    await require_writable_async(runtime)
     return await runtime.send_command(
         "omni_eval",
         {
@@ -32,6 +34,7 @@ async def omni_execute_script(
     inputs: dict[str, Any] | None = None,
 ) -> dict:
     """Execute a script file or inline GDScript code."""
+    await require_writable_async(runtime)
     return await runtime.send_command(
         "omni_execute_script",
         {
@@ -43,6 +46,7 @@ async def omni_execute_script(
     )
 
 
+
 async def reflection_call(
     runtime: DirectRuntime,
     target: Any,
@@ -50,6 +54,7 @@ async def reflection_call(
     args: list[Any] | None = None,
 ) -> dict:
     """Call any method on any Godot Object (Node, Resource, Singleton, RefCounted)."""
+    await require_writable_async(runtime)
     return await runtime.send_command(
         "reflection_call",
         {
@@ -84,6 +89,7 @@ async def reflection_set(
     value: Any,
 ) -> dict:
     """Write any property on any Godot Object."""
+    await require_writable_async(runtime)
     return await runtime.send_command(
         "reflection_set",
         {
@@ -115,6 +121,7 @@ async def reflection_instantiate(
     script_path: str = "",
 ) -> dict:
     """Instantiate any Godot engine ClassDB class or custom script."""
+    await require_writable_async(runtime)
     return await runtime.send_command(
         "reflection_instantiate",
         {
@@ -123,6 +130,7 @@ async def reflection_instantiate(
         },
         timeout=10.0,
     )
+
 
 
 async def ui_semantic_tree(
@@ -145,6 +153,7 @@ async def ui_click_control(
     path: str = "",
 ) -> dict:
     """Simulate mouse click on any editor button, tab, checkbox, or menu."""
+    await require_writable_async(runtime)
     return await runtime.send_command(
         "ui_click_control",
         {
@@ -161,6 +170,7 @@ async def ui_type_text(
     target: str = "",
 ) -> dict:
     """Type text into any editor LineEdit or TextEdit."""
+    await require_writable_async(runtime)
     return await runtime.send_command(
         "ui_type_text",
         {
@@ -179,6 +189,7 @@ async def scene_instantiate_prefab(
     position: list[float] | None = None,
 ) -> dict:
     """Instantiate a .tscn scene file into the current active scene hierarchy."""
+    await require_writable_async(runtime)
     return await runtime.send_command(
         "scene_instantiate_prefab",
         {
@@ -199,6 +210,7 @@ async def shader_create(
     target_node_path: str = "",
 ) -> dict:
     """Create a new Shader (.gdshader) and optionally assign it as a ShaderMaterial to a node."""
+    await require_writable_async(runtime)
     return await runtime.send_command(
         "shader_create",
         {
@@ -221,6 +233,7 @@ async def mesh_create_primitive(
     position: list[float] | None = None,
 ) -> dict:
     """Create a 3D PrimitiveMesh (box, sphere, cylinder, plane, capsule, prism)."""
+    await require_writable_async(runtime)
     return await runtime.send_command(
         "mesh_create_primitive",
         {
@@ -246,6 +259,7 @@ async def collision_shape_create(
     node_name: str = "CollisionShape",
 ) -> dict:
     """Create and attach a 2D or 3D CollisionShape with predefined geometry to a physics body."""
+    await require_writable_async(runtime)
     return await runtime.send_command(
         "collision_shape_create",
         {
@@ -271,6 +285,7 @@ async def animation_preset_motion(
     loop: bool = True,
 ) -> dict:
     """Generate procedural motion presets (pulse, fade_in, fade_out, slide_in)."""
+    await require_writable_async(runtime)
     return await runtime.send_command(
         "animation_preset_motion",
         {
@@ -283,6 +298,7 @@ async def animation_preset_motion(
         },
         timeout=15.0,
     )
+
 
 
 async def mcp_ping(

@@ -6,6 +6,7 @@ import asyncio
 import base64
 import json
 import logging
+from typing import Any
 
 from mcp.types import TextContent
 
@@ -457,3 +458,42 @@ async def game_eval(runtime: DirectRuntime, code: str) -> dict:
     before retrying an ``EVAL_GAME_NOT_READY`` response.
     """
     return await runtime.send_command("game_eval", {"code": code}, timeout=15.0)
+
+
+async def editor_eval(
+    runtime: DirectRuntime,
+    code: str,
+    mode: str = "auto",
+    inputs: dict[str, Any] | None = None,
+) -> dict:
+    """Execute arbitrary GDScript code in the Godot editor process."""
+    await require_writable_async(runtime)
+    return await runtime.send_command(
+        "editor_eval",
+        {
+            "code": code,
+            "mode": mode,
+            "inputs": inputs or {},
+        },
+        timeout=30.0,
+    )
+
+
+async def editor_execute_script(
+    runtime: DirectRuntime,
+    code: str = "",
+    path: str = "",
+    inputs: dict[str, Any] | None = None,
+) -> dict:
+    """Execute a script file or inline GDScript code in the Godot editor process."""
+    await require_writable_async(runtime)
+    return await runtime.send_command(
+        "editor_execute_script",
+        {
+            "code": code,
+            "path": path,
+            "inputs": inputs or {},
+        },
+        timeout=30.0,
+    )
+

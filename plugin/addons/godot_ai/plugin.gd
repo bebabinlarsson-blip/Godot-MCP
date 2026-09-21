@@ -399,6 +399,8 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy_handler("save", HANDLERS_DIR + "save_handler.gd", [undo, _connection])
 	_dispatcher.register_lazy_handler("fsm", HANDLERS_DIR + "fsm_handler.gd", [undo, _connection])
 	_dispatcher.register_lazy_handler("omni", HANDLERS_DIR + "omni_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("shader", HANDLERS_DIR + "shader_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("physics", HANDLERS_DIR + "physics_handler.gd", [undo, _connection])
 
 	_dispatcher.register_lazy("get_editor_state", "editor", &"get_editor_state")
 	_dispatcher.register_lazy("get_scene_tree", "scene", &"get_scene_tree")
@@ -629,6 +631,15 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy("animation_preset_motion", "omni", &"animation_preset_motion")
 	_dispatcher.register_lazy("mcp_ping", "omni", &"mcp_ping")
 	_dispatcher.register_lazy("ping", "omni", &"mcp_ping")
+	_dispatcher.register_lazy("editor_execute_script", "omni", &"omni_execute_script")
+	_dispatcher.register_lazy("node_call_method", "node", &"call_method")
+	_dispatcher.register_lazy("shader_apply_preset", "shader", &"apply_preset")
+	_dispatcher.register_lazy("shader_set_param", "shader", &"set_param")
+	_dispatcher.register_lazy("shader_get_params", "shader", &"get_params")
+	_dispatcher.register_lazy("physics_raycast_2d", "physics", &"raycast_2d")
+	_dispatcher.register_lazy("physics_raycast_3d", "physics", &"raycast_3d")
+	_dispatcher.register_lazy("physics_query_point_2d", "physics", &"query_point_2d")
+	_dispatcher.register_lazy("physics_scaffold_sensor", "physics", &"scaffold_sensor")
 
 	_connection.dispatcher = _dispatcher
 	add_child(_connection)

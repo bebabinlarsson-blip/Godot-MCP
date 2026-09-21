@@ -49,6 +49,8 @@ Ops:
         Scale a 2D or 3D node or Control. Undoable.
   • translate(path, offset, relative=true, scene_file="")
         Move / offset a node position. Undoable.
+  • call_method(path, method, args=[], scene_file="")
+        Call any method on a node with arguments.
 
 All write ops accept the optional ``scene_file`` guard — if non-empty, the
 mutation fails with EDITED_SCENE_MISMATCH when the editor's current scene
@@ -240,6 +242,7 @@ def register_node_tools(mcp: FastMCP, *, include_non_core: bool = True) -> None:
             "rotate": node_handlers.node_rotate,
             "scale": node_handlers.node_scale,
             "translate": node_handlers.node_translate,
+            "call_method": node_handlers.node_call_method,
             "instantiate_batch": scene_handlers.scene_instantiate_batch,
         },
         read_resource_forms={

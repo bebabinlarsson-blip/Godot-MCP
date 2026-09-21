@@ -341,12 +341,12 @@ func ui_type_text(params: Dictionary) -> Dictionary:
 func _resolve_object(target_ref: Variant) -> Object:
 	if target_ref is Object:
 		return target_ref if is_instance_valid(target_ref) else null
-	elif target_ref is int:
-		return instance_from_id(int(target_ref))
-	elif target_ref is float:
+	elif target_ref is int or target_ref is float:
 		return instance_from_id(int(target_ref))
 	elif target_ref is String:
 		var s := str(target_ref).strip_edges()
+		if s == "EditorInterface":
+			return EditorInterface
 		if s.begins_with("obj://"):
 			var parts := s.split("/")
 			if parts.size() >= 4:
@@ -355,9 +355,27 @@ func _resolve_object(target_ref: Variant) -> Object:
 			var tree := Engine.get_main_loop() as SceneTree
 			if tree and tree.root:
 				return tree.root.get_node_or_null(NodePath(s))
+		elif s.begins_with("res://"):
+			if ResourceLoader.exists(s):
+				return load(s)
 		elif Engine.has_singleton(s):
 			return Engine.get_singleton(s)
+		elif s.is_valid_int():
+			var id := s.to_int()
+			if id > 0:
+				var obj_by_id := instance_from_id(id)
+				if obj_by_id:
+					return obj_by_id
+
+		var scene_root: Node = EditorInterface.get_edited_scene_root()
+		if scene_root:
+			if s == scene_root.name or s == "":
+				return scene_root
+			var n := scene_root.get_node_or_null(NodePath(s))
+			if n:
+				return n
 	return null
+
 
 
 func _walk_ui(node: Node, depth: int, max_depth: int) -> Dictionary:

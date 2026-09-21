@@ -136,5 +136,7 @@ def register_scene_tools(mcp: FastMCP, *, include_non_core: bool = True) -> None
             ## `godot://scene/current` resource only exposes the active scene
             ## tree, so it isn't a substitute. No aggregate resource fits.
             "get_roots": None,
+            "diagnose": None,
         },
     )
+

@@ -214,3 +214,24 @@ async def node_translate(
         ),
     )
 
+
+async def node_call_method(
+    runtime: DirectRuntime,
+    path: str,
+    method: str,
+    args: list[Any] | None = None,
+    scene_file: str = "",
+) -> dict:
+    """Call any method on a node in the edited scene."""
+    await require_writable_async(runtime)
+    return await runtime.send_command(
+        "node_call_method",
+        _mutation_params(
+            scene_file,
+            path=path,
+            method=method,
+            args=args or [],
+        ),
+    )
+
+

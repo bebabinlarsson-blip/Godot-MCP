@@ -94,13 +94,16 @@ from godot_ai.tools.input_map import register_input_map_tools
 from godot_ai.tools.material import register_material_tools
 from godot_ai.tools.navigation import register_navigation_tools
 from godot_ai.tools.node import register_node_tools
+from godot_ai.tools.omni import register_omni_tools
 from godot_ai.tools.particle import register_particle_tools
+from godot_ai.tools.physics import register_physics_tools
 from godot_ai.tools.project import register_project_tools
 from godot_ai.tools.resource import register_resource_tools
 from godot_ai.tools.save import register_save_tools
 from godot_ai.tools.scene import register_scene_tools
 from godot_ai.tools.script import register_script_tools
 from godot_ai.tools.session import register_session_tools
+from godot_ai.tools.shader import register_shader_tools
 from godot_ai.tools.signal import register_signal_tools
 from godot_ai.tools.testing import register_testing_tools
 from godot_ai.tools.theme import register_theme_tools
@@ -333,6 +336,18 @@ _ROLLUP_BLOCKS: tuple[tuple[str | None, str], ...] = (
         "                   setup_region_3d, attach_agent_3d, bake_3d\n",
     ),
     ("custom", "  custom_manage    list, invoke\n"),
+    (
+        "omni",
+        "  omni_manage      eval, call, get, set, inspect, instantiate, ui_tree,\n"
+        "                   ui_click, ui_type, instantiate_prefab, shader_create,\n"
+        "                   mesh_primitive, collision_shape, preset_motion, ping\n",
+    ),
+    ("shader", "  shader_manage    create, apply_preset, set_param, get_params\n"),
+    (
+        "physics",
+        "  physics_manage   raycast_2d, raycast_3d, query_point_2d,\n"
+        "                   scaffold_sensor\n",
+    ),
 )
 
 ## Resources are registered unconditionally (they never count against tool
@@ -932,6 +947,13 @@ def create_server(
         register_navigation_tools(mcp)
     if "custom" not in exclude:
         register_custom_tools(mcp)
+    if "omni" not in exclude:
+        register_omni_tools(mcp)
+    if "shader" not in exclude:
+        register_shader_tools(mcp)
+    if "physics" not in exclude:
+        register_physics_tools(mcp)
+
 
     register_session_resources(mcp)
     register_scene_resources(mcp)

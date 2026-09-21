@@ -37,6 +37,10 @@ Ops:
         clear_debugger_errors=True to also clear the Debugger dock's
         visible Errors-tab rows (user-facing UI, so opt-in only); the
         response then includes debugger_errors_cleared.
+  • eval(code, mode="auto", inputs={})
+        Execute arbitrary GDScript directly in the Godot Editor process with full permissions.
+  • execute_script(code="", path="", inputs={})
+        Execute a script file or inline GDScript code in the Godot Editor process.
   • game_eval(code)
         Execute GDScript in the running game with return values. Uses
         'await' so user code can await internally. Errors return fast and
@@ -291,6 +295,8 @@ def register_editor_tools(mcp: FastMCP, *, include_non_core: bool = True) -> Non
             "quit": editor_handlers.editor_quit,
             "logs_clear": editor_handlers.logs_clear,
             "game_eval": editor_handlers.game_eval,
+            "eval": editor_handlers.editor_eval,
+            "execute_script": editor_handlers.editor_execute_script,
         },
         read_resource_forms={
             "state": "godot://editor/state",

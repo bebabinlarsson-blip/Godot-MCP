@@ -59,6 +59,9 @@ DOMAINS: tuple[str, ...] = (
     "csg",
     "navigation",
     "custom",
+    "omni",
+    "shader",
+    "physics",
 )
 
 ## Domains that contain at least one core (always-loaded) tool. When the

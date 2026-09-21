@@ -1559,3 +1559,32 @@ func translate_node(params: Dictionary) -> Dictionary:
 		"undoable": true
 	}}
 
+
+func call_method(params: Dictionary) -> Dictionary:
+	var resolved := _resolve_node(params)
+	if resolved.has("error"):
+		return resolved
+	var node: Node = resolved.node
+	var method: StringName = StringName(params.get("method", ""))
+	var args: Array = params.get("args", [])
+
+	if str(method).is_empty():
+		return ErrorCodes.make(ErrorCodes.MISSING_REQUIRED_PARAM, "method parameter is required")
+
+	if not node.has_method(method):
+		return ErrorCodes.make(
+			ErrorCodes.VALUE_OUT_OF_RANGE,
+			"Method '%s' not found on node '%s' (%s)." % [method, resolved.path, node.get_class()]
+		)
+
+	var res: Variant = node.callv(method, args)
+	return {
+		"data": {
+			"path": resolved.path,
+			"method": str(method),
+			"result": res,
+			"type": type_string(typeof(res))
+		}
+	}
+
+
