@@ -42,6 +42,10 @@ Ops:
         Attach a declarative list of vector _draw() ops to a Control —
         radar sweeps, gauges, corner brackets, crosshairs, waveforms.
         Op kinds: line | rect | arc | circle | polyline | polygon | string.
+  • scaffold_screen(kind="main_menu", parent_path="", name="", title="", layer=10, buttons=None)
+        Instantly scaffold a complete, production-ready UI screen hierarchy under a
+        CanvasLayer with responsive anchors, panels, title headers, and buttons.
+        Supported kinds: main_menu | pause_menu | hud | game_over | dialog_box.
 """
 
 
@@ -55,5 +59,7 @@ def register_ui_tools(mcp: FastMCP) -> None:
             "set_text": ui_handlers.ui_set_text,
             "build_layout": ui_handlers.ui_build_layout,
             "draw_recipe": control_handlers.control_draw_recipe,
+            "scaffold_screen": ui_handlers.ui_scaffold_screen,
         },
     )
+

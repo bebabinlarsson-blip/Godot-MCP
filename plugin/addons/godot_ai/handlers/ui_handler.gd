@@ -523,3 +523,180 @@ static func _canvas_layer_overlay_hint(node_class: String) -> String:
 		+ "with anchor_preset=full_rect) as its child and apply theme / "
 		+ "anchor_preset to that overlay."
 	)
+
+
+# ============================================================================
+# scaffold_screen
+# ============================================================================
+
+func scaffold_screen(params: Dictionary) -> Dictionary:
+	var kind: String = params.get("kind", "main_menu").to_lower()
+	var parent_path: String = params.get("parent_path", "")
+	var screen_name: String = params.get("name", "")
+	var title: String = params.get("title", "")
+	var layer_num: int = int(params.get("layer", 10))
+	var buttons_param = params.get("buttons", null)
+
+	var buttons: Array[String] = []
+	if buttons_param is Array:
+		for b in buttons_param:
+			buttons.append(str(b))
+	elif buttons.is_empty():
+		match kind:
+			"main_menu":
+				buttons = ["Start Game", "Options", "Quit"]
+				if title.is_empty():
+					title = "My Game"
+			"pause_menu":
+				buttons = ["Resume", "Options", "Main Menu"]
+				if title.is_empty():
+					title = "Paused"
+			"game_over":
+				buttons = ["Try Again", "Main Menu"]
+				if title.is_empty():
+					title = "Game Over"
+			"dialog_box":
+				buttons = ["Continue"]
+				if title.is_empty():
+					title = "Message"
+			"hud":
+				buttons = []
+				if title.is_empty():
+					title = "HUD"
+
+	var scene_check := McpNodeValidator.require_scene_or_error()
+	if scene_check.has("error"):
+		return scene_check
+	var scene_root: Node = scene_check.scene_root
+
+	var parent: Node = scene_root
+	if not parent_path.is_empty():
+		var resolved := McpNodeValidator.resolve_or_error(parent_path, "parent_path")
+		if resolved.has("error"):
+			return resolved
+		parent = resolved.node
+
+	if screen_name.is_empty():
+		match kind:
+			"main_menu":
+				screen_name = "MainMenu"
+			"pause_menu":
+				screen_name = "PauseMenu"
+			"game_over":
+				screen_name = "GameOverScreen"
+			"dialog_box":
+				screen_name = "DialogBox"
+			"hud":
+				screen_name = "HUD"
+			_:
+				screen_name = "UIScreen"
+
+	var canvas_layer := CanvasLayer.new()
+	canvas_layer.name = screen_name
+	canvas_layer.layer = layer_num
+
+	var root_control := Control.new()
+	root_control.name = "RootOverlay"
+	root_control.set_anchors_preset(Control.PRESET_FULL_RECT)
+	canvas_layer.add_child(root_control)
+
+	var created_button_paths: Array[String] = []
+
+	if kind in ["pause_menu", "game_over", "dialog_box"]:
+		var backdrop := ColorRect.new()
+		backdrop.name = "Backdrop"
+		backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+		backdrop.color = Color(0.0, 0.0, 0.0, 0.55)
+		root_control.add_child(backdrop)
+
+	if kind == "hud":
+		var margin_top := MarginContainer.new()
+		margin_top.name = "TopBar"
+		margin_top.set_anchors_preset(Control.PRESET_TOP_WIDE)
+		margin_top.add_theme_constant_override("margin_left", 16)
+		margin_top.add_theme_constant_override("margin_right", 16)
+		margin_top.add_theme_constant_override("margin_top", 16)
+		root_control.add_child(margin_top)
+
+		var hbox := HBoxContainer.new()
+		hbox.name = "StatsBox"
+		margin_top.add_child(hbox)
+
+		var score_label := Label.new()
+		score_label.name = "ScoreLabel"
+		score_label.text = "Score: 0"
+		score_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		hbox.add_child(score_label)
+
+		var health_label := Label.new()
+		health_label.name = "HealthLabel"
+		health_label.text = "Health: 100"
+		hbox.add_child(health_label)
+	else:
+		var center := CenterContainer.new()
+		center.name = "CenterContainer"
+		center.set_anchors_preset(Control.PRESET_FULL_RECT)
+		root_control.add_child(center)
+
+		var panel := PanelContainer.new()
+		panel.name = "CardPanel"
+		center.add_child(panel)
+
+		var vbox := VBoxContainer.new()
+		vbox.name = "ContentBox"
+		vbox.add_theme_constant_override("separation", 10)
+		panel.add_child(vbox)
+
+		if not title.is_empty():
+			var title_lbl := Label.new()
+			title_lbl.name = "TitleLabel"
+			title_lbl.text = title
+			title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			title_lbl.add_theme_font_size_override("font_size", 24)
+			vbox.add_child(title_lbl)
+
+			var sep := HSeparator.new()
+			sep.name = "TitleSeparator"
+			vbox.add_child(sep)
+
+		for btn_text in buttons:
+			var btn := Button.new()
+			btn.name = btn_text.replace(" ", "") + "Button"
+			btn.text = btn_text
+			btn.custom_minimum_size = Vector2(160, 36)
+			vbox.add_child(btn)
+
+	# Commit to UndoRedo and assign owners recursively
+	_undo_redo.create_action("Scaffold UI Screen: %s" % screen_name)
+	_undo_redo.add_do_method(parent, "add_child", canvas_layer)
+	_undo_redo.add_do_reference(canvas_layer)
+	_undo_redo.add_undo_method(parent, "remove_child", canvas_layer)
+	_undo_redo.commit_action()
+
+	# Set owners after add_child
+	_set_owner_recursive(canvas_layer, scene_root)
+
+	# Collect button paths
+	_collect_button_paths(canvas_layer, scene_root, created_button_paths)
+
+	return {
+		"root_path": McpScenePath.from_node(canvas_layer, scene_root),
+		"kind": kind,
+		"title": title,
+		"buttons": created_button_paths,
+	}
+
+
+static func _set_owner_recursive(node: Node, scene_root: Node) -> void:
+	if node != scene_root:
+		node.owner = scene_root
+	for child in node.get_children():
+		_set_owner_recursive(child, scene_root)
+
+
+static func _collect_button_paths(node: Node, scene_root: Node, out: Array[String]) -> void:
+	if node is Button:
+		out.append(McpScenePath.from_node(node, scene_root))
+	for child in node.get_children():
+		_collect_button_paths(child, scene_root, out)
+

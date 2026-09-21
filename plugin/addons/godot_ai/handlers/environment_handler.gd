@@ -179,3 +179,159 @@ func _save_environment(env: Environment, _sky: Sky, _sky_material: ProceduralSky
 	return McpResourceIO.save_to_disk(env, resource_path, overwrite, "Environment", {
 		"preset": preset,
 	}, _connection)
+
+
+func setup_environment_3d(params: Dictionary) -> Dictionary:
+	var scene_check := McpNodeValidator.require_scene_or_error()
+	if scene_check.has("error"):
+		return scene_check
+	var scene_root: Node = scene_check.scene_root
+
+	var parent_path: String = params.get("parent_path", "")
+	var parent: Node = scene_root
+	if not parent_path.is_empty():
+		var resolved := McpNodeValidator.resolve_or_error(parent_path, "parent_path")
+		if resolved.has("error"):
+			return resolved
+		parent = resolved.node
+
+	var preset: String = params.get("preset", "daylight").to_lower()
+	var create_sun: bool = bool(params.get("create_sun", true))
+	var volumetric_fog: bool = bool(params.get("volumetric_fog", false))
+	var glow: bool = bool(params.get("glow", false))
+
+	var world_env: WorldEnvironment = null
+	for child in parent.get_children():
+		if child is WorldEnvironment:
+			world_env = child
+			break
+
+	var created_env_node := false
+	if world_env == null:
+		world_env = WorldEnvironment.new()
+		world_env.name = "WorldEnvironment"
+		created_env_node = true
+
+	var env := Environment.new()
+	var sky := Sky.new()
+	var sky_mat := ProceduralSkyMaterial.new()
+	sky.sky_material = sky_mat
+
+	var sun_color := Color(1.0, 0.98, 0.92)
+	var sun_energy := 1.0
+	var sun_rotation := Vector3(-0.785398, 0.523599, 0.0)
+	var sun_shadows := true
+
+	match preset:
+		"daylight":
+			env.background_mode = Environment.BG_SKY
+			env.sky = sky
+			sky_mat.sky_top_color = Color(0.38, 0.45, 0.55)
+			sky_mat.sky_horizon_color = Color(0.65, 0.67, 0.7)
+			sky_mat.ground_bottom_color = Color(0.2, 0.17, 0.13)
+			env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+			env.ambient_light_energy = 1.0
+			env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+			sun_color = Color(1.0, 0.96, 0.9)
+			sun_energy = 1.2
+			sun_rotation = Vector3(-0.785398, 0.523599, 0.0)
+		"sunset":
+			env.background_mode = Environment.BG_SKY
+			env.sky = sky
+			sky_mat.sky_top_color = Color(0.25, 0.3, 0.55)
+			sky_mat.sky_horizon_color = Color(1.0, 0.55, 0.3)
+			sky_mat.ground_horizon_color = Color(0.85, 0.4, 0.25)
+			sky_mat.ground_bottom_color = Color(0.2, 0.12, 0.1)
+			env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+			env.ambient_light_color = Color(1.0, 0.75, 0.55)
+			env.ambient_light_energy = 0.8
+			env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+			sun_color = Color(1.0, 0.65, 0.35)
+			sun_energy = 1.5
+			sun_rotation = Vector3(-0.261799, -1.0472, 0.0)
+			volumetric_fog = true
+		"dark_dungeon":
+			env.background_mode = Environment.BG_CLEAR_COLOR
+			env.background_color = Color(0.015, 0.015, 0.02)
+			env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+			env.ambient_light_color = Color(0.08, 0.08, 0.12)
+			env.ambient_light_energy = 0.3
+			env.tonemap_mode = Environment.TONE_MAPPER_ACES
+			sun_color = Color(0.4, 0.45, 0.6)
+			sun_energy = 0.2
+			sun_rotation = Vector3(-1.0, 0.0, 0.0)
+			volumetric_fog = true
+		"neon_night":
+			env.background_mode = Environment.BG_CLEAR_COLOR
+			env.background_color = Color(0.02, 0.01, 0.04)
+			env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+			env.ambient_light_color = Color(0.15, 0.08, 0.25)
+			env.ambient_light_energy = 0.5
+			env.glow_enabled = true
+			env.glow_bloom = 0.25
+			env.glow_intensity = 0.8
+			env.tonemap_mode = Environment.TONE_MAPPER_ACES
+			sun_color = Color(0.3, 0.2, 0.5)
+			sun_energy = 0.3
+			sun_rotation = Vector3(-1.2, 0.4, 0.0)
+			glow = true
+		_:
+			env.background_mode = Environment.BG_SKY
+			env.sky = sky
+			env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+			env.ambient_light_energy = 1.0
+
+	if volumetric_fog:
+		env.volumetric_fog_enabled = true
+		env.volumetric_fog_density = 0.02
+
+	if glow:
+		env.glow_enabled = true
+
+	world_env.environment = env
+
+	var dir_light: DirectionalLight3D = null
+	if create_sun:
+		for child in parent.get_children():
+			if child is DirectionalLight3D:
+				dir_light = child
+				break
+		if dir_light == null:
+			dir_light = DirectionalLight3D.new()
+			dir_light.name = "SunLight"
+
+		dir_light.light_color = sun_color
+		dir_light.light_energy = sun_energy
+		dir_light.rotation = sun_rotation
+		dir_light.shadow_enabled = sun_shadows
+
+	_undo_redo.create_action("Setup 3D Environment: %s" % preset)
+	if created_env_node:
+		_undo_redo.add_do_method(parent, "add_child", world_env)
+		_undo_redo.add_do_reference(world_env)
+		_undo_redo.add_undo_method(parent, "remove_child", world_env)
+	else:
+		_undo_redo.add_do_property(world_env, "environment", env)
+		_undo_redo.add_do_reference(env)
+
+	if create_sun and dir_light != null and dir_light.get_parent() == null:
+		_undo_redo.add_do_method(parent, "add_child", dir_light)
+		_undo_redo.add_do_reference(dir_light)
+		_undo_redo.add_undo_method(parent, "remove_child", dir_light)
+
+	_undo_redo.commit_action()
+
+	if created_env_node:
+		world_env.owner = scene_root
+	if create_sun and dir_light != null and dir_light.owner == null:
+		dir_light.owner = scene_root
+
+	return {
+		"world_environment": McpScenePath.from_node(world_env, scene_root),
+		"directional_light": McpScenePath.from_node(dir_light, scene_root) if dir_light != null else "",
+		"preset": preset,
+		"shadows_enabled": sun_shadows,
+		"volumetric_fog": volumetric_fog,
+		"glow": glow,
+	}
+

@@ -46,6 +46,12 @@ Ops:
         | night | fog. sky may be bool or a procedural sky dict such as
         {"sky_material": "procedural", "sky_top_color": "#0f172a"}.
         Either assign to a WorldEnvironment node or save .tres.
+  • environment_setup_3d(preset="daylight", parent_path="", create_sun=True,
+                          volumetric_fog=False, glow=False)
+        Scaffold complete 3D environment and lighting. Presets: daylight |
+        sunset | dark_dungeon | neon_night | clear. Auto-creates
+        WorldEnvironment and DirectionalLight3D with matching sky, lighting,
+        shadows, and tone mapping in a single undoable step.
   • physics_shape_autofit(path, source_path="", shape_type="")
         Size a CollisionShape2D/3D to a nearby visual's bounds. Searches
         direct siblings then parent-siblings (handles nested
@@ -97,6 +103,7 @@ def register_resource_tools(mcp: FastMCP) -> None:
             "move": resource_handlers.resource_move,
             "curve_set_points": curve_handlers.curve_set_points,
             "environment_create": environment_handlers.environment_create,
+            "environment_setup_3d": environment_handlers.environment_setup_3d,
             "physics_shape_autofit": physics_shape_handlers.physics_shape_autofit,
             "physics_shape_generate": physics_shape_handlers.physics_shape_generate,
             "gradient_texture_create": texture_handlers.gradient_texture_create,

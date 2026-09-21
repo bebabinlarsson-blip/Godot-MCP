@@ -47,8 +47,24 @@ func get_editor_state(_params: Dictionary) -> Dictionary:
 		"game_status": game_status,
 		"helper_live": bool(game_status.get("helper_live", false)),
 		"session_active": bool(game_status.get("session_active", false)),
+		"modal_dialog_active": _check_modal_dialog_active(),
 	}
 	return {"data": data}
+
+
+static func _check_modal_dialog_active() -> bool:
+	var base := EditorInterface.get_base_control()
+	if not base:
+		return false
+	var root_win: Window = base.get_window()
+	if not root_win:
+		return false
+	for child in root_win.get_children():
+		if child is Window and (child as Window).visible:
+			if child is AcceptDialog or child is Popup or (child as Window).exclusive:
+				return true
+	return false
+
 
 
 func get_selection(_params: Dictionary) -> Dictionary:

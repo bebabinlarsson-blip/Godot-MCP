@@ -26,3 +26,23 @@ async def environment_create(
     if sky is not None:
         params["sky"] = sky
     return await runtime.send_command("environment_create", params)
+
+
+async def environment_setup_3d(
+    runtime: DirectRuntime,
+    preset: str = "daylight",
+    parent_path: str = "",
+    create_sun: bool = True,
+    volumetric_fog: bool = False,
+    glow: bool = False,
+) -> dict:
+    await require_writable_async(runtime)
+    params: dict = {
+        "preset": preset,
+        "parent_path": parent_path,
+        "create_sun": create_sun,
+        "volumetric_fog": volumetric_fog,
+        "glow": glow,
+    }
+    return await runtime.send_command("environment_setup_3d", params)
+

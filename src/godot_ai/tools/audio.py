@@ -37,6 +37,11 @@ Ops:
         Stop editor preview playback. Not undoable.
   • list(root="res://", include_duration=True)
         Scan project for AudioStream resources (every subclass + .tres/.res).
+  • generate_procedural_sfx(preset="jump", dest_path="", duration=0.0, sample_rate=22050)
+        Synthesize a chiptune PCM .wav sound effect directly into res://.
+        Presets: jump | coin | laser | hit | explosion | powerup | step | click.
+  • scaffold_buses(volumes=None)
+        Configure standard Master, Music, SFX, and UI audio buses in AudioServer.
 """
 
 
@@ -52,6 +57,8 @@ def register_audio_tools(mcp: FastMCP) -> None:
             "play": audio_handlers.audio_play,
             "stop": audio_handlers.audio_stop,
             "list": audio_handlers.audio_list,
+            "generate_procedural_sfx": audio_handlers.audio_generate_procedural_sfx,
+            "scaffold_buses": audio_handlers.audio_scaffold_buses,
         },
         read_resource_forms={
             ## Audio reads are stateful and per-player; no aggregate resource.

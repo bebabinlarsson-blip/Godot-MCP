@@ -1129,3 +1129,94 @@ static func _property_type_map(obj: Object) -> Dictionary:
 	for prop in obj.get_property_list():
 		out[prop.name] = int(prop.get("type", TYPE_NIL))
 	return out
+
+
+func scaffold_follow_camera_2d(params: Dictionary) -> Dictionary:
+	var scene_check := McpNodeValidator.require_scene_or_error()
+	if scene_check.has("error"):
+		return scene_check
+	var scene_root: Node = scene_check.scene_root
+
+	var target_path: String = params.get("target_path", "")
+	var parent_path: String = params.get("parent_path", "")
+	var parent: Node = scene_root
+
+	if not target_path.is_empty():
+		var res_target := McpNodeValidator.resolve_or_error(target_path, "target_path")
+		if res_target.has("error"):
+			return res_target
+		parent = res_target.node
+	elif not parent_path.is_empty():
+		var res_parent := McpNodeValidator.resolve_or_error(parent_path, "parent_path")
+		if res_parent.has("error"):
+			return res_parent
+		parent = res_parent.node
+
+	var cam_name: String = params.get("name", "FollowCamera2D")
+	var smoothing_speed: float = float(params.get("smoothing_speed", 5.0))
+	var enable_shake: bool = bool(params.get("enable_shake", true))
+	var make_current_cam: bool = bool(params.get("make_current", true))
+
+	var existing = parent.get_node_or_null(NodePath(cam_name))
+	var cam: Camera2D = null
+	var created_node := false
+
+	if existing != null and existing is Camera2D:
+		cam = existing
+	else:
+		cam = Camera2D.new()
+		cam.name = cam_name
+		created_node = true
+
+	cam.position = Vector2.ZERO
+	cam.position_smoothing_enabled = true
+	cam.position_smoothing_speed = smoothing_speed
+
+	var zoom_val = params.get("zoom", null)
+	if zoom_val is Array and zoom_val.size() >= 2:
+		cam.zoom = Vector2(float(zoom_val[0]), float(zoom_val[1]))
+	elif zoom_val is float or zoom_val is int:
+		var z: float = float(zoom_val)
+		cam.zoom = Vector2(z, z)
+	elif zoom_val is Vector2:
+		cam.zoom = zoom_val
+
+	var limits = params.get("limits", null)
+	if limits is Dictionary:
+		if limits.has("left"):
+			cam.limit_left = int(limits.left)
+		if limits.has("top"):
+			cam.limit_top = int(limits.top)
+		if limits.has("right"):
+			cam.limit_right = int(limits.right)
+		if limits.has("bottom"):
+			cam.limit_bottom = int(limits.bottom)
+		cam.limit_smoothed = true
+
+	if enable_shake and cam.get_script() == null:
+		var script := GDScript.new()
+		script.source_code = "@tool\nextends Camera2D\n\n@export var decay: float = 0.8\n@export var max_offset: Vector2 = Vector2(25.0, 15.0)\n@export var max_roll: float = 0.05\n\nvar trauma: float = 0.0\nvar trauma_power: int = 2\n\nfunc _process(delta: float) -> void:\n\tif trauma > 0.0:\n\t\ttrauma = max(trauma - decay * delta, 0.0)\n\t\t_apply_shake()\n\nfunc add_trauma(amount: float) -> void:\n\ttrauma = clamp(trauma + amount, 0.0, 1.0)\n\nfunc _apply_shake() -> void:\n\tvar shake: float = pow(trauma, trauma_power)\n\toffset.x = max_offset.x * shake * randf_range(-1.0, 1.0)\n\toffset.y = max_offset.y * shake * randf_range(-1.0, 1.0)\n\trotation = max_roll * shake * randf_range(-1.0, 1.0)\n"
+		cam.set_script(script)
+
+	_undo_redo.create_action("Scaffold FollowCamera2D on %s" % parent.name)
+	if created_node:
+		_undo_redo.add_do_method(parent, "add_child", cam)
+		_undo_redo.add_do_reference(cam)
+		_undo_redo.add_undo_method(parent, "remove_child", cam)
+	_undo_redo.commit_action()
+
+	if created_node:
+		cam.owner = scene_root
+
+	if make_current_cam and cam.has_method("make_current"):
+		cam.make_current()
+
+	return {
+		"camera_path": McpScenePath.from_node(cam, scene_root),
+		"parent_path": McpScenePath.from_node(parent, scene_root),
+		"smoothing_speed": smoothing_speed,
+		"shake_enabled": enable_shake,
+		"zoom": [cam.zoom.x, cam.zoom.y],
+		"is_current": cam.is_current(),
+	}
+

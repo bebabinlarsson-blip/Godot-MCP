@@ -48,6 +48,9 @@ const DEFERRED_TIMEOUT_MS_BY_COMMAND := {
 	## outside it so the actionable control result wins before DEFERRED_TIMEOUT.
 	"game_debug_control": 6500,
 	"scan_filesystem": 30000,
+	"navigation_bake_2d": 30000,
+	"navigation_bake_3d": 30000,
+	"scene_diagnose": 30000,
 }
 const ErrorCodes := preload("res://addons/godot_ai/utils/error_codes.gd")
 const FuzzySuggestions := preload("res://addons/godot_ai/utils/fuzzy_suggestions.gd")

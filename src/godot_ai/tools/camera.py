@@ -38,6 +38,11 @@ Ops:
         deadzone). drag_margins: {left,top,right,bottom} fractions [0,1].
   • follow_2d(camera_path, target_path, smoothing_speed=5.0, zero_transform=True)
         Reparent camera under target with smoothing — Godot-native follow.
+  • scaffold_follow_2d(target_path="", parent_path="", name="FollowCamera2D",
+                        smoothing_speed=5.0, zoom=None, enable_shake=True,
+                        make_current=True, limits=None)
+        Scaffold complete follow Camera2D with position smoothing and
+        trauma-based screen shake (adds add_trauma() method to camera).
   • get(camera_path="")
         Inspect a camera (class, current flag, all properties). Empty path
         resolves to the currently-active camera, falling back to the first.
@@ -61,6 +66,7 @@ def register_camera_tools(mcp: FastMCP) -> None:
             "set_limits_2d": camera_handlers.camera_set_limits_2d,
             "set_damping_2d": camera_handlers.camera_set_damping_2d,
             "follow_2d": camera_handlers.camera_follow_2d,
+            "scaffold_follow_2d": camera_handlers.camera_scaffold_follow_2d,
             "get": camera_handlers.camera_get,
             "list": camera_handlers.camera_list,
             "apply_preset": camera_handlers.camera_apply_preset,

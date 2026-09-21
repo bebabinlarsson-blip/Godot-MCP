@@ -361,3 +361,208 @@ static func _coerce_playback_value(value: Variant, expected_type: int) -> Varian
 			if value is String:
 				return value
 	return null
+
+
+# ============================================================================
+# generate_procedural_sfx
+# ============================================================================
+
+func generate_procedural_sfx(params: Dictionary) -> Dictionary:
+	var preset: String = params.get("preset", "jump").to_lower()
+	var dest_path: String = params.get("dest_path", "")
+	if dest_path.is_empty():
+		dest_path = "res://audio/%s.wav" % preset
+	if not dest_path.begins_with("res://"):
+		dest_path = "res://" + dest_path
+	if not dest_path.ends_with(".wav"):
+		dest_path += ".wav"
+
+	var sample_rate: int = int(params.get("sample_rate", 22050))
+	var duration: float = float(params.get("duration", 0.0))
+	if duration <= 0.0:
+		match preset:
+			"jump", "laser":
+				duration = 0.25
+			"coin":
+				duration = 0.3
+			"hit":
+				duration = 0.15
+			"explosion":
+				duration = 0.45
+			"powerup":
+				duration = 0.4
+			"step", "click":
+				duration = 0.06
+			_:
+				duration = 0.25
+
+	var total_samples := int(duration * sample_rate)
+	var samples := PackedByteArray()
+	samples.resize(total_samples * 2)
+
+	var phase := 0.0
+	for i in range(total_samples):
+		var progress: float = float(i) / float(total_samples)
+		var sample_val := 0.0
+
+		match preset:
+			"jump":
+				var freq: float = 150.0 + 400.0 * (progress * progress)
+				phase += freq / float(sample_rate)
+				var env: float = 1.0 - progress
+				var sq: float = 1.0 if fmod(phase, 1.0) < 0.5 else -1.0
+				sample_val = sq * env * 0.6
+			"coin":
+				var freq: float = 987.77 if progress < 0.35 else 1318.51
+				phase += freq / float(sample_rate)
+				var env: float = (1.0 - progress * 0.8)
+				var sq: float = 1.0 if fmod(phase, 1.0) < 0.5 else -1.0
+				sample_val = sq * env * 0.5
+			"laser":
+				var freq: float = 900.0 * (1.0 - progress) + 80.0
+				phase += freq / float(sample_rate)
+				var env: float = 1.0 - progress
+				var sq: float = 1.0 if fmod(phase, 1.0) < 0.5 else -1.0
+				sample_val = sq * env * 0.7
+			"hit":
+				var freq: float = 160.0 * (1.0 - progress * 0.8) + 40.0
+				phase += freq / float(sample_rate)
+				var env: float = 1.0 - progress
+				var sq: float = 1.0 if fmod(phase, 1.0) < 0.5 else -1.0
+				var noise: float = randf_range(-1.0, 1.0)
+				sample_val = (sq * 0.6 + noise * 0.4) * env * 0.8
+			"explosion":
+				var noise: float = randf_range(-1.0, 1.0)
+				var env: float = pow(1.0 - progress, 2.0)
+				sample_val = noise * env * 0.85
+			"powerup":
+				var freq: float = 330.0
+				if progress > 0.66:
+					freq = 659.25
+				elif progress > 0.33:
+					freq = 440.0
+				phase += freq / float(sample_rate)
+				var env: float = 1.0 - progress * 0.5
+				var tri: float = 4.0 * abs(fmod(phase, 1.0) - 0.5) - 1.0
+				sample_val = tri * env * 0.7
+			"step":
+				var noise: float = randf_range(-1.0, 1.0)
+				var env: float = 1.0 - progress
+				sample_val = noise * env * 0.4
+			"click":
+				var freq: float = 1200.0
+				phase += freq / float(sample_rate)
+				var env: float = pow(1.0 - progress, 3.0)
+				sample_val = sin(phase * TAU) * env * 0.5
+			_:
+				var freq: float = 440.0
+				phase += freq / float(sample_rate)
+				sample_val = sin(phase * TAU) * (1.0 - progress) * 0.5
+
+		var int_val := int(clamp(sample_val, -1.0, 1.0) * 32767.0)
+		if int_val < 0:
+			int_val += 65536
+		samples[i * 2] = int_val & 0xFF
+		samples[i * 2 + 1] = (int_val >> 8) & 0xFF
+
+	var wav_bytes := PackedByteArray()
+	wav_bytes.resize(44 + samples.size())
+	wav_bytes[0] = 0x52; wav_bytes[1] = 0x49; wav_bytes[2] = 0x46; wav_bytes[3] = 0x46
+	var file_len := 36 + samples.size()
+	wav_bytes[4] = file_len & 0xFF
+	wav_bytes[5] = (file_len >> 8) & 0xFF
+	wav_bytes[6] = (file_len >> 16) & 0xFF
+	wav_bytes[7] = (file_len >> 24) & 0xFF
+	wav_bytes[8] = 0x57; wav_bytes[9] = 0x41; wav_bytes[10] = 0x56; wav_bytes[11] = 0x45
+	wav_bytes[12] = 0x66; wav_bytes[13] = 0x6D; wav_bytes[14] = 0x74; wav_bytes[15] = 0x20
+	wav_bytes[16] = 16; wav_bytes[17] = 0; wav_bytes[18] = 0; wav_bytes[19] = 0
+	wav_bytes[20] = 1; wav_bytes[21] = 0
+	wav_bytes[22] = 1; wav_bytes[23] = 0
+	wav_bytes[24] = sample_rate & 0xFF
+	wav_bytes[25] = (sample_rate >> 8) & 0xFF
+	wav_bytes[26] = (sample_rate >> 16) & 0xFF
+	wav_bytes[27] = (sample_rate >> 24) & 0xFF
+	var byte_rate := sample_rate * 2
+	wav_bytes[28] = byte_rate & 0xFF
+	wav_bytes[29] = (byte_rate >> 8) & 0xFF
+	wav_bytes[30] = (byte_rate >> 16) & 0xFF
+	wav_bytes[31] = (byte_rate >> 24) & 0xFF
+	wav_bytes[32] = 2; wav_bytes[33] = 0
+	wav_bytes[34] = 16; wav_bytes[35] = 0
+	wav_bytes[36] = 0x64; wav_bytes[37] = 0x61; wav_bytes[38] = 0x74; wav_bytes[39] = 0x61
+	var data_size := samples.size()
+	wav_bytes[40] = data_size & 0xFF
+	wav_bytes[41] = (data_size >> 8) & 0xFF
+	wav_bytes[42] = (data_size >> 16) & 0xFF
+	wav_bytes[43] = (data_size >> 24) & 0xFF
+
+	for j in range(samples.size()):
+		wav_bytes[44 + j] = samples[j]
+
+	var dir_path: String = dest_path.get_base_dir()
+	if not DirAccess.dir_exists_absolute(dir_path):
+		DirAccess.make_dir_recursive_absolute(dir_path)
+
+	var f := FileAccess.open(dest_path, FileAccess.WRITE)
+	if not f:
+		return ErrorCodes.make(
+			ErrorCodes.FILE_WRITE_ERROR,
+			"Cannot open '%s' for writing: %s" % [dest_path, error_string(FileAccess.get_open_error())]
+		)
+	f.store_buffer(wav_bytes)
+	f.close()
+
+	if EditorInterface.get_resource_filesystem():
+		EditorInterface.get_resource_filesystem().reindex_file(dest_path)
+
+	return {
+		"path": dest_path,
+		"preset": preset,
+		"duration": duration,
+		"sample_rate": sample_rate,
+		"bytes_written": wav_bytes.size(),
+	}
+
+
+# ============================================================================
+# scaffold_buses
+# ============================================================================
+
+func scaffold_buses(params: Dictionary) -> Dictionary:
+	var standard_buses: Array = ["Music", "SFX", "UI"]
+	var bus_volumes: Dictionary = params.get("volumes", {
+		"Master": 0.0,
+		"Music": -6.0,
+		"SFX": 0.0,
+		"UI": -3.0,
+	})
+
+	for bus_name in standard_buses:
+		var idx := AudioServer.get_bus_index(bus_name)
+		if idx == -1:
+			AudioServer.add_bus()
+			idx = AudioServer.bus_count - 1
+			AudioServer.set_bus_name(idx, bus_name)
+			AudioServer.set_bus_send(idx, &"Master")
+
+	for bus_name in bus_volumes.keys():
+		var idx := AudioServer.get_bus_index(bus_name)
+		if idx != -1:
+			var vol: float = float(bus_volumes[bus_name])
+			AudioServer.set_bus_volume_db(idx, vol)
+
+	var configured: Array[Dictionary] = []
+	for i in range(AudioServer.bus_count):
+		configured.append({
+			"index": i,
+			"name": AudioServer.get_bus_name(i),
+			"send": AudioServer.get_bus_send(i),
+			"volume_db": AudioServer.get_bus_volume_db(i),
+			"solo": AudioServer.is_bus_solo(i),
+			"mute": AudioServer.is_bus_mute(i),
+		})
+
+	return {
+		"buses": configured,
+		"bus_count": AudioServer.bus_count,
+	}

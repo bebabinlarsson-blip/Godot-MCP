@@ -89,6 +89,7 @@ from godot_ai.tools.game import register_game_tools
 from godot_ai.tools.gridmap import register_gridmap_tools
 from godot_ai.tools.input_map import register_input_map_tools
 from godot_ai.tools.material import register_material_tools
+from godot_ai.tools.navigation import register_navigation_tools
 from godot_ai.tools.node import register_node_tools
 from godot_ai.tools.particle import register_particle_tools
 from godot_ai.tools.project import register_project_tools
@@ -305,6 +306,11 @@ _ROLLUP_BLOCKS: tuple[tuple[str | None, str], ...] = (
         "                   gridmap_get_used_cells, gridmap_list_library_items\n",
     ),
     ("csg", "  csg_manage       csg_create, csg_set_operation\n"),
+    (
+        "navigation",
+        "  navigation_manage setup_region_2d, attach_agent_2d, bake_2d,\n"
+        "                   setup_region_3d, attach_agent_3d, bake_3d\n",
+    ),
     ("custom", "  custom_manage    list, invoke\n"),
 )
 
@@ -893,6 +899,8 @@ def create_server(
         register_gridmap_tools(mcp)
     if "csg" not in exclude:
         register_csg_tools(mcp)
+    if "navigation" not in exclude:
+        register_navigation_tools(mcp)
     if "custom" not in exclude:
         register_custom_tools(mcp)
 

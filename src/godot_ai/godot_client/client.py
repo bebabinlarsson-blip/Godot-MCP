@@ -41,6 +41,18 @@ def _diagnostic_hint(kind: Literal["error", "warning"], count: int) -> str:
     )
 
 
+_ADAPTIVE_COMMAND_TIMEOUTS: dict[str, float] = {
+    "filesystem_scan": 30.0,
+    "filesystem_download_asset": 60.0,
+    "project_run": 30.0,
+    "game_command": 45.0,
+    "game_run_playtest_suite": 60.0,
+    "scene_diagnose": 30.0,
+    "navigation_bake_2d": 30.0,
+    "navigation_bake_3d": 30.0,
+}
+
+
 class GodotCommandError(FastMCPError):
     """Raised when a Godot plugin command returns an error response."""
 
@@ -218,16 +230,35 @@ class GodotClient:
                 data=session_not_found_data(session_id, circuit_open=False),
             )
 
+        effective_timeout = timeout
+        if timeout == 5.0 and command in _ADAPTIVE_COMMAND_TIMEOUTS:
+            effective_timeout = _ADAPTIVE_COMMAND_TIMEOUTS[command]
+
         try:
             response = await self.ws_server.send_command(
                 session_id=session_id,
                 command=command,
                 params=params,
-                timeout=timeout,
+                timeout=effective_timeout,
             )
-        except (ConnectionError, TimeoutError) as exc:
+        except ConnectionError as exc:
             self._record_failure(session_id, kind=type(exc).__name__)
             raise
+        except TimeoutError as exc:
+            raise GodotCommandError(
+                code=ErrorCode.DEFERRED_TIMEOUT,
+                message=(
+                    f"Command '{command}' timed out after {effective_timeout:.1f}s. "
+                    "The editor may be compiling shaders, importing assets, or busy. "
+                    "You may retry with a larger timeout."
+                ),
+                data={
+                    "retryable": True,
+                    "command": command,
+                    "timeout": effective_timeout,
+                    "session_id": session_id,
+                },
+            ) from exc
         except PendingCommandLimitError as exc:
             raise GodotCommandError(
                 code=ErrorCode.TRANSPORT_OVERLOADED,

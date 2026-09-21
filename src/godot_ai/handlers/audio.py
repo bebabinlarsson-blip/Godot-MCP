@@ -78,3 +78,36 @@ async def audio_list(
         "audio_list",
         {"root": root, "include_duration": include_duration},
     )
+
+
+async def audio_generate_procedural_sfx(
+    runtime: DirectRuntime,
+    preset: str = "jump",
+    dest_path: str = "",
+    duration: float = 0.0,
+    sample_rate: int = 22050,
+) -> dict:
+    """Synthesize a procedural retro/chiptune sound effect directly to a .wav file."""
+    await require_writable_async(runtime)
+    return await runtime.send_command(
+        "audio_generate_procedural_sfx",
+        {
+            "preset": preset,
+            "dest_path": dest_path,
+            "duration": duration,
+            "sample_rate": sample_rate,
+        },
+    )
+
+
+async def audio_scaffold_buses(
+    runtime: DirectRuntime,
+    volumes: dict[str, float] | None = None,
+) -> dict:
+    """Configure standard Master, Music, SFX, and UI audio buses in AudioServer."""
+    await require_writable_async(runtime)
+    params: dict[str, Any] = {}
+    if volumes is not None:
+        params["volumes"] = volumes
+    return await runtime.send_command("audio_scaffold_buses", params)
+

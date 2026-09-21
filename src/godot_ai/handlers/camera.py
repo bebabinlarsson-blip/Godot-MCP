@@ -135,3 +135,31 @@ async def camera_apply_preset(
     if overrides:
         params["overrides"] = overrides
     return await runtime.send_command("camera_apply_preset", params)
+
+
+async def camera_scaffold_follow_2d(
+    runtime: DirectRuntime,
+    target_path: str = "",
+    parent_path: str = "",
+    name: str = "FollowCamera2D",
+    smoothing_speed: float = 5.0,
+    zoom: Any = None,
+    enable_shake: bool = True,
+    make_current: bool = True,
+    limits: dict[str, Any] | None = None,
+) -> dict:
+    await require_writable_async(runtime)
+    params: dict[str, Any] = {
+        "target_path": target_path,
+        "parent_path": parent_path,
+        "name": name,
+        "smoothing_speed": smoothing_speed,
+        "enable_shake": enable_shake,
+        "make_current": make_current,
+    }
+    if zoom is not None:
+        params["zoom"] = zoom
+    if limits is not None:
+        params["limits"] = limits
+    return await runtime.send_command("camera_scaffold_follow_2d", params)
+

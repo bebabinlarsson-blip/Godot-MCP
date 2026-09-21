@@ -594,3 +594,161 @@ func instantiate_batch(params: Dictionary) -> Dictionary:
 		"instances": created_nodes,
 		"undoable": undo_mgr != null
 	}}
+
+
+func diagnose_scene(params: Dictionary) -> Dictionary:
+	var scene_check := McpNodeValidator.require_scene_or_error()
+	if scene_check.has("error"):
+		return scene_check
+	var scene_root: Node = scene_check.scene_root
+
+	var root_path: String = params.get("root_path", "")
+	var target_root: Node = scene_root
+	if not root_path.is_empty():
+		var resolved := McpNodeValidator.resolve_or_error(root_path, "root_path")
+		if resolved.has("error"):
+			return resolved
+		target_root = resolved.node
+
+	var errors: Array[Dictionary] = []
+	var warnings: Array[Dictionary] = []
+	var info: Array[Dictionary] = []
+	var total_nodes: Array[int] = [0]
+	var camera_count: Array[int] = [0]
+	var current_cameras: Array[String] = []
+
+	_diagnose_node(target_root, scene_root, errors, warnings, info, total_nodes, camera_count, current_cameras)
+
+	if camera_count[0] == 0:
+		info.append({
+			"rule": "no_camera",
+			"path": McpScenePath.from_node(target_root, scene_root),
+			"message": "No Camera2D or Camera3D found in scene. Scene will render with default viewport view.",
+		})
+	elif current_cameras.size() > 1:
+		warnings.append({
+			"rule": "multiple_current_cameras",
+			"path": current_cameras[0],
+			"message": "Multiple cameras have current=true (%s). Only one can be active at a time." % ", ".join(current_cameras),
+			"fix_suggestion": "Set current=false on secondary cameras.",
+		})
+
+	return {
+		"scene_file": scene_root.scene_file_path if scene_root else "",
+		"root_node": McpScenePath.from_node(target_root, scene_root),
+		"total_nodes_checked": total_nodes[0],
+		"issue_count": errors.size() + warnings.size(),
+		"errors": errors,
+		"warnings": warnings,
+		"info": info,
+		"status": "pass" if errors.is_empty() and warnings.is_empty() else ("warning" if errors.is_empty() else "error"),
+	}
+
+
+static func _diagnose_node(node: Node, scene_root: Node, errors: Array[Dictionary], warnings: Array[Dictionary], info: Array[Dictionary], total_nodes: Array[int], camera_count: Array[int], current_cameras: Array[String]) -> void:
+	total_nodes[0] += 1
+	var path := McpScenePath.from_node(node, scene_root)
+
+	if node is CollisionObject2D:
+		var has_shape := false
+		for child in node.get_children():
+			if child is CollisionShape2D or child is CollisionPolygon2D:
+				has_shape = true
+				break
+		if not has_shape:
+			warnings.append({
+				"path": path,
+				"node_type": node.get_class(),
+				"rule": "missing_collision_shape",
+				"message": "CollisionObject2D has no CollisionShape2D or CollisionPolygon2D child and cannot collide.",
+				"fix_suggestion": "Add a CollisionShape2D child with a valid Shape2D.",
+			})
+	elif node is CollisionObject3D:
+		var has_shape := false
+		for child in node.get_children():
+			if child is CollisionShape3D or child is CollisionPolygon3D:
+				has_shape = true
+				break
+		if not has_shape:
+			warnings.append({
+				"path": path,
+				"node_type": node.get_class(),
+				"rule": "missing_collision_shape",
+				"message": "CollisionObject3D has no CollisionShape3D or CollisionPolygon3D child and cannot collide.",
+				"fix_suggestion": "Add a CollisionShape3D child with a valid Shape3D.",
+			})
+
+	if node is CollisionShape2D:
+		if (node as CollisionShape2D).shape == null:
+			errors.append({
+				"path": path,
+				"node_type": "CollisionShape2D",
+				"rule": "empty_shape_resource",
+				"message": "CollisionShape2D has no shape resource assigned.",
+				"fix_suggestion": "Assign a RectangleShape2D, CircleShape2D, or CapsuleShape2D.",
+			})
+		var s: Vector2 = (node as CollisionShape2D).scale
+		if absf(s.x - s.y) > 0.001:
+			warnings.append({
+				"path": path,
+				"node_type": "CollisionShape2D",
+				"rule": "non_uniform_scale",
+				"message": "CollisionShape2D has non-uniform scale (%s) which causes physics calculation errors." % str(s),
+				"fix_suggestion": "Reset CollisionShape2D scale to (1, 1) and resize the shape resource bounds instead.",
+			})
+	elif node is CollisionShape3D:
+		if (node as CollisionShape3D).shape == null:
+			errors.append({
+				"path": path,
+				"node_type": "CollisionShape3D",
+				"rule": "empty_shape_resource",
+				"message": "CollisionShape3D has no shape resource assigned.",
+				"fix_suggestion": "Assign a BoxShape3D, SphereShape3D, or CapsuleShape3D.",
+			})
+
+	if node is Sprite2D:
+		if (node as Sprite2D).texture == null:
+			warnings.append({
+				"path": path,
+				"node_type": "Sprite2D",
+				"rule": "missing_texture",
+				"message": "Sprite2D has no texture assigned.",
+				"fix_suggestion": "Assign a Texture2D or replace with ColorRect / Polygon2D.",
+			})
+	elif node is AnimatedSprite2D:
+		if (node as AnimatedSprite2D).sprite_frames == null:
+			warnings.append({
+				"path": path,
+				"node_type": "AnimatedSprite2D",
+				"rule": "missing_sprite_frames",
+				"message": "AnimatedSprite2D has no SpriteFrames resource assigned.",
+				"fix_suggestion": "Assign a SpriteFrames resource with animation frames.",
+			})
+	elif node is MeshInstance3D:
+		if (node as MeshInstance3D).mesh == null:
+			warnings.append({
+				"path": path,
+				"node_type": "MeshInstance3D",
+				"rule": "missing_mesh",
+				"message": "MeshInstance3D has no Mesh assigned.",
+				"fix_suggestion": "Assign a primitive mesh (BoxMesh, SphereMesh) or load a 3D model.",
+			})
+
+	if node is Camera2D or node is Camera3D:
+		camera_count[0] += 1
+		if node.has_method("is_current") and node.call("is_current"):
+			current_cameras.append(path)
+
+	if node is Control and not (node is Window):
+		var parent = node.get_parent()
+		if parent != null and not (parent is Control) and not (parent is CanvasLayer) and not (parent is Window):
+			info.append({
+				"path": path,
+				"node_type": node.get_class(),
+				"rule": "control_outside_canvas",
+				"message": "Control node '%s' is placed directly under %s (not a Control or CanvasLayer). For UI screens, placing under CanvasLayer is recommended." % [node.name, parent.get_class()],
+			})
+
+	for child in node.get_children():
+		_diagnose_node(child, scene_root, errors, warnings, info, total_nodes, camera_count, current_cameras)
+

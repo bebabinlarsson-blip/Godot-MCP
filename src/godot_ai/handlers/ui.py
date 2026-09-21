@@ -49,3 +49,26 @@ async def ui_build_layout(
         "build_layout",
         {"tree": tree, "parent_path": parent_path},
     )
+
+
+async def ui_scaffold_screen(
+    runtime: DirectRuntime,
+    kind: str = "main_menu",
+    parent_path: str = "",
+    name: str = "",
+    title: str = "",
+    layer: int = 10,
+    buttons: list[str] | None = None,
+) -> dict:
+    await require_writable_async(runtime)
+    params: dict[str, Any] = {
+        "kind": kind,
+        "parent_path": parent_path,
+        "name": name,
+        "title": title,
+        "layer": layer,
+    }
+    if buttons is not None:
+        params["buttons"] = buttons
+    return await runtime.send_command("ui_scaffold_screen", params)
+

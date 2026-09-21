@@ -32,6 +32,11 @@ Ops:
   • instantiate_batch(instances, parent_path="")
         Instantiate multiple PackedScenes into the active scene in a single UndoRedo action.
         instances: [{scene_path, name?, position?, rotation?, scale?, properties?}].
+  • diagnose(root_path="")
+        Comprehensive health check / scene doctor for the open scene. Validates
+        orphan collision shapes, unassigned shapes, non-uniform scaling, missing
+        textures, camera configuration, and control hierarchy with actionable
+        error/warning reports and fix suggestions.
 """
 
 
@@ -124,6 +129,7 @@ def register_scene_tools(mcp: FastMCP, *, include_non_core: bool = True) -> None
             "save_as": scene_handlers.scene_save_as,
             "get_roots": scene_handlers.scene_get_roots,
             "instantiate_batch": scene_handlers.scene_instantiate_batch,
+            "diagnose": scene_handlers.scene_diagnose,
         },
         read_resource_forms={
             ## get_roots lists root nodes of every open scene; the

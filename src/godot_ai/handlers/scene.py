@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from godot_ai.handlers._readiness import require_writable_async
 from godot_ai.runtime.direct import DirectRuntime
 
@@ -103,3 +105,14 @@ async def scene_hierarchy_resource_data(runtime: DirectRuntime) -> dict:
             "offset/limit to page the rest, or a smaller depth to scope it."
         )
     return result
+
+
+async def scene_diagnose(
+    runtime: DirectRuntime,
+    root_path: str = "",
+) -> dict:
+    params: dict[str, Any] = {}
+    if root_path:
+        params["root_path"] = root_path
+    return await runtime.send_command("scene_diagnose", params)
+

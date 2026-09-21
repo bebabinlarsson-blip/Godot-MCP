@@ -5,6 +5,25 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.15 (2026-09-21)
+
+Production game scaffolding primitives and engine reliability hardening: Transport timeout scaling with non-fatal deferred retry, modal dialog detection, procedural chiptune audio synthesis, audio bus topology scaffolding, responsive UI screen scaffolding, 2D/3D navigation mesh and agent management, full 3D environment and lighting presets, 2D follow camera with trauma-based screen shake, and automated scene diagnostics.
+
+### Added
+
+- **Procedural Chiptune Audio Synthesizer**: Added `generate_procedural_sfx` to `audio_manage` (and GDScript `AudioHandler`) to synthesize 16-bit mono PCM WAV chiptune effects directly to disk for 8 core presets (`jump`, `coin`, `laser`, `hit`, `explosion`, `powerup`, `step`, `click`) with automatic editor filesystem reindexing.
+- **Audio Bus Architecture Scaffolding**: Added `scaffold_buses` to `audio_manage` to initialize and configure standard `Master`, `Music`, `SFX`, and `UI` audio buses with custom dB attenuation in `AudioServer`.
+- **Responsive UI Screen Scaffolding**: Added `scaffold_screen` to `ui_manage` (and GDScript `UIHandler`) to build production UI screen hierarchies under `CanvasLayer` (`main_menu`, `pause_menu`, `hud`, `game_over`, `dialog_box`) with dark translucent backdrops, centered card containers, header labels, separators, and interactive buttons under a single atomic UndoRedo action.
+- **2D and 3D Navigation Primitives**: Introduced `navigation_manage` tool and `NavigationHandler` for 2D and 3D navigation mesh setup (`setup_region_2d`, `setup_region_3d`), agent attachment with collision avoidance (`attach_agent_2d`, `attach_agent_3d`), and synchronous/threaded in-editor polygon/mesh baking (`bake_2d`, `bake_3d`).
+- **3D Environment and Lighting Presets**: Added `setup_environment_3d` to `resource_manage` (and GDScript `EnvironmentHandler`) to configure complete 3D scene lighting in one step, creating `WorldEnvironment` and `DirectionalLight3D` with sun angle, color, energy, shadows, tonemapping, and volumetric fog for presets: `daylight`, `sunset`, `dark_dungeon`, `neon_night`, `clear`.
+- **2D Follow Camera with Trauma Screen Shake**: Added `scaffold_follow_2d` to `camera_manage` (and GDScript `CameraHandler`) providing smooth target following, zoom, bounds clamping, and built-in trauma-decay screen shake with an accessible `add_trauma(amount)` API.
+- **Scene Doctor and Diagnostics**: Added `diagnose` to `scene_manage` (and GDScript `SceneHandler`) to run an automated scene audit detecting orphan collision objects, unassigned collision shape resources, non-uniform 2D collision scale artifacts, missing visual textures/meshes, and camera misconfigurations with actionable fix suggestions.
+
+### Fixed
+
+- **Transport Timeout and Circuit Breaker Hardening**: Implemented command-specific adaptive timeouts (up to 30s-60s) for heavy engine operations (`filesystem_scan`, `filesystem_download_asset`, `project_run`, `game_command`, `game_run_playtest_suite`, `scene_diagnose`, `navigation_bake_2d/3d`). Timeout occurrences on active sessions now raise retryable `DEFERRED_TIMEOUT` instead of recording failure counts against the 30-second circuit breaker lock.
+- **Modal Dialog Detection**: Added modal window and dialog inspection in `editor_handler.gd`, surfacing `modal_dialog_active` in `get_editor_state` to prevent agent lockouts when confirmation dialogs are awaiting input.
+
 ## 5.0.14 (2026-09-19)
 
 Autonomous 2D/3D development pipeline primitives: Alternative tile collision matrix synchronization, terrain bitmask scaffolder, multi-directional locomotion BlendSpace scaffolding, procedural particle presets, and in-engine automated playtest suite runner.
