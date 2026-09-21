@@ -403,6 +403,10 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy_handler("physics", HANDLERS_DIR + "physics_handler.gd", [undo, _connection])
 	_dispatcher.register_lazy_handler("localization", HANDLERS_DIR + "localization_handler.gd", [undo, _connection])
 	_dispatcher.register_lazy_handler("geometry", HANDLERS_DIR + "geometry_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("viewport", HANDLERS_DIR + "viewport_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("multiplayer", HANDLERS_DIR + "multiplayer_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("tween", HANDLERS_DIR + "tween_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("profiler", HANDLERS_DIR + "profiler_handler.gd", [undo, _connection])
 
 	_dispatcher.register_lazy("get_editor_state", "editor", &"get_editor_state")
 	_dispatcher.register_lazy("get_scene_tree", "scene", &"get_scene_tree")
@@ -660,6 +664,26 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy("geometry_convex_hull", "geometry", &"convex_hull")
 	_dispatcher.register_lazy("geometry_scaffold_polygon_2d", "geometry", &"scaffold_polygon_2d")
 	_dispatcher.register_lazy("geometry_generate_mesh", "geometry", &"generate_mesh")
+
+	_dispatcher.register_lazy("viewport_create_subviewport", "viewport", &"create_subviewport")
+	_dispatcher.register_lazy("viewport_scaffold_splitscreen", "viewport", &"scaffold_splitscreen")
+	_dispatcher.register_lazy("viewport_wire_render_texture", "viewport", &"wire_render_texture")
+	_dispatcher.register_lazy("viewport_get_viewport_tree", "viewport", &"get_viewport_tree")
+	_dispatcher.register_lazy("viewport_set_properties", "viewport", &"set_viewport_properties")
+
+	_dispatcher.register_lazy("multiplayer_scaffold_network_manager", "multiplayer", &"scaffold_network_manager")
+	_dispatcher.register_lazy("multiplayer_scaffold_spawner", "multiplayer", &"scaffold_spawner")
+	_dispatcher.register_lazy("multiplayer_scaffold_synchronizer", "multiplayer", &"scaffold_synchronizer")
+	_dispatcher.register_lazy("multiplayer_get_network_status", "multiplayer", &"get_network_status")
+
+	_dispatcher.register_lazy("tween_create", "tween", &"create_tween")
+	_dispatcher.register_lazy("tween_preset_animation", "tween", &"preset_animation")
+	_dispatcher.register_lazy("tween_generate_code", "tween", &"generate_code")
+
+	_dispatcher.register_lazy("profiler_get_monitors", "profiler", &"get_monitors")
+	_dispatcher.register_lazy("profiler_get_memory_info", "profiler", &"get_memory_info")
+	_dispatcher.register_lazy("profiler_get_render_info", "profiler", &"get_render_info")
+	_dispatcher.register_lazy("profiler_get_physics_info", "profiler", &"get_physics_info")
 
 	_dispatcher.register_lazy("audio_bus_list", "audio", &"bus_list")
 	_dispatcher.register_lazy("audio_bus_add", "audio", &"bus_add")

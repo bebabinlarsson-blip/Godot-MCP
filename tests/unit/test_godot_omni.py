@@ -12,9 +12,6 @@ Guarantees:
 
 from __future__ import annotations
 
-import json
-from unittest.mock import patch
-
 import pytest
 
 from godot_omni.benchmark import BenchmarkSuite
@@ -29,15 +26,11 @@ from godot_omni.reflection import (
     serialize_variant,
 )
 from godot_omni.registry import (
-    CanonicalOperation,
-    CanonicalOperationRegistry,
-    OperationCategory,
     ReadWrite,
     get_global_registry,
 )
 from godot_omni.selftest import SelfTestRunner
 from godot_omni.versions import get_version_status
-
 
 # ==============================================================================
 # 1. Canonical Operations Registry & Minimum Count Threshold
@@ -390,6 +383,7 @@ def test_cli_self_test():
 
 def test_omni_server_creation_and_tools():
     import asyncio
+
     from godot_omni.server import create_omni_server
 
     server = create_omni_server()

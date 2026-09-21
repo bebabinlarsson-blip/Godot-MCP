@@ -114,5 +114,5 @@ async def scene_diagnose(
     params: dict[str, Any] = {}
     if root_path:
         params["root_path"] = root_path
-    return await runtime.send_command("scene_diagnose", params)
+    return await runtime.send_command("scene_diagnose", params, timeout=30.0)
 

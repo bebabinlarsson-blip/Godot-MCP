@@ -64,6 +64,10 @@ DOMAINS: tuple[str, ...] = (
     "physics",
     "localization",
     "geometry",
+    "viewport",
+    "multiplayer",
+    "tween",
+    "profiler",
 )
 
 ## Domains that contain at least one core (always-loaded) tool. When the

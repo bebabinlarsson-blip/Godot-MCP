@@ -5,6 +5,37 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.20 (2026-09-21)
+
+Viewport and splitscreen management, high-level multiplayer scaffolding, procedural tweens and motion recipes, and engine diagnostics: SubViewport creation and multi-player splitscreen scaffolding in viewport_manage, ENetMultiplayerPeer and replication configuration in multiplayer_manage, procedural game-feel juice animations and code generation in tween_manage, and real-time Performance monitors and memory breakdowns in profiler_manage.
+
+### Added
+
+- **Viewport and Multi-Player Splitscreen Management (`viewport_manage`)**:
+  - Introduced `viewport_manage` tool and `ViewportHandler` providing direct control over Godot Viewports and render targets.
+  - `create_subviewport`: Create standalone SubViewports or wrapped SubViewportContainers with configurable size, update modes, transparency, and 3D world isolation.
+  - `scaffold_splitscreen`: Scaffold complete 2-player horizontal, 2-player vertical, or 4-player quad splitscreen layouts with independent cameras and audio listeners.
+  - `wire_render_texture`: Route a SubViewport's ViewportTexture directly into Sprite2D, TextureRect, or MeshInstance3D albedo materials.
+  - `get_viewport_tree`: Inspect all Viewports in the active scene, their dimensions, update modes, and active 2D/3D cameras.
+  - `set_properties`: Configure Viewport MSAA, screen-space antialiasing, HDR 2D, and render update properties.
+- **High-Level Multiplayer Networking Scaffolding (`multiplayer_manage`)**:
+  - Introduced `multiplayer_manage` tool and `MultiplayerHandler` integrating Godot's high-level multiplayer networking architecture.
+  - `scaffold_network_manager`: Generate production-grade ENetMultiplayerPeer network manager scripts with host/join/disconnect routines and peer lifecycle signals.
+  - `scaffold_spawner`: Instantiate and configure MultiplayerSpawner nodes with auto-spawn flags and registered spawnable scenes.
+  - `scaffold_synchronizer`: Instantiate and configure MultiplayerSynchronizer nodes with declarative SceneReplicationConfig properties.
+  - `get_network_status`: Query active MultiplayerAPI state, server role, unique peer ID, and connected peers.
+- **Procedural Tweens and Motion Recipes (`tween_manage`)**:
+  - Introduced `tween_manage` tool and `TweenHandler` providing procedural motion, game-feel juice animations, and code generation.
+  - `create`: Construct and run property interpolations with configurable transition curves, ease modes, delays, and relative offsets.
+  - `preset_animation`: Execute game-feel recipes including punch_scale, shake_2d, float_bob, fade, flash_color, progress_fill, bounce_in, and spin.
+  - `generate_code`: Generate production GDScript Tween snippets for copy-paste or programmatic attachment.
+- **Performance Profiler and Engine Diagnostics (`profiler_manage`)**:
+  - Introduced `profiler_manage` tool and `ProfilerHandler` querying real-time engine performance metrics.
+  - `get_monitors`: Read key Performance monitors (FPS, process time, physics process time, draw calls, object counts, memory, and audio latency).
+  - `get_memory_info`: Retrieve structured memory statistics including static memory, peak memory, texture memory, buffer memory, and node counts.
+  - `get_render_info`: Inspect active draw calls, primitive counts, 2D/3D render objects, and VRAM utilization.
+  - `get_physics_info`: Query 2D and 3D physics server statistics including active bodies, collision pairs, and physics islands.
+
 ## 5.0.19 (2026-09-21)
 
 Engine geometry synthesis, localization pipeline, audio bus routing, and advanced physics queries: Comprehensive 2D and 3D procedural geometry via geometry_manage, full TranslationServer and CSV localization via localization_manage, in-depth AudioServer bus and DSP effect management in audio_manage, 3D point queries and ShapeCast sensors in physics_manage, and comprehensive project metadata querying in project_manage.

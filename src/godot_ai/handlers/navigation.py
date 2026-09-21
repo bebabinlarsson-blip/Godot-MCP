@@ -64,6 +64,7 @@ async def navigation_bake_2d(
     return await runtime.send_command(
         "navigation_bake_2d",
         {"region_path": region_path, "on_thread": on_thread},
+        timeout=30.0,
     )
 
 
@@ -126,4 +127,5 @@ async def navigation_bake_3d(
     return await runtime.send_command(
         "navigation_bake_3d",
         {"region_path": region_path, "on_thread": on_thread},
+        timeout=30.0,
     )

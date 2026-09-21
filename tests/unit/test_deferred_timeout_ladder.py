@@ -46,7 +46,9 @@ from godot_ai.handlers import client as client_handlers
 from godot_ai.handlers import editor as editor_handlers
 from godot_ai.handlers import filesystem as filesystem_handlers
 from godot_ai.handlers import game as game_handlers
+from godot_ai.handlers import navigation as navigation_handlers
 from godot_ai.handlers import project as project_handlers
+from godot_ai.handlers import scene as scene_handlers
 from godot_ai.handlers import script as script_handlers
 from godot_ai.runtime.direct import DirectRuntime
 from godot_ai.sessions.registry import SessionRegistry
@@ -101,6 +103,13 @@ COMMAND_DRIVERS: dict[str, Callable[[DirectRuntime], Awaitable[object]]] = {
     ## vision-routed editor capture — carries its own 13 s override and is
     ## checked separately below.
     "take_screenshot": lambda rt: editor_handlers.editor_screenshot(rt, source="game"),
+    "navigation_bake_2d": lambda rt: navigation_handlers.navigation_bake_2d(
+        rt, "res://test_region"
+    ),
+    "navigation_bake_3d": lambda rt: navigation_handlers.navigation_bake_3d(
+        rt, "res://test_region"
+    ),
+    "scene_diagnose": lambda rt: scene_handlers.scene_diagnose(rt),
 }
 
 

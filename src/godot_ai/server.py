@@ -94,11 +94,13 @@ from godot_ai.tools.gridmap import register_gridmap_tools
 from godot_ai.tools.input_map import register_input_map_tools
 from godot_ai.tools.localization import register_localization_tools
 from godot_ai.tools.material import register_material_tools
+from godot_ai.tools.multiplayer import register_multiplayer_tools
 from godot_ai.tools.navigation import register_navigation_tools
 from godot_ai.tools.node import register_node_tools
 from godot_ai.tools.omni import register_omni_tools
 from godot_ai.tools.particle import register_particle_tools
 from godot_ai.tools.physics import register_physics_tools
+from godot_ai.tools.profiler import register_profiler_tools
 from godot_ai.tools.project import register_project_tools
 from godot_ai.tools.resource import register_resource_tools
 from godot_ai.tools.save import register_save_tools
@@ -111,7 +113,9 @@ from godot_ai.tools.testing import register_testing_tools
 from godot_ai.tools.theme import register_theme_tools
 from godot_ai.tools.tilemap import register_tilemap_tools
 from godot_ai.tools.tileset import register_tileset_tools
+from godot_ai.tools.tween import register_tween_tools
 from godot_ai.tools.ui import register_ui_tools
+from godot_ai.tools.viewport import register_viewport_tools
 from godot_ai.transport.capability import (
     LaunchCapabilities,
     PortClaimUnavailable,
@@ -365,6 +369,25 @@ _ROLLUP_BLOCKS: tuple[tuple[str | None, str], ...] = (
         "geometry",
         "  geometry_manage  polygon_boolean, polygon_offset, triangulate,\n"
         "                   convex_hull, scaffold_polygon_2d, generate_mesh\n",
+    ),
+    (
+        "viewport",
+        "  viewport_manage  create_subviewport, scaffold_splitscreen,\n"
+        "                   wire_render_texture, get_viewport_tree, set_properties\n",
+    ),
+    (
+        "multiplayer",
+        "  multiplayer_manage scaffold_network_manager, scaffold_spawner,\n"
+        "                   scaffold_synchronizer, get_network_status\n",
+    ),
+    (
+        "tween",
+        "  tween_manage     create, preset_animation, generate_code\n",
+    ),
+    (
+        "profiler",
+        "  profiler_manage  get_monitors, get_memory_info, get_render_info,\n"
+        "                   get_physics_info\n",
     ),
 )
 
@@ -975,6 +998,14 @@ def create_server(
         register_localization_tools(mcp)
     if "geometry" not in exclude:
         register_geometry_tools(mcp)
+    if "viewport" not in exclude:
+        register_viewport_tools(mcp)
+    if "multiplayer" not in exclude:
+        register_multiplayer_tools(mcp)
+    if "tween" not in exclude:
+        register_tween_tools(mcp)
+    if "profiler" not in exclude:
+        register_profiler_tools(mcp)
 
 
     register_session_resources(mcp)

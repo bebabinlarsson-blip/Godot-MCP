@@ -58,11 +58,13 @@ const DOMAINS := [
 	{"id": "input_map", "label": "input_map", "count": 1, "tools": ["input_map_manage"]},
 	{"id": "localization", "label": "localization", "count": 1, "tools": ["localization_manage"]},
 	{"id": "material", "label": "material", "count": 1, "tools": ["material_manage"]},
+	{"id": "multiplayer", "label": "multiplayer", "count": 1, "tools": ["multiplayer_manage"]},
 	{"id": "navigation", "label": "navigation", "count": 1, "tools": ["navigation_manage"]},
 	{"id": "node", "label": "node", "count": 4, "tools": ["node_create", "node_find", "node_manage", "node_set_property"]},
 	{"id": "omni", "label": "omni", "count": 1, "tools": ["omni_manage"]},
 	{"id": "particle", "label": "particle", "count": 1, "tools": ["particle_manage"]},
 	{"id": "physics", "label": "physics", "count": 1, "tools": ["physics_manage"]},
+	{"id": "profiler", "label": "profiler", "count": 1, "tools": ["profiler_manage"]},
 	{"id": "project", "label": "project", "count": 2, "tools": ["project_manage", "project_run"]},
 	{"id": "resource", "label": "resource", "count": 1, "tools": ["resource_manage"]},
 	{"id": "save", "label": "save", "count": 1, "tools": ["save_manage"]},
@@ -74,7 +76,9 @@ const DOMAINS := [
 	{"id": "theme", "label": "theme", "count": 1, "tools": ["theme_manage"]},
 	{"id": "tilemap", "label": "tilemap", "count": 1, "tools": ["tilemap_manage"]},
 	{"id": "tileset", "label": "tileset", "count": 1, "tools": ["tileset_manage"]},
+	{"id": "tween", "label": "tween", "count": 1, "tools": ["tween_manage"]},
 	{"id": "ui", "label": "ui", "count": 1, "tools": ["ui_manage"]},
+	{"id": "viewport", "label": "viewport", "count": 1, "tools": ["viewport_manage"]},
 ]
 
 
