@@ -5,6 +5,46 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.21 (2026-09-21)
+
+DisplayServer and Window management, background threaded resource loading, GPU compute shaders, project export automation, OpenXR AR/VR rigging, and editor undo/redo transactions: DisplayServer geometry and sub-window scaffolding in display_manage, background resource streaming and loading screens in loader_manage, RenderingDevice compute shader dispatch in compute_manage, export preset inspection and automated builds in export_manage, OpenXR rigging and tracking in xr_manage, and EditorUndoRedoManager history introspection in undo_redo_manage.
+
+### Added
+
+- **DisplayServer and Window Management (`display_manage`)**:
+  - Introduced `display_manage` tool and `DisplayHandler` for direct control over DisplayServer and Window nodes.
+  - `get_window_info`: Query current window mode, position, size, screen count, DPI, refresh rate, and VSync mode.
+  - `set_window_mode`: Configure window mode (windowed, minimized, maximized, fullscreen, exclusive fullscreen).
+  - `set_window_properties`: Modify borderless flags, always-on-top status, transparent background, and min/max window dimensions.
+  - `set_mouse_mode`: Set mouse capture mode (visible, hidden, captured, confined).
+  - `scaffold_dialog`: Create and configure popups, ConfirmationDialog, FileDialog, or custom SubWindows.
+- **Background Threaded Resource Loading (`loader_manage`)**:
+  - Introduced `loader_manage` tool and `LoaderHandler` interfacing with ResourceLoader threaded loading.
+  - `load_threaded`: Initiate asynchronous threaded loading for large scenes, textures, and assets via ResourceLoader.load_threaded_request.
+  - `get_status`: Poll threaded load progress and status (invalid, in progress, failed, ready).
+  - `get_resource`: Finalize and retrieve loaded resources once threaded requests complete.
+  - `scaffold_loading_screen`: Generate responsive loading screen scenes and scripts with progress bars and smooth scene transitions.
+- **GPU Compute Shaders and RenderingDevice (`compute_manage`)**:
+  - Introduced `compute_manage` tool and `ComputeHandler` enabling GPU compute pipelines.
+  - `create_shader`: Scaffold GLSL compute shader files with standard uniform buffer and invocation templates.
+  - `dispatch`: Execute compute shaders via RenderingDevice with storage buffers, uniforms, and workgroup dispatch configurations.
+  - `get_device_info`: Query active RenderingDevice capabilities, device names, and driver version.
+- **Project Export Automation (`export_manage`)**:
+  - Introduced `export_manage` tool and `ExportHandler` automating project build pipelines.
+  - `list_presets`: Parse export_presets.cfg and report all defined platform presets and target paths.
+  - `get_preset_info`: Inspect detailed export preset configurations and feature flags.
+  - `export_project`: Execute headless godot --export-release or --export-debug builds for target presets.
+- **OpenXR AR/VR Rigging and Status (`xr_manage`)**:
+  - Introduced `xr_manage` tool and `XrHandler` integrating OpenXR and spatial computing workflows.
+  - `scaffold_xr_player`: Scaffold complete XROrigin3D hierarchies with XRCamera3D, left/right XRController3D nodes, hand trackers, and basic teleport movement.
+  - `get_xr_status`: Query OpenXR runtime initialization, tracking status, and head/controller poses.
+  - `generate_bootstrap_script`: Generate production OpenXR interface initialization and pass-through management scripts.
+- **Editor Undo/Redo Introspection (`undo_redo_manage`)**:
+  - Introduced `undo_redo_manage` tool and `UndoRedoHandler` connecting to EditorUndoRedoManager.
+  - `get_history`: Query undo/redo transaction stack, current action index, and action names.
+  - `undo`: Undo the most recent editor action.
+  - `redo`: Redo the previously reverted action.
+
 ## 5.0.20 (2026-09-21)
 
 Viewport and splitscreen management, high-level multiplayer scaffolding, procedural tweens and motion recipes, and engine diagnostics: SubViewport creation and multi-player splitscreen scaffolding in viewport_manage, ENetMultiplayerPeer and replication configuration in multiplayer_manage, procedural game-feel juice animations and code generation in tween_manage, and real-time Performance monitors and memory breakdowns in profiler_manage.

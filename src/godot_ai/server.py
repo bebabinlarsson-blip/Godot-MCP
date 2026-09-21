@@ -81,17 +81,21 @@ from godot_ai.tools.batch import register_batch_tools
 from godot_ai.tools.camera import register_camera_tools
 from godot_ai.tools.character import register_character_tools
 from godot_ai.tools.client import register_client_tools
+from godot_ai.tools.compute import register_compute_tools
 from godot_ai.tools.csg import register_csg_tools
 from godot_ai.tools.custom import register_custom_tools
 from godot_ai.tools.dialogue import register_dialogue_tools
+from godot_ai.tools.display import register_display_tools
 from godot_ai.tools.domains import CORE_BEARING_DOMAINS, CORE_TOOLS
 from godot_ai.tools.editor import register_editor_tools
+from godot_ai.tools.export import register_export_tools
 from godot_ai.tools.filesystem import register_filesystem_tools
 from godot_ai.tools.fsm import register_fsm_tools
 from godot_ai.tools.game import register_game_tools
 from godot_ai.tools.geometry import register_geometry_tools
 from godot_ai.tools.gridmap import register_gridmap_tools
 from godot_ai.tools.input_map import register_input_map_tools
+from godot_ai.tools.loader import register_loader_tools
 from godot_ai.tools.localization import register_localization_tools
 from godot_ai.tools.material import register_material_tools
 from godot_ai.tools.multiplayer import register_multiplayer_tools
@@ -115,7 +119,9 @@ from godot_ai.tools.tilemap import register_tilemap_tools
 from godot_ai.tools.tileset import register_tileset_tools
 from godot_ai.tools.tween import register_tween_tools
 from godot_ai.tools.ui import register_ui_tools
+from godot_ai.tools.undo_redo import register_undo_redo_tools
 from godot_ai.tools.viewport import register_viewport_tools
+from godot_ai.tools.xr import register_xr_tools
 from godot_ai.transport.capability import (
     LaunchCapabilities,
     PortClaimUnavailable,
@@ -388,6 +394,33 @@ _ROLLUP_BLOCKS: tuple[tuple[str | None, str], ...] = (
         "profiler",
         "  profiler_manage  get_monitors, get_memory_info, get_render_info,\n"
         "                   get_physics_info\n",
+    ),
+    (
+        "display",
+        "  display_manage   set_mode, get_display_info, set_window_rect,\n"
+        "                   set_vsync, set_mouse_mode, scaffold_subwindow\n",
+    ),
+    (
+        "loader",
+        "  loader_manage    start_load, get_status, get_resource,\n"
+        "                   scaffold_loading_screen\n",
+    ),
+    (
+        "compute",
+        "  compute_manage   create_shader, get_device_info, run_compute\n",
+    ),
+    (
+        "export",
+        "  export_manage    list_presets, get_preset_info, run_export\n",
+    ),
+    (
+        "xr",
+        "  xr_manage        scaffold_xr_rig, get_xr_status,\n"
+        "                   generate_xr_startup_script\n",
+    ),
+    (
+        "undo_redo",
+        "  undo_redo_manage get_history, undo, redo\n",
     ),
 )
 
@@ -1006,6 +1039,18 @@ def create_server(
         register_tween_tools(mcp)
     if "profiler" not in exclude:
         register_profiler_tools(mcp)
+    if "display" not in exclude:
+        register_display_tools(mcp)
+    if "loader" not in exclude:
+        register_loader_tools(mcp)
+    if "compute" not in exclude:
+        register_compute_tools(mcp)
+    if "export" not in exclude:
+        register_export_tools(mcp)
+    if "xr" not in exclude:
+        register_xr_tools(mcp)
+    if "undo_redo" not in exclude:
+        register_undo_redo_tools(mcp)
 
 
     register_session_resources(mcp)

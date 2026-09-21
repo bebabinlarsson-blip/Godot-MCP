@@ -35,7 +35,7 @@ MAX_MANIFEST_SIZE = 1024 * 1024
 SIGNATURE_SIZE = 512
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 COMMIT = re.compile(r"^[0-9a-f]{40}$")
-VERSION = re.compile(r"^4\.\d+\.\d+$")
+VERSION = re.compile(r"^(?:[4-9]|\d{2,})\.\d+\.\d+$")
 RESERVED = set("CON PRN AUX NUL CONIN$ CONOUT$".split()) | {
     f"{kind}{number}"
     for kind in ("COM", "LPT")

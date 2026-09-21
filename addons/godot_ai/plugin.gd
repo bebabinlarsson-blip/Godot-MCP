@@ -407,6 +407,12 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy_handler("multiplayer", HANDLERS_DIR + "multiplayer_handler.gd", [undo, _connection])
 	_dispatcher.register_lazy_handler("tween", HANDLERS_DIR + "tween_handler.gd", [undo, _connection])
 	_dispatcher.register_lazy_handler("profiler", HANDLERS_DIR + "profiler_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("display", HANDLERS_DIR + "display_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("loader", HANDLERS_DIR + "loader_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("compute", HANDLERS_DIR + "compute_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("export", HANDLERS_DIR + "export_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("xr", HANDLERS_DIR + "xr_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("undo_redo", HANDLERS_DIR + "undo_redo_handler.gd", [undo, _connection])
 
 	_dispatcher.register_lazy("get_editor_state", "editor", &"get_editor_state")
 	_dispatcher.register_lazy("get_scene_tree", "scene", &"get_scene_tree")
@@ -693,6 +699,34 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy("audio_bus_save_layout", "audio", &"bus_save_layout")
 
 	_dispatcher.register_lazy("project_get_info", "project", &"get_info")
+
+	_dispatcher.register_lazy("display_set_mode", "display", &"set_mode")
+	_dispatcher.register_lazy("display_get_display_info", "display", &"get_display_info")
+	_dispatcher.register_lazy("display_set_window_rect", "display", &"set_window_rect")
+	_dispatcher.register_lazy("display_set_vsync", "display", &"set_vsync")
+	_dispatcher.register_lazy("display_set_mouse_mode", "display", &"set_mouse_mode")
+	_dispatcher.register_lazy("display_scaffold_subwindow", "display", &"scaffold_subwindow")
+
+	_dispatcher.register_lazy("loader_start_load", "loader", &"start_load")
+	_dispatcher.register_lazy("loader_get_status", "loader", &"get_status")
+	_dispatcher.register_lazy("loader_get_resource", "loader", &"get_resource")
+	_dispatcher.register_lazy("loader_scaffold_loading_screen", "loader", &"scaffold_loading_screen")
+
+	_dispatcher.register_lazy("compute_create_shader", "compute", &"create_shader")
+	_dispatcher.register_lazy("compute_get_device_info", "compute", &"get_device_info")
+	_dispatcher.register_lazy("compute_run_compute", "compute", &"run_compute")
+
+	_dispatcher.register_lazy("export_list_presets", "export", &"list_presets")
+	_dispatcher.register_lazy("export_get_preset_info", "export", &"get_preset_info")
+	_dispatcher.register_lazy("export_run_export", "export", &"run_export")
+
+	_dispatcher.register_lazy("xr_scaffold_xr_rig", "xr", &"scaffold_xr_rig")
+	_dispatcher.register_lazy("xr_get_xr_status", "xr", &"get_xr_status")
+	_dispatcher.register_lazy("xr_generate_xr_startup_script", "xr", &"generate_xr_startup_script")
+
+	_dispatcher.register_lazy("undo_redo_get_history", "undo_redo", &"get_history")
+	_dispatcher.register_lazy("undo_redo_undo", "undo_redo", &"undo")
+	_dispatcher.register_lazy("undo_redo_redo", "undo_redo", &"redo")
 
 	_connection.dispatcher = _dispatcher
 	add_child(_connection)

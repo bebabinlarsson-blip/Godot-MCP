@@ -68,6 +68,12 @@ DOMAINS: tuple[str, ...] = (
     "multiplayer",
     "tween",
     "profiler",
+    "display",
+    "loader",
+    "compute",
+    "export",
+    "xr",
+    "undo_redo",
 )
 
 ## Domains that contain at least one core (always-loaded) tool. When the
