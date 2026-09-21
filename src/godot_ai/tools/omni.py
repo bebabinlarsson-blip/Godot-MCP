@@ -1,8 +1,6 @@
-"""MCP tools for Godot Omni: Arbitrary GDScript evaluation, Universal Reflection, and Semantic UI Automation."""
+"""MCP tools for Godot Omni: Arbitrary GDScript evaluation, Reflection, and UI Automation."""
 
 from __future__ import annotations
-
-from typing import Any
 
 from fastmcp import Context, FastMCP
 
@@ -37,12 +35,15 @@ Ops:
         Instantiate any .tscn prefab directly into the edited scene.
   * shader_create(shader_path, shader_type="canvas_item", code="", target_node_path="")
         Create a new GDShader and optionally assign it as a ShaderMaterial to a node.
-  * mesh_primitive(primitive_type="box", node_name="", parent_path="", size=None, albedo_color=None, position=None)
+  * mesh_primitive(primitive_type="box", node_name="", parent_path="", size=None,
+                   albedo_color=None, position=None)
         Create a 3D primitive mesh (box, sphere, cylinder, plane, capsule, prism).
-  * collision_shape(parent_path, shape_type="box", is_2d=True, size=None, radius=16.0, height=32.0, node_name="CollisionShape")
+  * collision_shape(parent_path, shape_type="box", is_2d=True, size=None, radius=16.0,
+                    height=32.0, node_name="CollisionShape")
         Create a 2D or 3D CollisionShape and attach it to a physics body.
-  * preset_motion(preset="pulse", target_node_path="", animation_player_path="", anim_name="", duration=1.0, loop=True)
-        Inject procedural motion presets (pulse, fade_in, fade_out, slide_in) into an AnimationPlayer.
+  * preset_motion(preset="pulse", target_node_path="", animation_player_path="",
+                  anim_name="", duration=1.0, loop=True)
+        Inject procedural motion presets (pulse, fade_in, fade_out, slide_in).
   * ping()
         Quick diagnostic ping returning engine version, process frames, and memory metrics.
 """
@@ -63,7 +64,8 @@ def register_omni_tools(mcp: FastMCP) -> None:
         instantiate resources, or manipulate scenes on the fly.
 
         Args:
-            code: GDScript code to execute (e.g. 'EditorInterface.get_editor_settings().get_setting(...)').
+            code: GDScript code to execute (e.g.
+                'EditorInterface.get_editor_settings().get_setting(...)').
             mode: 'auto', 'expression', or 'block'.
             session_id: Optional session ID to target.
         """
@@ -100,7 +102,7 @@ def register_omni_tools(mcp: FastMCP) -> None:
         position: list[float] | None = None,
         session_id: str = "",
     ) -> dict:
-        """Create a 3D PrimitiveMesh (box, sphere, cylinder, plane, capsule, prism) with material and transform."""
+        """Create a 3D PrimitiveMesh (box, sphere, cylinder, plane, capsule, prism)."""
         runtime = DirectRuntime.from_context(ctx, session_id=session_id or None)
         return await omni_handlers.mesh_create_primitive(
             runtime,
@@ -124,7 +126,7 @@ def register_omni_tools(mcp: FastMCP) -> None:
         node_name: str = "CollisionShape",
         session_id: str = "",
     ) -> dict:
-        """Create and attach a 2D or 3D CollisionShape with predefined geometry to a physics body."""
+        """Create and attach a 2D or 3D CollisionShape with geometry to a physics body."""
         runtime = DirectRuntime.from_context(ctx, session_id=session_id or None)
         return await omni_handlers.collision_shape_create(
             runtime,

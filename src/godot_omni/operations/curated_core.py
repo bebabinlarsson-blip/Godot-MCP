@@ -5,9 +5,7 @@ from __future__ import annotations
 from godot_omni.operations.builder import op
 from godot_omni.registry.models import (
     CanonicalOperation,
-    ExecutionContext,
     LatencyTier,
-    OperationCategory,
     ReadWrite,
 )
 

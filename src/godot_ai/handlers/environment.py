@@ -46,3 +46,25 @@ async def environment_setup_3d(
     }
     return await runtime.send_command("environment_setup_3d", params)
 
+
+async def environment_setup_2d(
+    runtime: DirectRuntime,
+    preset: str = "dungeon",
+    parent_path: str = "",
+    add_torch_to: str = "",
+    torch_energy: float = 1.2,
+    torch_radius: float = 2.0,
+    shadows: bool = True,
+) -> dict:
+    await require_writable_async(runtime)
+    params: dict = {
+        "preset": preset,
+        "parent_path": parent_path,
+        "add_torch_to": add_torch_to,
+        "torch_energy": torch_energy,
+        "torch_radius": torch_radius,
+        "shadows": shadows,
+    }
+    return await runtime.send_command("environment_setup_2d", params)
+
+

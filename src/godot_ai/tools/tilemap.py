@@ -52,10 +52,11 @@ Ops:
   • tilemap_place_tile(path, source_id, atlas_col, atlas_row, map_x, map_y,
                        rotation_degrees=0, flip_h=false, flip_v=false, alternative_tile=-1)
         Place a tile with exact rotation (0, 90, 180, 270) and flip flags.
-        Returns: {map_x, map_y, source_id, atlas_col, atlas_row, alternative_tile, rotation_degrees, flip_h, flip_v}
+        Returns: {map_x, map_y, source_id, atlas_col, atlas_row, alternative_tile,
+                  rotation_degrees, flip_h, flip_v}
 
   • tilemap_rotate_cell(path, map_x, map_y, degrees=90)
-        Rotate an existing tile cell at (map_x, map_y) clockwise by degrees (90, 180, 270) with D4 symmetry.
+        Rotate tile cell at (map_x, map_y) clockwise by degrees (90, 180, 270).
         Returns: {map_x, map_y, degrees, old_alternative, new_alternative}
 
   • tilemap_flip_cell(path, map_x, map_y, flip_h=false, flip_v=false)
@@ -68,11 +69,14 @@ Ops:
 
   • tilemap_get_cell(path, map_x, map_y)
         Get detailed information of a tile cell.
-        Returns: {has_tile, map_x, map_y, source_id, atlas_col, atlas_row, alternative_tile, flip_h, flip_v, transpose}
+        Returns: {has_tile, map_x, map_y, source_id, atlas_col, atlas_row,
+                  alternative_tile, flip_h, flip_v, transpose}
 
   • tilemap_generate_layout(path, genre="platformer", rect_w=32, rect_h=18, rect_x=0, rect_y=0,
-                            source_id=0, floor_col=0, floor_row=0, wall_col=1, wall_row=0, accent_col=2, accent_row=0, layer=0)
-        Generate a complete layout placed directly into the editor. Supported genres: 'platformer', 'topdown', 'rpg', 'dungeon', 'arena'.
+                            source_id=0, floor_col=0, floor_row=0, wall_col=1, wall_row=0,
+                            accent_col=2, accent_row=0, layer=0)
+        Generate a complete layout placed directly into the editor.
+        Supported genres: 'platformer', 'topdown', 'rpg', 'dungeon', 'arena'.
         Returns: {genre, cells_placed, rect, source_id, layer, undoable}
 """
 

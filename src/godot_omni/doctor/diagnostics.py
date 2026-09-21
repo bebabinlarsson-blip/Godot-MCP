@@ -98,7 +98,7 @@ class OmniDoctor:
                 details.append(f"Editor Settings Found: {len(settings_files)} configurations ({', '.join(f.name for f in settings_files[:3])})")
             else:
                 details.append("No Godot Editor Settings directory found in APPDATA.")
-        
+
         passed = len(found_binaries) > 0 or details[-1].startswith("Editor Settings Found")
         return DiagnosticSection(
             title="Godot Engine Installation",

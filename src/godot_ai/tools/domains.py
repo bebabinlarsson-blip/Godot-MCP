@@ -49,6 +49,7 @@ DOMAINS: tuple[str, ...] = (
     "particle",
     "camera",
     "audio",
+    "character",
     "tilemap",
     "tileset",
     "gridmap",

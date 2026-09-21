@@ -260,6 +260,80 @@ func ensure_binding(params: Dictionary) -> Dictionary:
 	}
 
 
+func scaffold_preset(params: Dictionary) -> Dictionary:
+	var preset: String = params.get("preset", "wasd_platformer").to_lower()
+	var bindings: Array[Dictionary] = []
+	match preset:
+		"wasd_platformer":
+			bindings = [
+				{"action": "move_left", "event_type": "key", "keycode": "A"},
+				{"action": "move_left", "event_type": "key", "keycode": "Left"},
+				{"action": "move_right", "event_type": "key", "keycode": "D"},
+				{"action": "move_right", "event_type": "key", "keycode": "Right"},
+				{"action": "jump", "event_type": "key", "keycode": "Space"},
+				{"action": "jump", "event_type": "key", "keycode": "W"},
+				{"action": "jump", "event_type": "key", "keycode": "Up"},
+			]
+		"wasd_topdown":
+			bindings = [
+				{"action": "move_left", "event_type": "key", "keycode": "A"},
+				{"action": "move_left", "event_type": "key", "keycode": "Left"},
+				{"action": "move_right", "event_type": "key", "keycode": "D"},
+				{"action": "move_right", "event_type": "key", "keycode": "Right"},
+				{"action": "move_up", "event_type": "key", "keycode": "W"},
+				{"action": "move_up", "event_type": "key", "keycode": "Up"},
+				{"action": "move_down", "event_type": "key", "keycode": "S"},
+				{"action": "move_down", "event_type": "key", "keycode": "Down"},
+				{"action": "interact", "event_type": "key", "keycode": "E"},
+				{"action": "interact", "event_type": "key", "keycode": "Space"},
+			]
+		"first_person":
+			bindings = [
+				{"action": "move_forward", "event_type": "key", "keycode": "W"},
+				{"action": "move_forward", "event_type": "key", "keycode": "Up"},
+				{"action": "move_backward", "event_type": "key", "keycode": "S"},
+				{"action": "move_backward", "event_type": "key", "keycode": "Down"},
+				{"action": "move_left", "event_type": "key", "keycode": "A"},
+				{"action": "move_left", "event_type": "key", "keycode": "Left"},
+				{"action": "move_right", "event_type": "key", "keycode": "D"},
+				{"action": "move_right", "event_type": "key", "keycode": "Right"},
+				{"action": "jump", "event_type": "key", "keycode": "Space"},
+				{"action": "sprint", "event_type": "key", "keycode": "Shift"},
+				{"action": "interact", "event_type": "key", "keycode": "E"},
+			]
+		"driving":
+			bindings = [
+				{"action": "accelerate", "event_type": "key", "keycode": "W"},
+				{"action": "accelerate", "event_type": "key", "keycode": "Up"},
+				{"action": "brake_reverse", "event_type": "key", "keycode": "S"},
+				{"action": "brake_reverse", "event_type": "key", "keycode": "Down"},
+				{"action": "steer_left", "event_type": "key", "keycode": "A"},
+				{"action": "steer_left", "event_type": "key", "keycode": "Left"},
+				{"action": "steer_right", "event_type": "key", "keycode": "D"},
+				{"action": "steer_right", "event_type": "key", "keycode": "Right"},
+				{"action": "handbrake", "event_type": "key", "keycode": "Space"},
+			]
+		_:
+			return ErrorCodes.make(ErrorCodes.VALUE_OUT_OF_RANGE,
+				"Unknown preset '%s'. Supported presets: 'wasd_platformer', 'wasd_topdown', 'first_person', 'driving'." % preset)
+
+	var applied: Array[Dictionary] = []
+	for b in bindings:
+		var res := ensure_binding(b)
+		if res.has("error"):
+			return res
+		applied.append(b)
+
+	return {
+		"data": {
+			"preset": preset,
+			"bindings_count": applied.size(),
+			"bindings": applied,
+			"persisted": true,
+		}
+	}
+
+
 func _validate_deadzone(deadzone: float) -> Dictionary:
 	if deadzone < 0.0 or deadzone > 1.0:
 		return ErrorCodes.make(ErrorCodes.VALUE_OUT_OF_RANGE,

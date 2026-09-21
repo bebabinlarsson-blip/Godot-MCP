@@ -566,3 +566,72 @@ func scaffold_buses(params: Dictionary) -> Dictionary:
 		"buses": configured,
 		"bus_count": AudioServer.bus_count,
 	}
+
+
+# ============================================================================
+# scaffold_music_player
+# ============================================================================
+
+func scaffold_music_player(params: Dictionary) -> Dictionary:
+	var _scene_check := McpNodeValidator.require_scene_or_error()
+	if _scene_check.has("error"):
+		return _scene_check
+	var scene_root: Node = _scene_check.scene_root
+
+	var parent_path: String = params.get("parent_path", "")
+	var parent: Node = scene_root
+	if not parent_path.is_empty():
+		parent = McpScenePath.resolve(parent_path, scene_root)
+		if parent == null:
+			return ErrorCodes.make(ErrorCodes.NODE_NOT_FOUND, McpScenePath.format_parent_error(parent_path, scene_root))
+
+	var player_name: String = params.get("name", "MusicPlayer")
+	var stream_path: String = params.get("stream_path", "")
+	var autoplay: bool = bool(params.get("autoplay", true))
+	var volume_db: float = float(params.get("volume_db", 0.0))
+	var bus: String = params.get("bus", "Music")
+	var loop: bool = bool(params.get("loop", true))
+
+	# Ensure bus exists
+	if AudioServer.get_bus_index(bus) == -1:
+		AudioServer.add_bus()
+		var idx := AudioServer.bus_count - 1
+		AudioServer.set_bus_name(idx, bus)
+		AudioServer.set_bus_send(idx, &"Master")
+
+	var player := AudioStreamPlayer.new()
+	player.name = player_name
+	player.bus = bus
+	player.volume_db = volume_db
+	player.autoplay = autoplay
+
+	if not stream_path.is_empty():
+		if ResourceLoader.exists(stream_path):
+			var res := load(stream_path)
+			if res is AudioStream:
+				if loop:
+					if res is AudioStreamWAV:
+						res.loop_mode = AudioStreamWAV.LOOP_FORWARD
+					elif res.has_method("set_loop"):
+						res.set_loop(true)
+				player.stream = res
+
+	_undo_redo.create_action("MCP: Scaffold Music Player '%s'" % player_name)
+	_undo_redo.add_do_method(parent, "add_child", player, true)
+	_undo_redo.add_do_method(player, "set_owner", scene_root)
+	_undo_redo.add_do_reference(player)
+	_undo_redo.add_undo_method(parent, "remove_child", player)
+	_undo_redo.commit_action()
+
+	return {
+		"data": {
+			"player_path": McpScenePath.from_node(player, scene_root),
+			"name": player_name,
+			"bus": bus,
+			"autoplay": autoplay,
+			"volume_db": volume_db,
+			"stream": stream_path,
+			"undoable": true,
+		}
+	}
+

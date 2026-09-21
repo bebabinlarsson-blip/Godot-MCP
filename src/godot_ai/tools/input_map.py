@@ -54,6 +54,12 @@ Ops:
             ``axis_value`` is the direction/value, usually -1.0 or 1.0.
   • ensure_binding(action, event_type, ...)
         Idempotently ensure the action exists and has the requested binding.
+  • scaffold_preset(preset="wasd_platformer")
+        Scaffold a standard input mapping preset.
+        Presets: 'wasd_platformer' (A/D/Space/W/Arrows),
+                 'wasd_topdown' (WASD/Arrows/E/Space),
+                 'first_person' (WASD/Space/Shift/E),
+                 'driving' (W/S/A/D/Arrows/Space).
 """
 
 
@@ -69,6 +75,7 @@ def register_input_map_tools(mcp: FastMCP) -> None:
             "remove_action": input_map_handlers.input_map_remove_action,
             "bind_event": input_map_handlers.input_map_bind_event,
             "ensure_binding": input_map_handlers.input_map_ensure_binding,
+            "scaffold_preset": input_map_handlers.input_map_scaffold_preset,
         },
         read_resource_forms={
             "list": "godot://input_map",

@@ -26,3 +26,17 @@ async def autoload_add(
 async def autoload_remove(runtime: DirectRuntime, name: str) -> dict:
     await require_writable_async(runtime)
     return await runtime.send_command("remove_autoload", {"name": name})
+
+
+async def autoload_scaffold_game_manager(
+    runtime: DirectRuntime,
+    name: str = "GameManager",
+    script_path: str = "res://scripts/game_manager.gd",
+    max_lives: int = 3,
+) -> dict:
+    await require_writable_async(runtime)
+    return await runtime.send_command(
+        "autoload_scaffold_game_manager",
+        {"name": name, "script_path": script_path, "max_lives": max_lives},
+    )
+

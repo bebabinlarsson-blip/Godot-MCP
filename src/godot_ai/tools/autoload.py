@@ -19,6 +19,11 @@ Ops:
         Register an autoload (script or PackedScene) by ``res://`` path.
   • remove(name)
         Unregister an autoload by name. The underlying file is not deleted.
+  • scaffold_game_manager(name="GameManager",
+                          script_path="res://scripts/game_manager.gd",
+                          max_lives=3)
+        Scaffold and register a production-ready GameManager singleton with
+        score, lives, level tracking, typed signals, and scene transition methods.
 """
 
 
@@ -31,6 +36,7 @@ def register_autoload_tools(mcp: FastMCP) -> None:
             "list": autoload_handlers.autoload_list,
             "add": autoload_handlers.autoload_add,
             "remove": autoload_handlers.autoload_remove,
+            "scaffold_game_manager": autoload_handlers.autoload_scaffold_game_manager,
         },
         read_resource_forms={
             "list": None,  ## No aggregate autoload resource yet.

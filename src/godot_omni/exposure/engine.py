@@ -8,14 +8,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
 from godot_omni.exposure.models import (
     CLIENT_BUDGETS,
-    ClientBudget,
     ExposureMode,
 )
-from godot_omni.registry import CanonicalOperation, CanonicalOperationRegistry, get_global_registry
+from godot_omni.registry import CanonicalOperationRegistry, get_global_registry
 
 logger = logging.getLogger(__name__)
 

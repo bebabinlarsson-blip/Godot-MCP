@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import Any
 
 from godot_omni.exposure import AdaptiveExposureEngine, ExposureMode
 from godot_omni.registry import get_global_registry
@@ -29,7 +28,7 @@ def handle_tools_stats(args: argparse.Namespace) -> int:
         print(f"  * Runtime Operations     : {stats['runtime_operations']}")
         print(f"  * Reflection Operations  : {stats['reflection_operations']}")
         print(f"Distinct Domains           : {stats['compact_domains_available']}")
-        print(f"Dynamic Reflection (obj://): Supported")
+        print("Dynamic Reflection (obj://): Supported")
         print("==================================================")
 
     # Hard enforcement: MUST fail if canonical_operations < 1500
@@ -159,7 +158,7 @@ def handle_tools_list(args: argparse.Namespace) -> int:
         print(json.dumps([op.to_dict() for op in filtered], indent=2))
         return 0
 
-    print(f"\nCanonical Operations" + (f" in domain '{domain}'" if domain else "") + f" ({len(filtered)} total):")
+    print("\nCanonical Operations" + (f" in domain '{domain}'" if domain else "") + f" ({len(filtered)} total):")
     print("-" * 80)
     for op in filtered[:50]:
         print(f"* {op.id:<45} [{op.domain}] {op.title}")

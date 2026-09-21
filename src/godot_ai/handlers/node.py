@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from godot_ai.handlers._readiness import require_writable_async
 from godot_ai.runtime.direct import DirectRuntime
 from godot_ai.tools._pagination import paginate

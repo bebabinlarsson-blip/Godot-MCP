@@ -44,6 +44,13 @@ Ops:
         must be a ``res://`` scene inside the project that already exists and
         loads as a PackedScene, so a scaffolded project can be made runnable
         without opening the generic startup-execution surface.
+  • apply_preset(preset="pixel_art_2d", viewport_width=None, viewport_height=None)
+        Configure project display resolution, stretch modes, and texture filtering
+        in one atomic operation.
+        Presets: 'pixel_art_2d' (320x180 viewport stretch, nearest filter),
+                 'hd_2d' (1920x1080 canvas_items stretch, linear filter),
+                 'low_poly_3d' (1280x720 canvas_items expand, FXAA),
+                 'cinematic_3d' (1920x1080 canvas_items expand, 4x MSAA, FXAA, TAA).
 """
 
 
@@ -109,6 +116,7 @@ def register_project_tools(mcp: FastMCP) -> None:
             "settings_get": project_handlers.project_settings_get,
             "settings_set": project_handlers.project_settings_set,
             "set_main_scene": project_handlers.project_set_main_scene,
+            "apply_preset": project_handlers.project_apply_preset,
         },
         read_resource_forms={
             ## stop ends a play session; not a read in the URI sense.

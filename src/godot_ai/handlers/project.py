@@ -85,6 +85,23 @@ async def project_set_main_scene(runtime: DirectRuntime, path: str) -> dict:
     return await runtime.send_command("set_main_scene", {"path": path})
 
 
+async def project_apply_preset(
+    runtime: DirectRuntime,
+    preset: str = "pixel_art_2d",
+    viewport_width: int | None = None,
+    viewport_height: int | None = None,
+) -> dict:
+    """Configure project display, stretch mode, and texture filter via preset."""
+    await require_writable_async(runtime)
+    params: dict[str, Any] = {"preset": preset}
+    if viewport_width is not None:
+        params["viewport_width"] = viewport_width
+    if viewport_height is not None:
+        params["viewport_height"] = viewport_height
+    return await runtime.send_command("project_apply_preset", params)
+
+
+
 def project_info_resource_data(runtime: DirectRuntime) -> dict:
     session = runtime.get_active_session()
     if session is None:

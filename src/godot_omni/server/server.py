@@ -26,7 +26,7 @@ def create_omni_server(
 ) -> FastMCP:
     """Creates a FastMCP server configured with Godot Omni tools and adaptive exposure."""
     registry = get_global_registry()
-    exposure_engine = AdaptiveExposureEngine(registry)
+    _exposure_engine = AdaptiveExposureEngine(registry)
 
     mcp = FastMCP(
         "Godot Omni",

@@ -56,7 +56,7 @@ def _write_json_atomic(path: Path, data: dict[str, Any]) -> bool:
         with os.fdopen(temp_fd, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
             f.write("\n")
-        
+
         # Atomic replace with retry for Windows
         for attempt in range(5):
             try:

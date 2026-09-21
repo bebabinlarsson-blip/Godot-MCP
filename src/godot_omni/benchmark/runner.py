@@ -9,7 +9,6 @@ against performance requirements:
 from __future__ import annotations
 
 import gc
-import statistics
 import sys
 import time
 from dataclasses import dataclass

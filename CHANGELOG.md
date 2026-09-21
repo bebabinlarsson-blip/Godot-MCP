@@ -5,6 +5,21 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.16 (2026-09-21)
+
+Autonomous game systems and engine scaffolding primitives: 2D/3D character controller scaffolding with physics and mouse capture, one-call input map presets, project display and rendering presets, 2D atmospheric lighting environment with radial torch illumination, singleton GameManager architecture with typed signals and scene switching, dedicated background music player scaffolding, and repository linter hygiene.
+
+### Added
+
+- **Character Controller and Movement Scaffolding**: Introduced `character_manage` tool and `CharacterHandler` with `scaffold_2d` and `scaffold_3d` operations.
+  - `scaffold_2d`: Spawns `CharacterBody2D`, fitted `CollisionShape2D`, placeholder visuals, follow camera with trauma screen shake, and injects a production movement script with coyote time, jump buffering, floor snapping, and acceleration/friction curves for `platformer` and `topdown` genres.
+  - `scaffold_3d`: Spawns `CharacterBody3D`, `CapsuleShape3D`, `CapsuleMesh`, and `Camera3D` (head mount or `SpringArm3D`) with mouse look capture, sprinting, jumping, gravity, and air control for `first_person` and `third_person` genres.
+- **Input Map Presets**: Added `scaffold_preset` to `input_map_manage` (and GDScript `InputHandler`) to configure complete physical key bindings in one atomic call for `wasd_platformer`, `wasd_topdown`, `first_person`, and `driving`.
+- **Project Display and Rendering Presets**: Added `apply_preset` to `project_manage` (and GDScript `ProjectHandler`) to atomically configure display viewport dimensions, window override sizes, stretch modes, and texture filtering for `pixel_art_2d`, `hd_2d`, `low_poly_3d`, and `cinematic_3d`.
+- **2D Atmospheric Lighting Environment**: Added `environment_setup_2d` to `resource_manage` (and GDScript `EnvironmentHandler`) to configure ambient tinting via `CanvasModulate` (`dungeon`, `midnight`, `sunset`, `spooky`, `foggy`) and optionally attach a radial falloff `PointLight2D` torch with shadows to target characters.
+- **Game Architecture Singleton Scaffolding**: Added `scaffold_game_manager` to `autoload_manage` (and GDScript `AutoloadHandler`) to generate and register a `GameManager` autoload singleton with typed signals (`score_changed`, `lives_changed`, `game_over`, `level_completed`), score/lives state, and scene reload/transition methods.
+- **Dedicated Background Music Player**: Added `scaffold_music_player` to `audio_manage` (and GDScript `AudioHandler`) to create an `AudioStreamPlayer` routed to the `Music` bus with autoplay, volume control, and loop configuration.
+
 ## 5.0.15 (2026-09-21)
 
 Production game scaffolding primitives and engine reliability hardening: Transport timeout scaling with non-fatal deferred retry, modal dialog detection, procedural chiptune audio synthesis, audio bus topology scaffolding, responsive UI screen scaffolding, 2D/3D navigation mesh and agent management, full 3D environment and lighting presets, 2D follow camera with trauma-based screen shake, and automated scene diagnostics.

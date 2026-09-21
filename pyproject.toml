@@ -1,6 +1,6 @@
 [project]
 name = "godot-ai"
-version = "5.0.15"
+version = "5.0.16"
 
 description = "Production-grade Model Context Protocol (MCP) server for Godot 4 with seamless editor integration"
 readme = { file = "README.md", content-type = "text/markdown" }
@@ -120,3 +120,7 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/godot_omni/**" = ["E501"]
+

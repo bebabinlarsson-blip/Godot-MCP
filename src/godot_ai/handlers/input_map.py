@@ -71,3 +71,15 @@ async def input_map_ensure_binding(
     }
     params.update(kwargs)
     return await runtime.send_command("ensure_binding", params)
+
+
+async def input_map_scaffold_preset(
+    runtime: DirectRuntime,
+    preset: str = "wasd_platformer",
+) -> dict:
+    await require_writable_async(runtime)
+    return await runtime.send_command(
+        "input_map_scaffold_preset",
+        {"preset": preset},
+    )
+

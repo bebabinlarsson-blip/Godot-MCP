@@ -52,6 +52,12 @@ Ops:
         sunset | dark_dungeon | neon_night | clear. Auto-creates
         WorldEnvironment and DirectionalLight3D with matching sky, lighting,
         shadows, and tone mapping in a single undoable step.
+  • environment_setup_2d(preset="dungeon", parent_path="", add_torch_to="",
+                          torch_energy=1.2, torch_radius=2.0, shadows=True)
+        Scaffold complete 2D atmospheric lighting environment. Presets: dungeon |
+        midnight | sunset | spooky | foggy. Creates CanvasModulate ambient tint,
+        and optionally attaches a PointLight2D radial torch with falloff texture
+        and shadows to the target character/object.
   • physics_shape_autofit(path, source_path="", shape_type="")
         Size a CollisionShape2D/3D to a nearby visual's bounds. Searches
         direct siblings then parent-siblings (handles nested
@@ -104,6 +110,7 @@ def register_resource_tools(mcp: FastMCP) -> None:
             "curve_set_points": curve_handlers.curve_set_points,
             "environment_create": environment_handlers.environment_create,
             "environment_setup_3d": environment_handlers.environment_setup_3d,
+            "environment_setup_2d": environment_handlers.environment_setup_2d,
             "physics_shape_autofit": physics_shape_handlers.physics_shape_autofit,
             "physics_shape_generate": physics_shape_handlers.physics_shape_generate,
             "gradient_texture_create": texture_handlers.gradient_texture_create,

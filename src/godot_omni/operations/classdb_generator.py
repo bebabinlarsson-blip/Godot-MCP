@@ -7,7 +7,6 @@ from typing import Any
 from godot_omni.operations.builder import op
 from godot_omni.registry.models import (
     CanonicalOperation,
-    LatencyTier,
     OperationCategory,
     ReadWrite,
 )

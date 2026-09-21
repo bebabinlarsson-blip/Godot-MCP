@@ -89,3 +89,102 @@ func remove_autoload(params: Dictionary) -> Dictionary:
 			"reason": "Autoload changes are saved to project.godot",
 		}
 	}
+
+
+func scaffold_game_manager(params: Dictionary) -> Dictionary:
+	var name: String = params.get("name", "GameManager")
+	var script_path: String = params.get("script_path", "res://scripts/game_manager.gd")
+	var max_lives: int = int(params.get("max_lives", 3))
+
+	var path_err = McpPathValidator.path_error(script_path, "script_path")
+	if path_err != null:
+		return path_err
+
+	var base_dir := script_path.get_base_dir()
+	if not DirAccess.dir_exists_absolute(base_dir):
+		DirAccess.make_dir_recursive_absolute(base_dir)
+
+	var code := """extends Node
+
+signal score_changed(new_score: int)
+signal lives_changed(new_lives: int)
+signal game_over
+signal level_completed
+
+var score: int = 0
+var lives: int = %d
+var current_level: int = 1
+var is_game_over: bool = false
+
+func add_score(amount: int) -> void:
+	if is_game_over:
+		return
+	score += amount
+	score_changed.emit(score)
+
+func reset_score() -> void:
+	score = 0
+	score_changed.emit(score)
+
+func take_damage(amount: int = 1) -> void:
+	if is_game_over:
+		return
+	lives = max(lives - amount, 0)
+	lives_changed.emit(lives)
+	if lives <= 0:
+		trigger_game_over()
+
+func add_lives(amount: int = 1) -> void:
+	if is_game_over:
+		return
+	lives += amount
+	lives_changed.emit(lives)
+
+func trigger_game_over() -> void:
+	is_game_over = true
+	game_over.emit()
+
+func trigger_level_complete() -> void:
+	level_completed.emit()
+
+func restart_game() -> void:
+	score = 0
+	lives = %d
+	is_game_over = false
+	score_changed.emit(score)
+	lives_changed.emit(lives)
+	get_tree().reload_current_scene()
+
+func change_scene(scene_path: String) -> void:
+	get_tree().change_scene_to_file(scene_path)
+""" % [max_lives, max_lives]
+
+	var file := FileAccess.open(script_path, FileAccess.WRITE)
+	if file == null:
+		return ErrorCodes.make(ErrorCodes.INTERNAL_ERROR, "Failed to create script file at %s" % script_path)
+	file.store_string(code)
+	file.close()
+
+	EditorInterface.get_resource_filesystem().reindex_file(script_path)
+
+	var key := "autoload/%s" % name
+	var value := "*" + script_path
+	ProjectSettings.set_setting(key, value)
+	ProjectSettings.set_initial_value(key, "")
+	ProjectSettings.set_as_basic(key, true)
+	var err := ProjectSettings.save()
+	if err != OK:
+		return ErrorCodes.make(ErrorCodes.INTERNAL_ERROR,
+			"Failed to save project settings while registering autoload '%s': %s (error %d)" % [name, error_string(err), err])
+
+	return {
+		"data": {
+			"name": name,
+			"path": script_path,
+			"singleton": true,
+			"max_lives": max_lives,
+			"undoable": false,
+			"reason": "Autoload changes are saved to project.godot",
+		}
+	}
+

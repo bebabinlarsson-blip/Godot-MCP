@@ -335,3 +335,118 @@ func setup_environment_3d(params: Dictionary) -> Dictionary:
 		"glow": glow,
 	}
 
+
+func setup_environment_2d(params: Dictionary) -> Dictionary:
+	var scene_check := McpNodeValidator.require_scene_or_error()
+	if scene_check.has("error"):
+		return scene_check
+	var scene_root: Node = scene_check.scene_root
+
+	var parent_path: String = params.get("parent_path", "")
+	var parent: Node = scene_root
+	if not parent_path.is_empty():
+		var resolved := McpNodeValidator.resolve_or_error(parent_path, "parent_path")
+		if resolved.has("error"):
+			return resolved
+		parent = resolved.node
+
+	var preset: String = params.get("preset", "dungeon").to_lower()
+	var add_torch_to: String = params.get("add_torch_to", "")
+	var torch_energy: float = float(params.get("torch_energy", 1.2))
+	var torch_radius: float = float(params.get("torch_radius", 2.0))
+	var shadows: bool = bool(params.get("shadows", true))
+
+	var ambient_color := Color(0.12, 0.12, 0.18, 1.0)
+	var torch_color := Color(1.0, 0.8, 0.5, 1.0)
+
+	match preset:
+		"dungeon":
+			ambient_color = Color(0.12, 0.12, 0.18, 1.0)
+			torch_color = Color(1.0, 0.75, 0.45, 1.0)
+		"midnight":
+			ambient_color = Color(0.04, 0.04, 0.1, 1.0)
+			torch_color = Color(0.8, 0.85, 1.0, 1.0)
+		"sunset":
+			ambient_color = Color(0.8, 0.45, 0.35, 1.0)
+			torch_color = Color(1.0, 0.9, 0.6, 1.0)
+		"spooky":
+			ambient_color = Color(0.08, 0.16, 0.1, 1.0)
+			torch_color = Color(0.5, 1.0, 0.5, 1.0)
+		"foggy":
+			ambient_color = Color(0.4, 0.42, 0.45, 1.0)
+			torch_color = Color(1.0, 1.0, 0.9, 1.0)
+		_:
+			return ErrorCodes.make(ErrorCodes.VALUE_OUT_OF_RANGE,
+				"Unknown preset '%s'. Supported presets: 'dungeon', 'midnight', 'sunset', 'spooky', 'foggy'." % preset)
+
+	var canvas_mod: CanvasModulate = null
+	for child in parent.get_children():
+		if child is CanvasModulate:
+			canvas_mod = child
+			break
+
+	var created_mod := false
+	if canvas_mod == null:
+		canvas_mod = CanvasModulate.new()
+		canvas_mod.name = "CanvasModulate"
+		canvas_mod.color = ambient_color
+		created_mod = true
+
+	var torch_node: PointLight2D = null
+	var torch_parent: Node = null
+	if not add_torch_to.is_empty():
+		var t_resolved := McpNodeValidator.resolve_or_error(add_torch_to, "add_torch_to")
+		if t_resolved.has("error"):
+			return t_resolved
+		torch_parent = t_resolved.node
+
+		torch_node = PointLight2D.new()
+		torch_node.name = "TorchLight2D"
+		torch_node.color = torch_color
+		torch_node.energy = torch_energy
+		torch_node.texture_scale = torch_radius
+		torch_node.shadow_enabled = shadows
+
+		var grad_tex := GradientTexture2D.new()
+		grad_tex.fill = GradientTexture2D.FILL_RADIAL
+		grad_tex.fill_from = Vector2(0.5, 0.5)
+		grad_tex.fill_to = Vector2(0.5, 0.0)
+		var grad := Gradient.new()
+		grad.set_color(0, Color(1.0, 1.0, 1.0, 1.0))
+		grad.set_color(1, Color(1.0, 1.0, 1.0, 0.0))
+		grad_tex.gradient = grad
+		grad_tex.width = 256
+		grad_tex.height = 256
+		torch_node.texture = grad_tex
+
+	_undo_redo.create_action("Setup 2D Environment: %s" % preset)
+	if created_mod:
+		_undo_redo.add_do_method(parent, "add_child", canvas_mod)
+		_undo_redo.add_do_reference(canvas_mod)
+		_undo_redo.add_undo_method(parent, "remove_child", canvas_mod)
+	else:
+		_undo_redo.add_do_property(canvas_mod, "color", ambient_color)
+
+	if torch_node != null and torch_parent != null:
+		_undo_redo.add_do_method(torch_parent, "add_child", torch_node)
+		_undo_redo.add_do_reference(torch_node)
+		_undo_redo.add_undo_method(torch_parent, "remove_child", torch_node)
+
+	_undo_redo.commit_action()
+
+	if created_mod:
+		canvas_mod.owner = scene_root
+	if torch_node != null:
+		torch_node.owner = scene_root
+
+	return {
+		"data": {
+			"canvas_modulate": McpScenePath.from_node(canvas_mod, scene_root),
+			"ambient_color": ambient_color.to_html(true),
+			"preset": preset,
+			"torch_light": McpScenePath.from_node(torch_node, scene_root) if torch_node != null else "",
+			"undoable": true,
+		}
+	}
+
+

@@ -220,7 +220,7 @@ async def mesh_create_primitive(
     albedo_color: list[float] | None = None,
     position: list[float] | None = None,
 ) -> dict:
-    """Create a 3D PrimitiveMesh (box, sphere, cylinder, plane, capsule, prism) with material and transform."""
+    """Create a 3D PrimitiveMesh (box, sphere, cylinder, plane, capsule, prism)."""
     return await runtime.send_command(
         "mesh_create_primitive",
         {
@@ -270,7 +270,7 @@ async def animation_preset_motion(
     duration: float = 1.0,
     loop: bool = True,
 ) -> dict:
-    """Generate procedural motion presets (pulse, fade_in, fade_out, slide_in) into an AnimationPlayer."""
+    """Generate procedural motion presets (pulse, fade_in, fade_out, slide_in)."""
     return await runtime.send_command(
         "animation_preset_motion",
         {

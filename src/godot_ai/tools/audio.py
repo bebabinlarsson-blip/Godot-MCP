@@ -42,6 +42,10 @@ Ops:
         Presets: jump | coin | laser | hit | explosion | powerup | step | click.
   • scaffold_buses(volumes=None)
         Configure standard Master, Music, SFX, and UI audio buses in AudioServer.
+  • scaffold_music_player(parent_path="", name="MusicPlayer", stream_path="",
+                          autoplay=True, volume_db=0.0, bus="Music", loop=True)
+        Scaffold a dedicated background music player (AudioStreamPlayer)
+        routed to the Music bus with autoplay and loop configuration.
 """
 
 
@@ -59,6 +63,7 @@ def register_audio_tools(mcp: FastMCP) -> None:
             "list": audio_handlers.audio_list,
             "generate_procedural_sfx": audio_handlers.audio_generate_procedural_sfx,
             "scaffold_buses": audio_handlers.audio_scaffold_buses,
+            "scaffold_music_player": audio_handlers.audio_scaffold_music_player,
         },
         read_resource_forms={
             ## Audio reads are stateful and per-player; no aggregate resource.

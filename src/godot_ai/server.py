@@ -79,6 +79,7 @@ from godot_ai.tools.audio import register_audio_tools
 from godot_ai.tools.autoload import register_autoload_tools
 from godot_ai.tools.batch import register_batch_tools
 from godot_ai.tools.camera import register_camera_tools
+from godot_ai.tools.character import register_character_tools
 from godot_ai.tools.client import register_client_tools
 from godot_ai.tools.csg import register_csg_tools
 from godot_ai.tools.custom import register_custom_tools
@@ -252,6 +253,10 @@ _ROLLUP_BLOCKS: tuple[tuple[str | None, str], ...] = (
         "audio",
         "  audio_manage     player_create, player_set_stream, player_set_playback,\n"
         "                   play, stop, list\n",
+    ),
+    (
+        "character",
+        "  character_manage scaffold_2d, scaffold_3d\n",
     ),
     (
         "particle",
@@ -891,6 +896,8 @@ def create_server(
         register_camera_tools(mcp)
     if "audio" not in exclude:
         register_audio_tools(mcp)
+    if "character" not in exclude:
+        register_character_tools(mcp)
     if "tilemap" not in exclude:
         register_tilemap_tools(mcp)
     if "tileset" not in exclude:

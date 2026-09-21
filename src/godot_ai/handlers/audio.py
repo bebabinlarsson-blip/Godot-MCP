@@ -111,3 +111,28 @@ async def audio_scaffold_buses(
         params["volumes"] = volumes
     return await runtime.send_command("audio_scaffold_buses", params)
 
+
+async def audio_scaffold_music_player(
+    runtime: DirectRuntime,
+    parent_path: str = "",
+    name: str = "MusicPlayer",
+    stream_path: str = "",
+    autoplay: bool = True,
+    volume_db: float = 0.0,
+    bus: str = "Music",
+    loop: bool = True,
+) -> dict:
+    """Scaffold a background music player AudioStreamPlayer routed to Music bus."""
+    await require_writable_async(runtime)
+    params: dict[str, Any] = {
+        "parent_path": parent_path,
+        "name": name,
+        "stream_path": stream_path,
+        "autoplay": autoplay,
+        "volume_db": volume_db,
+        "bus": bus,
+        "loop": loop,
+    }
+    return await runtime.send_command("audio_scaffold_music_player", params)
+
+
