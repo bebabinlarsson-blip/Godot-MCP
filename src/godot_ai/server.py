@@ -89,8 +89,10 @@ from godot_ai.tools.editor import register_editor_tools
 from godot_ai.tools.filesystem import register_filesystem_tools
 from godot_ai.tools.fsm import register_fsm_tools
 from godot_ai.tools.game import register_game_tools
+from godot_ai.tools.geometry import register_geometry_tools
 from godot_ai.tools.gridmap import register_gridmap_tools
 from godot_ai.tools.input_map import register_input_map_tools
+from godot_ai.tools.localization import register_localization_tools
 from godot_ai.tools.material import register_material_tools
 from godot_ai.tools.navigation import register_navigation_tools
 from godot_ai.tools.node import register_node_tools
@@ -235,7 +237,8 @@ _ROLLUP_BLOCKS: tuple[tuple[str | None, str], ...] = (
     ("script", "  script_manage    read, detach, find_symbols\n"),
     (
         "project",
-        "  project_manage   stop, settings_get, settings_set, set_main_scene\n",
+        "  project_manage   stop, settings_get, settings_set, set_main_scene,\n"
+        "                   apply_preset, get_info\n",
     ),
     (
         "editor",
@@ -258,7 +261,11 @@ _ROLLUP_BLOCKS: tuple[tuple[str | None, str], ...] = (
     (
         "audio",
         "  audio_manage     player_create, player_set_stream, player_set_playback,\n"
-        "                   play, stop, list\n",
+        "                   play, stop, list, generate_procedural_sfx,\n"
+        "                   scaffold_buses, scaffold_music_player,\n"
+        "                   scaffold_sound_manager, bus_list, bus_add,\n"
+        "                   bus_remove, bus_set_properties, bus_add_effect,\n"
+        "                   bus_save_layout\n",
     ),
     (
         "character",
@@ -346,7 +353,18 @@ _ROLLUP_BLOCKS: tuple[tuple[str | None, str], ...] = (
     (
         "physics",
         "  physics_manage   raycast_2d, raycast_3d, query_point_2d,\n"
-        "                   scaffold_sensor\n",
+        "                   query_point_3d, scaffold_sensor, shapecast_scaffold,\n"
+        "                   set_layer_names, get_layer_names\n",
+    ),
+    (
+        "localization",
+        "  localization_manage scaffold_csv, add_entry, get_locales, set_locale,\n"
+        "                   translate, extract_strings\n",
+    ),
+    (
+        "geometry",
+        "  geometry_manage  polygon_boolean, polygon_offset, triangulate,\n"
+        "                   convex_hull, scaffold_polygon_2d, generate_mesh\n",
     ),
 )
 
@@ -953,6 +971,10 @@ def create_server(
         register_shader_tools(mcp)
     if "physics" not in exclude:
         register_physics_tools(mcp)
+    if "localization" not in exclude:
+        register_localization_tools(mcp)
+    if "geometry" not in exclude:
+        register_geometry_tools(mcp)
 
 
     register_session_resources(mcp)

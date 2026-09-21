@@ -50,6 +50,20 @@ Ops:
                            pool_size=16, bus="SFX", register_autoload=True)
         Scaffold a multi-channel sound effect manager singleton with AudioStreamPlayer
         pooling, pitch variation, and 2D spatial audio helper.
+  • bus_list()
+        List all AudioServer buses with their properties and effects.
+  • bus_add(name, send="Master", volume_db=0.0, at_pos=-1)
+        Add a new audio bus and route it to a parent bus.
+  • bus_remove(bus)
+        Remove an audio bus by name or index.
+  • bus_set_properties(bus, volume_db?, send?, solo?, mute?, bypass_effects?)
+        Update properties on an existing bus.
+  • bus_add_effect(bus, effect_type, at_position=-1, enabled=True, params={})
+        Add an audio effect to a bus. Types: Reverb, Delay, Chorus, Phaser,
+        Distortion, EQ, Compressor, Limiter, LowPassFilter, HighPassFilter,
+        BandPassFilter, NotchFilter, Amplify.
+  • bus_save_layout(path="res://default_bus_layout.tres")
+        Save the current AudioServer bus layout to a resource file.
 """
 
 
@@ -69,11 +83,18 @@ def register_audio_tools(mcp: FastMCP) -> None:
             "scaffold_buses": audio_handlers.audio_scaffold_buses,
             "scaffold_music_player": audio_handlers.audio_scaffold_music_player,
             "scaffold_sound_manager": audio_handlers.audio_scaffold_sound_manager,
+            "bus_list": audio_handlers.audio_bus_list,
+            "bus_add": audio_handlers.audio_bus_add,
+            "bus_remove": audio_handlers.audio_bus_remove,
+            "bus_set_properties": audio_handlers.audio_bus_set_properties,
+            "bus_add_effect": audio_handlers.audio_bus_add_effect,
+            "bus_save_layout": audio_handlers.audio_bus_save_layout,
         },
         read_resource_forms={
             ## Audio reads are stateful and per-player; no aggregate resource.
             "play": None,
             "stop": None,
             "list": None,
+            "bus_list": None,
         },
     )

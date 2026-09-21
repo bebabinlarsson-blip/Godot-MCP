@@ -5,6 +5,44 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.19 (2026-09-21)
+
+Engine geometry synthesis, localization pipeline, audio bus routing, and advanced physics queries: Comprehensive 2D and 3D procedural geometry via geometry_manage, full TranslationServer and CSV localization via localization_manage, in-depth AudioServer bus and DSP effect management in audio_manage, 3D point queries and ShapeCast sensors in physics_manage, and comprehensive project metadata querying in project_manage.
+
+### Added
+
+- **Procedural Geometry and Mesh Synthesis (`geometry_manage`)**:
+  - Introduced `geometry_manage` tool and `GeometryHandler` providing direct access to Godot's Geometry2D and SurfaceTool pipelines.
+  - `polygon_boolean`: Perform 2D constructive solid polygon operations (merge, difference, intersection, xor) via Geometry2D.
+  - `polygon_offset`: Inflate or deflate 2D polygons with configurable delta and join types (square, round, miter).
+  - `triangulate`: Decompose 2D polygons into index arrays for mesh and collision generation via Geometry2D.triangulate_polygon.
+  - `convex_hull`: Compute 2D convex hull wrapping arbitrary point sets via Geometry2D.convex_hull.
+  - `scaffold_polygon_2d`: Instantiate and attach Polygon2D or CollisionPolygon2D nodes directly into active scenes.
+  - `generate_mesh`: Generate procedural 3D meshes (cube, plane, pyramid) via SurfaceTool, supporting direct scene attachment or resource saving to res://.
+- **Localization and Translation System (`localization_manage`)**:
+  - Introduced `localization_manage` tool and `LocalizationHandler` integrating TranslationServer and CSV-based translation workflows.
+  - `scaffold_csv`: Generate standard multi-language CSV files and automatically register them in ProjectSettings.
+  - `add_entry`: Insert or update translation rows with multi-language strings in project localization CSV files.
+  - `get_locales`: Query loaded locales, fallback locales, and translation domains from TranslationServer.
+  - `set_locale`: Set the active test locale in TranslationServer for immediate in-editor preview.
+  - `translate`: Translate message keys via TranslationServer with context support.
+  - `extract_strings`: Scan project GDScript and scene files for tr() message lookup occurrences.
+- **AudioServer Bus and DSP Effect Management (`audio_manage`)**:
+  - Expanded `audio_manage` with comprehensive AudioServer bus routing and effect management.
+  - `bus_list`: Query all active audio buses, volume decibels, routing targets, and DSP effects.
+  - `bus_add`: Create new audio buses routed to designated parent buses.
+  - `bus_remove`: Remove audio buses by name or index.
+  - `bus_set_properties`: Atomically configure bus volume, mute, solo, and effect bypass flags.
+  - `bus_add_effect`: Attach audio effects (Reverb, Delay, Chorus, Phaser, Distortion, EQ, Compressor, Limiter, LowPassFilter, HighPassFilter, BandPassFilter, NotchFilter, Amplify) with parameter tuning.
+  - `bus_save_layout`: Persist current AudioServer bus layouts to .tres resource files.
+- **Advanced Physics Queries and Layer Management (`physics_manage`)**:
+  - `query_point_3d`: Query physics bodies and areas intersecting a given 3D world coordinate via PhysicsServer3D.
+  - `shapecast_scaffold`: Instantiate and attach ShapeCast2D or ShapeCast3D sweep sensors with configurable collision shapes.
+  - `set_layer_names`: Configure human-readable names for 2D/3D physics and render layers in ProjectSettings.
+  - `get_layer_names`: Read configured layer names across physics, render, and navigation layers.
+- **Project Metadata Snapshot (`project_manage`)**:
+  - Added `get_info` operation returning Godot engine version, project name, path, display settings, rendering method, and registered autoloads.
+
 ## 5.0.18 (2026-09-21)
 
 Universal Godot engine access, reflection, and total automation expansion: Universal engine control and arbitrary GDScript evaluation in the editor process via omni_manage, complete visual shader synthesis with production game presets via shader_manage, direct space-state physics queries and sensor scaffolding via physics_manage, editor-process GDScript evaluation in editor_manage, and universal node method invocation in node_manage.

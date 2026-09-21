@@ -1102,6 +1102,13 @@ def test_v3_chain_signs_onward_bundle_without_changing_single_hop(
     tmp_path, monkeypatch, next_version
 ):
     smoke = load_smoke_script()
+    git_tag_check = subprocess.run(
+        ["git", "rev-parse", "-q", "--verify", "refs/tags/v3.2.5"],
+        cwd=ROOT,
+        capture_output=True,
+    )
+    if git_tag_check.returncode != 0:
+        pytest.skip("v3.2.5 git tag is required for v3-crossing fixture test")
     project = tmp_path / "chain"
     result = smoke.prepare_v3_crossing_project(
         project,

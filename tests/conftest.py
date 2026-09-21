@@ -17,8 +17,15 @@ from __future__ import annotations
 ## can pass ``GODOT_AI_DISABLE_TELEMETRY=false`` (or unset it) before
 ## invoking pytest to bring the live path back.
 import os
+import shutil
+from pathlib import Path
 
 os.environ.setdefault("GODOT_AI_DISABLE_TELEMETRY", "true")
+
+if os.name == "nt" and not shutil.which("openssl"):
+    git_bin = Path(r"C:\Program Files\Git\usr\bin")
+    if (git_bin / "openssl.exe").is_file():
+        os.environ["PATH"] = f"{git_bin};{os.environ.get('PATH', '')}"
 
 import asyncio
 import hmac

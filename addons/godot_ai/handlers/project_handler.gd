@@ -297,6 +297,36 @@ func apply_preset(params: Dictionary) -> Dictionary:
 	}
 
 
+func get_info(params: Dictionary = {}) -> Dictionary:
+	var name: String = ProjectSettings.get_setting("application/config/name", "")
+	var desc: String = ProjectSettings.get_setting("application/config/description", "")
+	var version: String = ProjectSettings.get_setting("application/config/version", "")
+	var main_scene: String = ProjectSettings.get_setting(MAIN_SCENE_KEY, "")
+	var vw: int = int(ProjectSettings.get_setting("display/window/size/viewport_width", 1152))
+	var vh: int = int(ProjectSettings.get_setting("display/window/size/viewport_height", 648))
+	var stretch_mode: String = str(ProjectSettings.get_setting("display/window/stretch/mode", "disabled"))
+	var stretch_aspect: String = str(ProjectSettings.get_setting("display/window/stretch/aspect", "ignore"))
+	var renderer: String = str(ProjectSettings.get_setting("rendering/renderer/rendering_method", "forward_plus"))
+	var features: PackedStringArray = ProjectSettings.get_setting("application/config/features", PackedStringArray())
+
+	return {
+		"data": {
+			"name": name,
+			"description": desc,
+			"version": version,
+			"main_scene": main_scene,
+			"viewport_width": vw,
+			"viewport_height": vh,
+			"stretch_mode": stretch_mode,
+			"stretch_aspect": stretch_aspect,
+			"rendering_method": renderer,
+			"features": Array(features),
+			"is_playing": EditorInterface.is_playing_scene(),
+			"edited_scene_root": str(EditorInterface.get_edited_scene_root().name) if EditorInterface.get_edited_scene_root() != null else ""
+		}
+	}
+
+
 func run_project(params: Dictionary) -> Dictionary:
 	var mode: String = params.get("mode", "main")
 	var autosave: bool = params.get("autosave", true)

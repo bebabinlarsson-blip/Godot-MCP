@@ -101,6 +101,12 @@ async def project_apply_preset(
     return await runtime.send_command("project_apply_preset", params)
 
 
+async def project_get_info(
+    runtime: DirectRuntime,
+) -> dict:
+    """Get structured project metadata, display settings, and active scene status."""
+    return await runtime.send_command("project_get_info", {}, timeout=10.0)
+
 
 def project_info_resource_data(runtime: DirectRuntime) -> dict:
     session = runtime.get_active_session()

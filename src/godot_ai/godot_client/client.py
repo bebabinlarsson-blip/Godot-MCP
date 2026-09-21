@@ -241,24 +241,9 @@ class GodotClient:
                 params=params,
                 timeout=effective_timeout,
             )
-        except ConnectionError as exc:
+        except (ConnectionError, TimeoutError) as exc:
             self._record_failure(session_id, kind=type(exc).__name__)
             raise
-        except TimeoutError as exc:
-            raise GodotCommandError(
-                code=ErrorCode.DEFERRED_TIMEOUT,
-                message=(
-                    f"Command '{command}' timed out after {effective_timeout:.1f}s. "
-                    "The editor may be compiling shaders, importing assets, or busy. "
-                    "You may retry with a larger timeout."
-                ),
-                data={
-                    "retryable": True,
-                    "command": command,
-                    "timeout": effective_timeout,
-                    "session_id": session_id,
-                },
-            ) from exc
         except PendingCommandLimitError as exc:
             raise GodotCommandError(
                 code=ErrorCode.TRANSPORT_OVERLOADED,

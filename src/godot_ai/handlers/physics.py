@@ -99,3 +99,79 @@ async def physics_scaffold_sensor(
         },
         timeout=15.0,
     )
+
+
+async def physics_query_point_3d(
+    runtime: DirectRuntime,
+    point: list[float] | None = None,
+    collision_mask: int = 4294967295,
+    max_results: int = 32,
+    collide_with_bodies: bool = True,
+    collide_with_areas: bool = False,
+) -> dict:
+    """Query intersecting colliders at a given 3D world point."""
+    return await runtime.send_command(
+        "physics_query_point_3d",
+        {
+            "point": point or [0, 0, 0],
+            "collision_mask": collision_mask,
+            "max_results": max_results,
+            "collide_with_bodies": collide_with_bodies,
+            "collide_with_areas": collide_with_areas,
+        },
+        timeout=10.0,
+    )
+
+
+async def physics_shapecast_scaffold(
+    runtime: DirectRuntime,
+    parent_path: str = "",
+    target_position: list[float] | None = None,
+    is_2d: bool = False,
+    sensor_name: str = "ShapeCastSensor",
+    collision_mask: int = 1,
+    shape_type: str = "sphere",
+) -> dict:
+    """Scaffold and attach a ShapeCast2D or ShapeCast3D sensor to a node."""
+    await require_writable_async(runtime)
+    return await runtime.send_command(
+        "physics_shapecast_scaffold",
+        {
+            "parent_path": parent_path,
+            "target_position": target_position,
+            "is_2d": is_2d,
+            "sensor_name": sensor_name,
+            "collision_mask": collision_mask,
+            "shape_type": shape_type,
+        },
+        timeout=15.0,
+    )
+
+
+async def physics_set_layer_names(
+    runtime: DirectRuntime,
+    layer_type: str = "2d_physics",
+    layers: dict | None = None,
+) -> dict:
+    """Configure human-readable physics or render layer names in ProjectSettings."""
+    await require_writable_async(runtime)
+    return await runtime.send_command(
+        "physics_set_layer_names",
+        {
+            "layer_type": layer_type,
+            "layers": layers or {},
+        },
+        timeout=10.0,
+    )
+
+
+async def physics_get_layer_names(
+    runtime: DirectRuntime,
+    layer_type: str = "all",
+) -> dict:
+    """Read configured layer names across physics and render layers."""
+    return await runtime.send_command(
+        "physics_get_layer_names",
+        {"layer_type": layer_type},
+        timeout=10.0,
+    )

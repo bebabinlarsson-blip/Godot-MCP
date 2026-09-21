@@ -156,4 +156,88 @@ async def audio_scaffold_sound_manager(
     return await runtime.send_command("audio_scaffold_sound_manager", params)
 
 
+async def audio_bus_list(
+    runtime: DirectRuntime,
+) -> dict:
+    """List all audio buses and their configured effects in AudioServer."""
+    return await runtime.send_command("audio_bus_list", {}, timeout=10.0)
 
+
+async def audio_bus_add(
+    runtime: DirectRuntime,
+    name: str = "",
+    send: str = "Master",
+    volume_db: float = 0.0,
+    at_pos: int = -1,
+) -> dict:
+    """Add a new audio bus to AudioServer."""
+    await require_writable_async(runtime)
+    return await runtime.send_command(
+        "audio_bus_add",
+        {"name": name, "send": send, "volume_db": volume_db, "at_pos": at_pos},
+        timeout=10.0,
+    )
+
+
+async def audio_bus_remove(
+    runtime: DirectRuntime,
+    bus: str | int = "",
+) -> dict:
+    """Remove an audio bus from AudioServer by name or index."""
+    await require_writable_async(runtime)
+    return await runtime.send_command("audio_bus_remove", {"bus": bus}, timeout=10.0)
+
+
+async def audio_bus_set_properties(
+    runtime: DirectRuntime,
+    bus: str | int = "",
+    volume_db: float | None = None,
+    send: str | None = None,
+    solo: bool | None = None,
+    mute: bool | None = None,
+    bypass_effects: bool | None = None,
+) -> dict:
+    """Update properties on an audio bus in AudioServer."""
+    await require_writable_async(runtime)
+    params: dict[str, Any] = {"bus": bus}
+    if volume_db is not None:
+        params["volume_db"] = volume_db
+    if send is not None:
+        params["send"] = send
+    if solo is not None:
+        params["solo"] = solo
+    if mute is not None:
+        params["mute"] = mute
+    if bypass_effects is not None:
+        params["bypass_effects"] = bypass_effects
+    return await runtime.send_command("audio_bus_set_properties", params, timeout=10.0)
+
+
+async def audio_bus_add_effect(
+    runtime: DirectRuntime,
+    bus: str | int = "Master",
+    effect_type: str = "reverb",
+    params: dict | None = None,
+    at_pos: int = -1,
+) -> dict:
+    """Instantiate and attach a DSP effect to an audio bus."""
+    await require_writable_async(runtime)
+    return await runtime.send_command(
+        "audio_bus_add_effect",
+        {
+            "bus": bus,
+            "effect_type": effect_type,
+            "params": params or {},
+            "at_pos": at_pos,
+        },
+        timeout=10.0,
+    )
+
+
+async def audio_bus_save_layout(
+    runtime: DirectRuntime,
+    path: str = "res://default_bus_layout.tres",
+) -> dict:
+    """Save active AudioServer bus layout to a .tres resource."""
+    await require_writable_async(runtime)
+    return await runtime.send_command("audio_bus_save_layout", {"path": path}, timeout=10.0)

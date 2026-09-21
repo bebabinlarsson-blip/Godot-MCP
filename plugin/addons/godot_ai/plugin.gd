@@ -401,6 +401,8 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy_handler("omni", HANDLERS_DIR + "omni_handler.gd", [undo, _connection])
 	_dispatcher.register_lazy_handler("shader", HANDLERS_DIR + "shader_handler.gd", [undo, _connection])
 	_dispatcher.register_lazy_handler("physics", HANDLERS_DIR + "physics_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("localization", HANDLERS_DIR + "localization_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("geometry", HANDLERS_DIR + "geometry_handler.gd", [undo, _connection])
 
 	_dispatcher.register_lazy("get_editor_state", "editor", &"get_editor_state")
 	_dispatcher.register_lazy("get_scene_tree", "scene", &"get_scene_tree")
@@ -640,6 +642,33 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy("physics_raycast_3d", "physics", &"raycast_3d")
 	_dispatcher.register_lazy("physics_query_point_2d", "physics", &"query_point_2d")
 	_dispatcher.register_lazy("physics_scaffold_sensor", "physics", &"scaffold_sensor")
+	_dispatcher.register_lazy("physics_query_point_3d", "physics", &"query_point_3d")
+	_dispatcher.register_lazy("physics_shapecast_scaffold", "physics", &"shapecast_scaffold")
+	_dispatcher.register_lazy("physics_set_layer_names", "physics", &"set_layer_names")
+	_dispatcher.register_lazy("physics_get_layer_names", "physics", &"get_layer_names")
+
+	_dispatcher.register_lazy("localization_scaffold_csv", "localization", &"scaffold_csv")
+	_dispatcher.register_lazy("localization_add_entry", "localization", &"add_entry")
+	_dispatcher.register_lazy("localization_get_locales", "localization", &"get_locales")
+	_dispatcher.register_lazy("localization_set_locale", "localization", &"set_locale")
+	_dispatcher.register_lazy("localization_translate", "localization", &"translate")
+	_dispatcher.register_lazy("localization_extract_strings", "localization", &"extract_strings")
+
+	_dispatcher.register_lazy("geometry_polygon_boolean", "geometry", &"polygon_boolean")
+	_dispatcher.register_lazy("geometry_polygon_offset", "geometry", &"polygon_offset")
+	_dispatcher.register_lazy("geometry_triangulate", "geometry", &"triangulate")
+	_dispatcher.register_lazy("geometry_convex_hull", "geometry", &"convex_hull")
+	_dispatcher.register_lazy("geometry_scaffold_polygon_2d", "geometry", &"scaffold_polygon_2d")
+	_dispatcher.register_lazy("geometry_generate_mesh", "geometry", &"generate_mesh")
+
+	_dispatcher.register_lazy("audio_bus_list", "audio", &"bus_list")
+	_dispatcher.register_lazy("audio_bus_add", "audio", &"bus_add")
+	_dispatcher.register_lazy("audio_bus_remove", "audio", &"bus_remove")
+	_dispatcher.register_lazy("audio_bus_set_properties", "audio", &"bus_set_properties")
+	_dispatcher.register_lazy("audio_bus_add_effect", "audio", &"bus_add_effect")
+	_dispatcher.register_lazy("audio_bus_save_layout", "audio", &"bus_save_layout")
+
+	_dispatcher.register_lazy("project_get_info", "project", &"get_info")
 
 	_connection.dispatcher = _dispatcher
 	add_child(_connection)

@@ -51,6 +51,10 @@ Ops:
                  'hd_2d' (1920x1080 canvas_items stretch, linear filter),
                  'low_poly_3d' (1280x720 canvas_items expand, FXAA),
                  'cinematic_3d' (1920x1080 canvas_items expand, 4x MSAA, FXAA, TAA).
+  * get_info()
+        Retrieve comprehensive project metadata: Godot version, project name,
+        project path, display settings, rendering settings, active scenes, and
+        registered autoloads.
 """
 
 
@@ -117,10 +121,12 @@ def register_project_tools(mcp: FastMCP) -> None:
             "settings_set": project_handlers.project_settings_set,
             "set_main_scene": project_handlers.project_set_main_scene,
             "apply_preset": project_handlers.project_apply_preset,
+            "get_info": project_handlers.project_get_info,
         },
         read_resource_forms={
             ## stop ends a play session; not a read in the URI sense.
             "stop": None,
             "settings_get": "godot://project/settings",
+            "get_info": "godot://project/info",
         },
     )

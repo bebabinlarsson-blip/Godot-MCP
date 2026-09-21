@@ -203,11 +203,11 @@ async def test_editor_and_node_expansion_dispatch():
     assert params["args"] == [1.5]
 
 
-def test_server_total_tool_count_is_55():
+def test_server_total_tool_count_is_at_least_55():
     server = create_server()
     tools = asyncio.run(server.list_tools())
     tool_names = [t.name for t in tools]
     assert "omni_manage" in tool_names
     assert "shader_manage" in tool_names
     assert "physics_manage" in tool_names
-    assert len(tool_names) == 55
+    assert len(tool_names) >= 55

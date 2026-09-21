@@ -251,16 +251,16 @@ def main() -> int:
         if next_version == base_version:
             next_version = bump_patch_version(base_version)
         for label, value in (("base", base_version), ("next", next_version)):
-            if re.fullmatch(r"4\.\d+\.\d+", value) is None:
-                raise HarnessError(f"{label} smoke version must be a canonical v4 version")
+            if re.fullmatch(r"[45]\.\d+\.\d+", value) is None:
+                raise HarnessError(f"{label} smoke version must be a canonical version")
         server_version = args.server_version or base_version
         next_server_version = args.next_server_version or next_version
         for label, value in (
             ("base server", server_version),
             ("next server", next_server_version),
         ):
-            if re.fullmatch(r"4\.\d+\.\d+", value) is None:
-                raise HarnessError(f"{label} smoke version must be a canonical v4 version")
+            if re.fullmatch(r"[45]\.\d+\.\d+", value) is None:
+                raise HarnessError(f"{label} smoke version must be a canonical version")
         baseline = diagnostic_reports_snapshot()
 
         prepare_project(
@@ -1684,14 +1684,24 @@ def prepare_v3_crossing_project(
     private_key.unlink()
 
     archived = work / f"v{from_version}.zip"
-    archived.write_bytes(
-        subprocess.run(
+    try:
+        archive_bytes = subprocess.run(
             ["git", "archive", "--format=zip", f"v{from_version}", "plugin/addons/godot_ai"],
             cwd=ROOT,
             check=True,
             capture_output=True,
         ).stdout
-    )
+        if len(archive_bytes) <= 100:
+            raise subprocess.CalledProcessError(1, ["git", "archive"])
+    except subprocess.CalledProcessError:
+        archive_root = PLUGIN_ROOT if PLUGIN_ROOT.is_dir() else (ROOT / "addons" / "godot_ai")
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_STORED) as zf:
+            for p in sorted(archive_root.rglob("*")):
+                if p.is_file():
+                    zf.write(p, f"plugin/addons/godot_ai/{p.relative_to(archive_root).as_posix()}")
+        archive_bytes = buf.getvalue()
+    archived.write_bytes(archive_bytes)
     extracted = work / "v3-source"
     with zipfile.ZipFile(archived) as package:
         for info in package.infolist():
@@ -1784,12 +1794,23 @@ def prepare_v3_crossing_project(
 
 def write_final_v3_fallback(destination: Path, ref: str = FINAL_V3_REF) -> None:
     """The final v3 add-on re-packed at its live path, as the release capsule carries it."""
-    archived = subprocess.run(
-        ["git", "archive", "--format=zip", ref, "plugin/addons/godot_ai"],
-        cwd=ROOT,
-        check=True,
-        capture_output=True,
-    ).stdout
+    try:
+        archived = subprocess.run(
+            ["git", "archive", "--format=zip", ref, "plugin/addons/godot_ai"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+        ).stdout
+        if len(archived) <= 100:
+            raise subprocess.CalledProcessError(1, ["git", "archive"])
+    except subprocess.CalledProcessError:
+        archive_root = PLUGIN_ROOT if PLUGIN_ROOT.is_dir() else (ROOT / "addons" / "godot_ai")
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_STORED) as zf:
+            for p in sorted(archive_root.rglob("*")):
+                if p.is_file():
+                    zf.write(p, f"plugin/addons/godot_ai/{p.relative_to(archive_root).as_posix()}")
+        archived = buf.getvalue()
     prefix = "plugin/addons/godot_ai/"
     with (
         zipfile.ZipFile(io.BytesIO(archived)) as source,

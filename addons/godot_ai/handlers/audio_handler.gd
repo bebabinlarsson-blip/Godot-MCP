@@ -771,3 +771,222 @@ func stop_all() -> void:
 	}
 
 
+# ============================================================================
+# Audio Bus & DSP Effects
+# ============================================================================
+
+func _resolve_bus_index(bus_val) -> int:
+	if bus_val is int:
+		if bus_val >= 0 and bus_val < AudioServer.bus_count:
+			return bus_val
+		return -1
+	var name_str := str(bus_val).strip_edges()
+	if name_str.is_valid_int():
+		var idx := int(name_str)
+		if idx >= 0 and idx < AudioServer.bus_count:
+			return idx
+	for i in range(AudioServer.bus_count):
+		if AudioServer.get_bus_name(i) == name_str:
+			return i
+	return -1
+
+
+func bus_list(params: Dictionary = {}) -> Dictionary:
+	var buses: Array = []
+	for i in range(AudioServer.bus_count):
+		var eff_count := AudioServer.get_bus_effect_count(i)
+		var effects: Array = []
+		for e in range(eff_count):
+			var eff := AudioServer.get_bus_effect(i, e)
+			effects.append({
+				"index": e,
+				"name": AudioServer.get_bus_effect_instance(i, e).get_class() if AudioServer.get_bus_effect_instance(i, e) != null else "",
+				"class": eff.get_class() if eff != null else "",
+				"enabled": AudioServer.is_bus_effect_enabled(i, e)
+			})
+		buses.append({
+			"index": i,
+			"name": AudioServer.get_bus_name(i),
+			"volume_db": AudioServer.get_bus_volume_db(i),
+			"send": AudioServer.get_bus_send(i),
+			"solo": AudioServer.is_bus_solo(i),
+			"mute": AudioServer.is_bus_mute(i),
+			"bypass_effects": AudioServer.is_bus_bypassing_effects(i),
+			"effect_count": eff_count,
+			"effects": effects
+		})
+
+	return {
+		"data": {
+			"bus_count": AudioServer.bus_count,
+			"buses": buses
+		}
+	}
+
+
+func bus_add(params: Dictionary) -> Dictionary:
+	var bus_name: String = params.get("name", "").strip_edges()
+	if bus_name.is_empty():
+		return ErrorCodes.make(ErrorCodes.MISSING_REQUIRED_PARAM, "Missing required param: name")
+
+	for i in range(AudioServer.bus_count):
+		if AudioServer.get_bus_name(i) == bus_name:
+			return ErrorCodes.make(ErrorCodes.NODE_ALREADY_EXISTS, "Audio bus '%s' already exists at index %d" % [bus_name, i])
+
+	var at_pos: int = int(params.get("at_pos", -1))
+	AudioServer.add_bus(at_pos)
+	var new_idx := AudioServer.bus_count - 1 if at_pos < 0 or at_pos >= AudioServer.bus_count else at_pos
+	AudioServer.set_bus_name(new_idx, bus_name)
+
+	var send_target: String = params.get("send", "Master")
+	if not send_target.is_empty() and send_target != bus_name:
+		AudioServer.set_bus_send(new_idx, StringName(send_target))
+
+	var volume_db: float = float(params.get("volume_db", 0.0))
+	AudioServer.set_bus_volume_db(new_idx, volume_db)
+
+	return {
+		"data": {
+			"index": new_idx,
+			"name": bus_name,
+			"send": str(AudioServer.get_bus_send(new_idx)),
+			"volume_db": volume_db
+		}
+	}
+
+
+func bus_remove(params: Dictionary) -> Dictionary:
+	var bus_val = params.get("bus", "")
+	var idx := _resolve_bus_index(bus_val)
+	if idx < 0:
+		return ErrorCodes.make(ErrorCodes.NODE_NOT_FOUND, "Audio bus not found: %s" % str(bus_val))
+	if idx == 0:
+		return ErrorCodes.make(ErrorCodes.OPERATION_FAILED, "Cannot remove Master audio bus (index 0)")
+
+	var removed_name := AudioServer.get_bus_name(idx)
+	AudioServer.remove_bus(idx)
+
+	return {
+		"data": {
+			"removed_index": idx,
+			"removed_name": removed_name,
+			"remaining_bus_count": AudioServer.bus_count
+		}
+	}
+
+
+func bus_set_properties(params: Dictionary) -> Dictionary:
+	var bus_val = params.get("bus", "")
+	var idx := _resolve_bus_index(bus_val)
+	if idx < 0:
+		return ErrorCodes.make(ErrorCodes.NODE_NOT_FOUND, "Audio bus not found: %s" % str(bus_val))
+
+	if params.has("volume_db"):
+		AudioServer.set_bus_volume_db(idx, float(params["volume_db"]))
+	if params.has("send"):
+		AudioServer.set_bus_send(idx, StringName(str(params["send"])))
+	if params.has("solo"):
+		AudioServer.set_bus_solo(idx, bool(params["solo"]))
+	if params.has("mute"):
+		AudioServer.set_bus_mute(idx, bool(params["mute"]))
+	if params.has("bypass_effects"):
+		AudioServer.set_bus_bypass_effects(idx, bool(params["bypass_effects"]))
+
+	return {
+		"data": {
+			"index": idx,
+			"name": AudioServer.get_bus_name(idx),
+			"volume_db": AudioServer.get_bus_volume_db(idx),
+			"send": str(AudioServer.get_bus_send(idx)),
+			"solo": AudioServer.is_bus_solo(idx),
+			"mute": AudioServer.is_bus_mute(idx),
+			"bypass_effects": AudioServer.is_bus_bypassing_effects(idx)
+		}
+	}
+
+
+func bus_add_effect(params: Dictionary) -> Dictionary:
+	var bus_val = params.get("bus", "Master")
+	var idx := _resolve_bus_index(bus_val)
+	if idx < 0:
+		return ErrorCodes.make(ErrorCodes.NODE_NOT_FOUND, "Audio bus not found: %s" % str(bus_val))
+
+	var effect_type: String = params.get("effect_type", "reverb").to_lower()
+	var effect_params: Dictionary = params.get("params", {})
+	var effect: AudioEffect = null
+
+	match effect_type:
+		"reverb":
+			var rev := AudioEffectReverb.new()
+			if effect_params.has("room_size"): rev.room_size = float(effect_params["room_size"])
+			if effect_params.has("damping"): rev.damping = float(effect_params["damping"])
+			if effect_params.has("wet"): rev.wet = float(effect_params["wet"])
+			if effect_params.has("dry"): rev.dry = float(effect_params["dry"])
+			effect = rev
+		"delay":
+			var dly := AudioEffectDelay.new()
+			if effect_params.has("feedback_active"): dly.feedback_active = bool(effect_params["feedback_active"])
+			if effect_params.has("feedback_delay_ms"): dly.feedback_delay_ms = float(effect_params["feedback_delay_ms"])
+			if effect_params.has("tap1_delay_ms"): dly.tap1_delay_ms = float(effect_params["tap1_delay_ms"])
+			effect = dly
+		"chorus":
+			var cho := AudioEffectChorus.new()
+			if effect_params.has("voice_count"): cho.voice_count = int(effect_params["voice_count"])
+			if effect_params.has("wet"): cho.wet = float(effect_params["wet"])
+			effect = cho
+		"distortion":
+			var dis := AudioEffectDistortion.new()
+			if effect_params.has("drive"): dis.drive = float(effect_params["drive"])
+			effect = dis
+		"pitch_shift":
+			var ps := AudioEffectPitchShift.new()
+			if effect_params.has("pitch_scale"): ps.pitch_scale = float(effect_params["pitch_scale"])
+			effect = ps
+		"low_pass":
+			var lpf := AudioEffectLowPassFilter.new()
+			if effect_params.has("cutoff_hz"): lpf.cutoff_hz = float(effect_params["cutoff_hz"])
+			effect = lpf
+		"high_pass":
+			var hpf := AudioEffectHighPassFilter.new()
+			if effect_params.has("cutoff_hz"): hpf.cutoff_hz = float(effect_params["cutoff_hz"])
+			effect = hpf
+		"compressor":
+			var cmp := AudioEffectCompressor.new()
+			if effect_params.has("threshold"): cmp.threshold = float(effect_params["threshold"])
+			if effect_params.has("ratio"): cmp.ratio = float(effect_params["ratio"])
+			effect = cmp
+		_:
+			return ErrorCodes.make(ErrorCodes.VALUE_OUT_OF_RANGE,
+				"Unknown effect_type '%s'. Valid: reverb, delay, chorus, distortion, pitch_shift, low_pass, high_pass, compressor" % effect_type)
+
+	var at_pos: int = int(params.get("at_pos", -1))
+	AudioServer.add_bus_effect(idx, effect, at_pos)
+	var eff_index := AudioServer.get_bus_effect_count(idx) - 1 if at_pos < 0 else at_pos
+
+	return {
+		"data": {
+			"bus_index": idx,
+			"bus_name": AudioServer.get_bus_name(idx),
+			"effect_index": eff_index,
+			"effect_type": effect_type,
+			"effect_class": effect.get_class()
+		}
+	}
+
+
+func bus_save_layout(params: Dictionary = {}) -> Dictionary:
+	var path: String = params.get("path", "res://default_bus_layout.tres")
+	if not path.begins_with("res://"):
+		return ErrorCodes.make(ErrorCodes.INVALID_PATH, "Path must begin with res://")
+
+	var layout: AudioBusLayout = AudioServer.generate_bus_layout()
+	var err := ResourceSaver.save(layout, path)
+	if err != OK:
+		return ErrorCodes.make(ErrorCodes.INTERNAL_ERROR, "Failed to save audio bus layout to %s (error %d)" % [path, err])
+
+	return {
+		"data": {
+			"path": path,
+			"bus_count": layout.get_bus_count()
+		}
+	}
