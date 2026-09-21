@@ -427,6 +427,208 @@ func apply_theme(params: Dictionary) -> Dictionary:
 
 
 # ============================================================================
+# theme_apply_preset
+# ============================================================================
+
+func apply_preset(params: Dictionary) -> Dictionary:
+	var preset: String = params.get("preset", "dark_modern").to_lower()
+	var theme_path: String = params.get("theme_path", "")
+	var node_path: String = params.get("node_path", "")
+	var set_as_default: bool = bool(params.get("set_as_default", false))
+	var overwrite: bool = bool(params.get("overwrite", true))
+
+	if theme_path.is_empty():
+		theme_path = "res://assets/themes/" + preset + ".tres"
+
+	var path_err := _validate_res_path(theme_path, ".tres", "theme_path", true)
+	if path_err != null:
+		return path_err
+
+	var dir_path := theme_path.get_base_dir()
+	if not DirAccess.dir_exists_absolute(dir_path):
+		DirAccess.make_dir_recursive_absolute(dir_path)
+
+	var theme := Theme.new()
+
+	# Helper to create flat stylebox
+	var make_sb = func(bg: Color, border: Color, bw: int, radius: int, pad_x: int, pad_y: int) -> StyleBoxFlat:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = bg
+		sb.border_color = border
+		sb.border_width_left = bw
+		sb.border_width_right = bw
+		sb.border_width_top = bw
+		sb.border_width_bottom = bw
+		sb.corner_radius_top_left = radius
+		sb.corner_radius_top_right = radius
+		sb.corner_radius_bottom_left = radius
+		sb.corner_radius_bottom_right = radius
+		sb.content_margin_left = float(pad_x)
+		sb.content_margin_right = float(pad_x)
+		sb.content_margin_top = float(pad_y)
+		sb.content_margin_bottom = float(pad_y)
+		return sb
+
+	if preset == "cyberpunk_neon":
+		var cyan := Color(0.0, 0.94, 1.0)
+		var magenta := Color(1.0, 0.0, 0.33)
+		var dark_bg := Color(0.04, 0.05, 0.09, 0.95)
+		var btn_norm := Color(0.07, 0.1, 0.15)
+		var btn_hov := Color(0.0, 0.23, 0.27)
+		var btn_press := Color(0.35, 0.0, 0.15)
+		var text_col := Color(0.88, 0.97, 1.0)
+
+		theme.set_stylebox("normal", "Button", make_sb.call(btn_norm, cyan, 2, 2, 12, 6))
+		theme.set_stylebox("hover", "Button", make_sb.call(btn_hov, cyan, 2, 2, 12, 6))
+		theme.set_stylebox("pressed", "Button", make_sb.call(btn_press, magenta, 2, 2, 12, 6))
+		theme.set_stylebox("disabled", "Button", make_sb.call(Color(0.05, 0.05, 0.07, 0.6), Color(0.2, 0.3, 0.4), 1, 2, 12, 6))
+		theme.set_stylebox("focus", "Button", make_sb.call(Color(0, 0, 0, 0), cyan, 2, 2, 12, 6))
+		theme.set_color("font_color", "Button", text_col)
+		theme.set_color("font_hover_color", "Button", Color(1.0, 1.0, 1.0))
+		theme.set_color("font_pressed_color", "Button", magenta)
+
+		theme.set_stylebox("panel", "Panel", make_sb.call(dark_bg, cyan, 2, 4, 12, 12))
+		theme.set_stylebox("panel", "PanelContainer", make_sb.call(dark_bg, cyan, 2, 4, 12, 12))
+		theme.set_stylebox("normal", "LineEdit", make_sb.call(Color(0.05, 0.07, 0.12), cyan, 1, 2, 8, 6))
+		theme.set_stylebox("focus", "LineEdit", make_sb.call(Color(0.05, 0.07, 0.12), magenta, 2, 2, 8, 6))
+		theme.set_color("font_color", "LineEdit", text_col)
+		theme.set_color("font_color", "Label", text_col)
+		theme.set_stylebox("background", "ProgressBar", make_sb.call(Color(0.05, 0.07, 0.12), cyan, 1, 2, 2, 2))
+		theme.set_stylebox("fill", "ProgressBar", make_sb.call(cyan, Color(0, 0, 0, 0), 0, 2, 2, 2))
+
+	elif preset == "retro_pixel":
+		var white := Color(1.0, 1.0, 1.0)
+		var gold := Color(0.96, 0.82, 0.25)
+		var bg_dark := Color(0.06, 0.06, 0.11)
+		var btn_norm := Color(0.17, 0.17, 0.27)
+		var btn_hov := Color(0.26, 0.26, 0.42)
+		var btn_press := Color(0.1, 0.1, 0.16)
+		var border_col := Color(0.34, 0.34, 0.51)
+
+		theme.set_stylebox("normal", "Button", make_sb.call(btn_norm, border_col, 2, 0, 10, 6))
+		theme.set_stylebox("hover", "Button", make_sb.call(btn_hov, white, 2, 0, 10, 6))
+		theme.set_stylebox("pressed", "Button", make_sb.call(btn_press, gold, 2, 0, 10, 6))
+		theme.set_stylebox("disabled", "Button", make_sb.call(Color(0.1, 0.1, 0.15), Color(0.2, 0.2, 0.25), 1, 0, 10, 6))
+		theme.set_stylebox("focus", "Button", make_sb.call(Color(0, 0, 0, 0), gold, 2, 0, 10, 6))
+		theme.set_color("font_color", "Button", white)
+		theme.set_color("font_hover_color", "Button", gold)
+
+		theme.set_stylebox("panel", "Panel", make_sb.call(bg_dark, border_col, 2, 0, 10, 10))
+		theme.set_stylebox("panel", "PanelContainer", make_sb.call(bg_dark, border_col, 2, 0, 10, 10))
+		theme.set_color("font_color", "Label", white)
+		theme.set_stylebox("normal", "LineEdit", make_sb.call(btn_press, border_col, 2, 0, 8, 4))
+		theme.set_stylebox("background", "ProgressBar", make_sb.call(btn_press, border_col, 2, 0, 2, 2))
+		theme.set_stylebox("fill", "ProgressBar", make_sb.call(gold, Color(0, 0, 0, 0), 0, 0, 2, 2))
+
+	elif preset == "fantasy_parchment":
+		var gold := Color(0.83, 0.69, 0.22)
+		var dark_parch := Color(0.17, 0.11, 0.05, 0.95)
+		var btn_norm := Color(0.26, 0.18, 0.09)
+		var btn_hov := Color(0.35, 0.25, 0.12)
+		var btn_press := Color(0.17, 0.11, 0.05)
+		var border_col := Color(0.72, 0.53, 0.04)
+		var text_col := Color(0.98, 0.92, 0.84)
+
+		theme.set_stylebox("normal", "Button", make_sb.call(btn_norm, border_col, 2, 4, 14, 6))
+		theme.set_stylebox("hover", "Button", make_sb.call(btn_hov, gold, 2, 4, 14, 6))
+		theme.set_stylebox("pressed", "Button", make_sb.call(btn_press, gold, 2, 4, 14, 6))
+		theme.set_stylebox("disabled", "Button", make_sb.call(Color(0.15, 0.1, 0.06), Color(0.4, 0.3, 0.15), 1, 4, 14, 6))
+		theme.set_stylebox("focus", "Button", make_sb.call(Color(0, 0, 0, 0), gold, 2, 4, 14, 6))
+		theme.set_color("font_color", "Button", text_col)
+		theme.set_color("font_hover_color", "Button", Color(1.0, 0.95, 0.8))
+
+		theme.set_stylebox("panel", "Panel", make_sb.call(dark_parch, border_col, 2, 6, 12, 12))
+		theme.set_stylebox("panel", "PanelContainer", make_sb.call(dark_parch, border_col, 2, 6, 12, 12))
+		theme.set_color("font_color", "Label", text_col)
+		theme.set_stylebox("normal", "LineEdit", make_sb.call(btn_press, border_col, 1, 4, 8, 6))
+		theme.set_stylebox("background", "ProgressBar", make_sb.call(btn_press, border_col, 1, 3, 2, 2))
+		theme.set_stylebox("fill", "ProgressBar", make_sb.call(gold, Color(0, 0, 0, 0), 0, 3, 2, 2))
+
+	elif preset == "clean_light":
+		var blue := Color(0.06, 0.65, 0.91)
+		var bg_panel := Color(1.0, 1.0, 1.0)
+		var btn_norm := Color(0.97, 0.98, 0.99)
+		var btn_hov := Color(0.95, 0.96, 0.98)
+		var btn_press := Color(0.89, 0.91, 0.94)
+		var border_col := Color(0.8, 0.84, 0.88)
+		var text_dark := Color(0.06, 0.09, 0.16)
+
+		theme.set_stylebox("normal", "Button", make_sb.call(btn_norm, border_col, 1, 6, 14, 8))
+		theme.set_stylebox("hover", "Button", make_sb.call(btn_hov, blue, 1, 6, 14, 8))
+		theme.set_stylebox("pressed", "Button", make_sb.call(btn_press, blue, 1, 6, 14, 8))
+		theme.set_stylebox("disabled", "Button", make_sb.call(Color(0.95, 0.95, 0.95), Color(0.88, 0.88, 0.88), 1, 6, 14, 8))
+		theme.set_stylebox("focus", "Button", make_sb.call(Color(0, 0, 0, 0), blue, 2, 6, 14, 8))
+		theme.set_color("font_color", "Button", text_dark)
+		theme.set_color("font_hover_color", "Button", blue)
+
+		theme.set_stylebox("panel", "Panel", make_sb.call(bg_panel, border_col, 1, 8, 14, 14))
+		theme.set_stylebox("panel", "PanelContainer", make_sb.call(bg_panel, border_col, 1, 8, 14, 14))
+		theme.set_color("font_color", "Label", text_dark)
+		theme.set_stylebox("normal", "LineEdit", make_sb.call(Color(1, 1, 1), border_col, 1, 6, 8, 6))
+		theme.set_stylebox("background", "ProgressBar", make_sb.call(Color(0.93, 0.94, 0.96), border_col, 1, 4, 2, 2))
+		theme.set_stylebox("fill", "ProgressBar", make_sb.call(blue, Color(0, 0, 0, 0), 0, 4, 2, 2))
+
+	else: # Default: dark_modern
+		var blue := Color(0.23, 0.51, 0.96)
+		var panel_bg := Color(0.12, 0.13, 0.17, 0.95)
+		var btn_norm := Color(0.15, 0.16, 0.21)
+		var btn_hov := Color(0.2, 0.22, 0.27)
+		var btn_press := Color(0.11, 0.31, 0.85)
+		var border_col := Color(0.22, 0.25, 0.32)
+		var text_light := Color(0.95, 0.96, 0.96)
+
+		theme.set_stylebox("normal", "Button", make_sb.call(btn_norm, border_col, 1, 6, 14, 8))
+		theme.set_stylebox("hover", "Button", make_sb.call(btn_hov, blue, 1, 6, 14, 8))
+		theme.set_stylebox("pressed", "Button", make_sb.call(btn_press, blue, 1, 6, 14, 8))
+		theme.set_stylebox("disabled", "Button", make_sb.call(Color(0.1, 0.1, 0.13), Color(0.16, 0.18, 0.22), 1, 6, 14, 8))
+		theme.set_stylebox("focus", "Button", make_sb.call(Color(0, 0, 0, 0), blue, 2, 6, 14, 8))
+		theme.set_color("font_color", "Button", text_light)
+		theme.set_color("font_hover_color", "Button", Color(1, 1, 1))
+
+		theme.set_stylebox("panel", "Panel", make_sb.call(panel_bg, border_col, 1, 8, 14, 14))
+		theme.set_stylebox("panel", "PanelContainer", make_sb.call(panel_bg, border_col, 1, 8, 14, 14))
+		theme.set_color("font_color", "Label", text_light)
+		theme.set_stylebox("normal", "LineEdit", make_sb.call(Color(0.09, 0.1, 0.13), border_col, 1, 6, 8, 6))
+		theme.set_stylebox("background", "ProgressBar", make_sb.call(Color(0.09, 0.1, 0.13), border_col, 1, 4, 2, 2))
+		theme.set_stylebox("fill", "ProgressBar", make_sb.call(blue, Color(0, 0, 0, 0), 0, 4, 2, 2))
+
+	var save_err := McpResourceIO.guarded_save(theme, theme_path, _connection)
+	if save_err != OK:
+		return ErrorCodes.make(ErrorCodes.INTERNAL_ERROR, "Failed to save theme: %s" % error_string(save_err))
+
+	var node_applied := false
+	if not node_path.is_empty():
+		var res := McpNodeValidator.resolve_or_error(node_path, "node_path")
+		if not res.has("error") and res.node is Control:
+			var ctrl: Control = res.node
+			_undo_redo.create_action("MCP: Apply preset theme to %s" % ctrl.name)
+			_undo_redo.add_do_property(ctrl, "theme", theme)
+			_undo_redo.add_undo_property(ctrl, "theme", ctrl.theme)
+			_undo_redo.commit_action()
+			node_applied = true
+
+	var default_set := false
+	if set_as_default:
+		ProjectSettings.set_setting("gui/theme/custom", theme_path)
+		ProjectSettings.set_initial_value("gui/theme/custom", "")
+		ProjectSettings.set_as_basic("gui/theme/custom", true)
+		default_set = (ProjectSettings.save() == OK)
+
+	var efs := EditorInterface.get_resource_filesystem()
+	if efs != null:
+		efs.update_file(theme_path)
+
+	return {
+		"data": {
+			"preset": preset,
+			"theme_path": theme_path,
+			"applied_to_node": node_applied,
+			"set_as_project_default": default_set,
+		}
+	}
+
+
+# ============================================================================
 # Helpers
 # ============================================================================
 

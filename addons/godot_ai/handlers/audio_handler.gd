@@ -635,3 +635,139 @@ func scaffold_music_player(params: Dictionary) -> Dictionary:
 		}
 	}
 
+
+# ============================================================================
+# scaffold_sound_manager
+# ============================================================================
+
+func scaffold_sound_manager(params: Dictionary) -> Dictionary:
+	var mgr_name: String = params.get("name", "SoundManager")
+	var script_path: String = params.get("script_path", "res://scripts/sound_manager.gd")
+	var pool_size: int = int(params.get("pool_size", 16))
+	var default_bus: String = params.get("bus", "SFX")
+	var register_autoload: bool = bool(params.get("register_autoload", true))
+
+	var path_err = McpPathValidator.path_error(script_path, "script_path")
+	if path_err != null:
+		return path_err
+
+	var base_dir := script_path.get_base_dir()
+	if not DirAccess.dir_exists_absolute(base_dir):
+		DirAccess.make_dir_recursive_absolute(base_dir)
+
+	# Ensure SFX bus exists
+	if AudioServer.get_bus_index(default_bus) == -1:
+		AudioServer.add_bus()
+		var idx := AudioServer.bus_count - 1
+		AudioServer.set_bus_name(idx, default_bus)
+		AudioServer.set_bus_send(idx, &"Master")
+
+	var sound_code := """extends Node
+
+@export var default_bus: String = "%s"
+@export var pool_size: int = %d
+
+var _players: Array[AudioStreamPlayer] = []
+var _next_player_idx: int = 0
+
+func _ready() -> void:
+	for i in range(pool_size):
+		var player := AudioStreamPlayer.new()
+		player.name = "SFXPlayer_" + str(i)
+		player.bus = default_bus
+		add_child(player)
+		_players.append(player)
+
+func play_sfx(stream: Variant, pitch_variance: float = 0.1, volume_db: float = 0.0, bus_override: String = "") -> AudioStreamPlayer:
+	var sound_stream: AudioStream = null
+	if stream is String:
+		if ResourceLoader.exists(stream):
+			sound_stream = load(stream) as AudioStream
+	elif stream is AudioStream:
+		sound_stream = stream
+
+	if sound_stream == null:
+		push_warning("SoundManager: Invalid audio stream provided.")
+		return null
+
+	var target_player: AudioStreamPlayer = null
+	for p in _players:
+		if not p.playing:
+			target_player = p
+			break
+
+	if target_player == null:
+		target_player = _players[_next_player_idx]
+		_next_player_idx = (_next_player_idx + 1) %% _players.size()
+
+	target_player.stream = sound_stream
+	target_player.volume_db = volume_db
+	target_player.bus = bus_override if not bus_override.is_empty() else default_bus
+
+	if pitch_variance > 0.0:
+		target_player.pitch_scale = maxf(0.05, 1.0 + randf_range(-pitch_variance, pitch_variance))
+	else:
+		target_player.pitch_scale = 1.0
+
+	target_player.play()
+	return target_player
+
+func play_sfx_at_position(stream: Variant, global_pos: Vector2, pitch_variance: float = 0.1, volume_db: float = 0.0, bus_override: String = "") -> AudioStreamPlayer2D:
+	var sound_stream: AudioStream = null
+	if stream is String:
+		if ResourceLoader.exists(stream):
+			sound_stream = load(stream) as AudioStream
+	elif stream is AudioStream:
+		sound_stream = stream
+
+	if sound_stream == null:
+		push_warning("SoundManager: Invalid audio stream provided.")
+		return null
+
+	var p2d := AudioStreamPlayer2D.new()
+	p2d.stream = sound_stream
+	p2d.global_position = global_pos
+	p2d.volume_db = volume_db
+	p2d.bus = bus_override if not bus_override.is_empty() else default_bus
+	if pitch_variance > 0.0:
+		p2d.pitch_scale = maxf(0.05, 1.0 + randf_range(-pitch_variance, pitch_variance))
+	get_tree().root.add_child(p2d)
+	p2d.finished.connect(func(): p2d.queue_free())
+	p2d.play()
+	return p2d
+
+func stop_all() -> void:
+	for p in _players:
+		p.stop()
+""" % [default_bus, pool_size]
+
+	var file := FileAccess.open(script_path, FileAccess.WRITE)
+	if file == null:
+		return ErrorCodes.make(ErrorCodes.INTERNAL_ERROR, "Failed to create sound manager script at: %s" % script_path)
+	file.store_string(sound_code)
+	file.close()
+
+	var autoload_ok := false
+	if register_autoload:
+		var key := "autoload/%s" % mgr_name
+		ProjectSettings.set_setting(key, "*" + script_path)
+		ProjectSettings.set_initial_value(key, "")
+		ProjectSettings.set_as_basic(key, true)
+		autoload_ok = (ProjectSettings.save() == OK)
+
+	var efs := EditorInterface.get_resource_filesystem()
+	if efs != null:
+		efs.update_file(script_path)
+
+	return {
+		"data": {
+			"name": mgr_name,
+			"script_path": script_path,
+			"pool_size": pool_size,
+			"bus": default_bus,
+			"register_autoload": register_autoload,
+			"autoload_saved": autoload_ok,
+		}
+	}
+
+

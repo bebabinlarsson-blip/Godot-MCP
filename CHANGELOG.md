@@ -5,6 +5,24 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.17 (2026-09-21)
+
+Autonomous game systems and persistence expansion: Dialogue and branching narrative system scaffolding with typewriter effects, corruption-resistant atomic save and load persistence with group-based state serialization, modular node-based finite state machines with character and enemy AI presets, single-call UI theme presets across classic and modern aesthetics, multi-channel sound effect manager with audio player pooling, and test instructions parity hardening.
+
+### Added
+
+- **Dialogue and Narrative System Management**: Introduced `dialogue_manage` tool and `DialogueHandler` with `scaffold_system` and `create_dialogue` operations.
+  - `scaffold_system`: Scaffolds a complete `DialogueManager` singleton and `DialogueBox` CanvasLayer UI scene featuring typewriter text animation, BBCode styling, speaker labels, continue prompt, and dynamic branching choice buttons, wired to typed signals (`dialogue_started`, `line_displayed`, `choices_presented`, `choice_selected`, `dialogue_ended`).
+  - `create_dialogue`: Creates structured branching dialogue graphs in JSON/Resource format with speaker designations, localized dialogue strings, and choice jump targets.
+- **Save and Load Persistence Management**: Introduced `save_manage` tool and `SaveHandler` with atomic file persistence operations (`scaffold_save_system`, `save_slot`, `load_slot`, `list_slots`, `delete_slot`).
+  - `scaffold_save_system`: Scaffolds an atomic, corruption-resistant `SaveManager` singleton using temporary-file writes and renames. Automatically gathers state from all nodes in the 'saveable' group implementing `save_state()`, restores state via `load_state()`, manages save slot directories, and provides optional password encryption.
+  - `save_slot`, `load_slot`, `list_slots`, `delete_slot`: In-editor inspection and testing of save slot files and metadata in `user://saves/`.
+- **Finite State Machine Architecture**: Introduced `fsm_manage` tool and `FsmHandler` with `scaffold_fsm`.
+  - Generates modular node-based state machine architecture: base `State` class with typed lifecycle hooks (`enter`, `exit`, `update`, `physics_update`, `handle_input`), and `StateMachine` controller managing transitions, history, and signal dispatch.
+  - Built-in state presets: `enemy_ai` (Idle, Patrol, Chase, Attack, Hurt, Dead), `character` (Idle, Move, Jump, Fall), and `custom` (user-defined state script generation), with automatic hierarchy instantiation under target scene nodes.
+- **Single-Call UI Theme Presets**: Added `apply_preset` to `theme_manage` (and GDScript `ThemeHandler`) supporting cohesive theme generation for `cyberpunk_neon`, `dark_modern`, `retro_pixel`, `fantasy_parchment`, and `clean_light`, styling Button states (normal, hover, pressed, disabled, focus), Panels, LineEdits, ProgressBars, Sliders, and Labels.
+- **Multi-Channel Sound Effect Manager**: Added `scaffold_sound_manager` to `audio_manage` (and GDScript `AudioHandler`) to generate a `SoundManager` singleton with an `AudioStreamPlayer` pool (default 16 players) ensuring non-clipping sound effects, automatic pitch randomization (`pitch_variance`), volume controls, and 2D spatial playback.
+
 ## 5.0.16 (2026-09-21)
 
 Autonomous game systems and engine scaffolding primitives: 2D/3D character controller scaffolding with physics and mouse capture, one-call input map presets, project display and rendering presets, 2D atmospheric lighting environment with radial torch illumination, singleton GameManager architecture with typed signals and scene switching, dedicated background music player scaffolding, and repository linter hygiene.

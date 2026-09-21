@@ -12,8 +12,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--version",
-        default="5.0.16",
-        help="Release version used in the zip file name (default: 5.0.16).",
+        default="5.0.17",
+        help="Release version used in the zip file name (default: 5.0.17).",
     )
     args = parser.parse_args()
 

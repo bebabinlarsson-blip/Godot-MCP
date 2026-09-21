@@ -46,6 +46,10 @@ Ops:
                           autoplay=True, volume_db=0.0, bus="Music", loop=True)
         Scaffold a dedicated background music player (AudioStreamPlayer)
         routed to the Music bus with autoplay and loop configuration.
+  • scaffold_sound_manager(name="SoundManager", script_path="res://scripts/sound_manager.gd",
+                           pool_size=16, bus="SFX", register_autoload=True)
+        Scaffold a multi-channel sound effect manager singleton with AudioStreamPlayer
+        pooling, pitch variation, and 2D spatial audio helper.
 """
 
 
@@ -64,6 +68,7 @@ def register_audio_tools(mcp: FastMCP) -> None:
             "generate_procedural_sfx": audio_handlers.audio_generate_procedural_sfx,
             "scaffold_buses": audio_handlers.audio_scaffold_buses,
             "scaffold_music_player": audio_handlers.audio_scaffold_music_player,
+            "scaffold_sound_manager": audio_handlers.audio_scaffold_sound_manager,
         },
         read_resource_forms={
             ## Audio reads are stateful and per-player; no aggregate resource.

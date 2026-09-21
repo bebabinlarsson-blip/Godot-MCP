@@ -123,3 +123,23 @@ async def theme_apply(
         "apply_theme",
         {"node_path": node_path, "theme_path": theme_path},
     )
+
+
+async def theme_apply_preset(
+    runtime: DirectRuntime,
+    preset: str = "dark_modern",
+    theme_path: str = "",
+    node_path: str = "",
+    set_as_default: bool = False,
+    overwrite: bool = True,
+) -> dict:
+    await require_writable_async(runtime)
+    params: dict[str, Any] = {
+        "preset": preset,
+        "theme_path": theme_path,
+        "node_path": node_path,
+        "set_as_default": set_as_default,
+        "overwrite": overwrite,
+    }
+    return await runtime.send_command("theme_apply_preset", params)
+

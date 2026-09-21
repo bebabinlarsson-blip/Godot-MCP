@@ -136,3 +136,24 @@ async def audio_scaffold_music_player(
     return await runtime.send_command("audio_scaffold_music_player", params)
 
 
+async def audio_scaffold_sound_manager(
+    runtime: DirectRuntime,
+    name: str = "SoundManager",
+    script_path: str = "res://scripts/sound_manager.gd",
+    pool_size: int = 16,
+    bus: str = "SFX",
+    register_autoload: bool = True,
+) -> dict:
+    """Scaffold a multi-channel sound effect manager singleton with pooling."""
+    await require_writable_async(runtime)
+    params: dict[str, Any] = {
+        "name": name,
+        "script_path": script_path,
+        "pool_size": pool_size,
+        "bus": bus,
+        "register_autoload": register_autoload,
+    }
+    return await runtime.send_command("audio_scaffold_sound_manager", params)
+
+
+

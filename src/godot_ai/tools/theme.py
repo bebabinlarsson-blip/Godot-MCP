@@ -37,6 +37,12 @@ Ops (pass via op="..." plus a params dict):
   • apply(node_path, theme_path="")
         Assign the theme to a Control (cascades to descendants). Empty
         theme_path clears.
+  • apply_preset(preset="dark_modern", theme_path="", node_path="",
+                 set_as_default=False, overwrite=True)
+        Apply a full cohesive Theme preset (Button states, Panels, LineEdits,
+        Sliders, ProgressBars, Labels) in one call.
+        Presets: 'cyberpunk_neon', 'dark_modern', 'retro_pixel',
+                 'fantasy_parchment', 'clean_light'.
 
 All ops accept `session_id` on the wrapper to target a specific editor.
 """
@@ -54,5 +60,6 @@ def register_theme_tools(mcp: FastMCP) -> None:
             "set_font_size": theme_handlers.theme_set_font_size,
             "set_stylebox_flat": theme_handlers.theme_set_stylebox_flat,
             "apply": theme_handlers.theme_apply,
+            "apply_preset": theme_handlers.theme_apply_preset,
         },
     )

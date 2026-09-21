@@ -83,9 +83,11 @@ from godot_ai.tools.character import register_character_tools
 from godot_ai.tools.client import register_client_tools
 from godot_ai.tools.csg import register_csg_tools
 from godot_ai.tools.custom import register_custom_tools
+from godot_ai.tools.dialogue import register_dialogue_tools
 from godot_ai.tools.domains import CORE_BEARING_DOMAINS, CORE_TOOLS
 from godot_ai.tools.editor import register_editor_tools
 from godot_ai.tools.filesystem import register_filesystem_tools
+from godot_ai.tools.fsm import register_fsm_tools
 from godot_ai.tools.game import register_game_tools
 from godot_ai.tools.gridmap import register_gridmap_tools
 from godot_ai.tools.input_map import register_input_map_tools
@@ -95,6 +97,7 @@ from godot_ai.tools.node import register_node_tools
 from godot_ai.tools.particle import register_particle_tools
 from godot_ai.tools.project import register_project_tools
 from godot_ai.tools.resource import register_resource_tools
+from godot_ai.tools.save import register_save_tools
 from godot_ai.tools.scene import register_scene_tools
 from godot_ai.tools.script import register_script_tools
 from godot_ai.tools.session import register_session_tools
@@ -257,6 +260,19 @@ _ROLLUP_BLOCKS: tuple[tuple[str | None, str], ...] = (
     (
         "character",
         "  character_manage scaffold_2d, scaffold_3d\n",
+    ),
+    (
+        "dialogue",
+        "  dialogue_manage  scaffold_system, create_dialogue\n",
+    ),
+    (
+        "save",
+        "  save_manage      scaffold_save_system, save_slot, load_slot, list_slots,\n"
+        "                   delete_slot\n",
+    ),
+    (
+        "fsm",
+        "  fsm_manage       scaffold_fsm\n",
     ),
     (
         "particle",
@@ -898,6 +914,12 @@ def create_server(
         register_audio_tools(mcp)
     if "character" not in exclude:
         register_character_tools(mcp)
+    if "dialogue" not in exclude:
+        register_dialogue_tools(mcp)
+    if "save" not in exclude:
+        register_save_tools(mcp)
+    if "fsm" not in exclude:
+        register_fsm_tools(mcp)
     if "tilemap" not in exclude:
         register_tilemap_tools(mcp)
     if "tileset" not in exclude:
