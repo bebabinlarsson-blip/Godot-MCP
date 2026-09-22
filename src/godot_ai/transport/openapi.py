@@ -34,7 +34,7 @@ async def generate_openapi_spec(
     *,
     server_url: str = "http://localhost:8000",
     title: str = "Godot AI Engine Control",
-    version: str = "5.0.26",
+    version: str = "5.0.27",
     mode: str = "compact",
     tools: Sequence[Any] | None = None,
 ) -> dict[str, Any]:

@@ -38,12 +38,24 @@ def test_rest_gateway_endpoints(server_instance):
     app = server_instance.http_app()
     client = TestClient(app, base_url="http://127.0.0.1:8000")
 
+    # Landing page HTML endpoint (for web browsing AI / humans)
+    res_root = client.get("/")
+    assert res_root.status_code == 200
+    assert "Godot AI Remote Engine Bridge" in res_root.text
+    assert "Instructions for ChatGPT" in res_root.text
+
+    # Landing page JSON format
+    res_json = client.get("/?format=json")
+    assert res_json.status_code == 200
+    assert res_json.json()["status"] == "online"
+    assert res_json.json()["version"] == "5.0.27"
+
     # OpenAPI compact endpoint (default)
     res = client.get("/openapi.json")
     assert res.status_code == 200
     schema = res.json()
     assert schema["openapi"] == "3.1.0"
-    assert schema["info"]["version"] == "5.0.26"
+    assert schema["info"]["version"] == "5.0.27"
     assert len(schema["paths"]) <= 25
 
     # OpenAPI full endpoint
@@ -57,7 +69,7 @@ def test_rest_gateway_endpoints(server_instance):
     assert res.status_code == 200
     status_data = res.json()
     assert status_data["status"] == "online"
-    assert status_data["version"] == "5.0.26"
+    assert status_data["version"] == "5.0.27"
 
     # List tools endpoint
     res = client.get("/api/v1/tools")
@@ -66,13 +78,25 @@ def test_rest_gateway_endpoints(server_instance):
     assert "tools" in tools_data
     assert tools_data["count"] == 100
 
+    # Universal call endpoint routing
+    res_call_missing = client.get("/api/v1/call")
+    assert res_call_missing.status_code == 400
+    assert "Missing 'tool' parameter" in res_call_missing.json()["error"]
+
+    res_call_get = client.get("/api/v1/call?tool=editor_state")
+    assert res_call_get.json()["tool"] == "editor_state"
+
+    # Tree endpoint routing
+    res_tree = client.get("/api/v1/tree")
+    assert res_tree.status_code in (200, 400)
+
 
 def test_remote_godot_client_headers():
     client = RemoteGodotClient("http://localhost:8000", auth_token="secret-123")
     headers = client._make_headers()
     assert headers["Authorization"] == "Bearer secret-123"
     assert headers["X-Godot-AI-Key"] == "secret-123"
-    assert client._make_headers()["User-Agent"] == "GodotAI-RemoteClient/5.0.26"
+    assert client._make_headers()["User-Agent"] == "GodotAI-RemoteClient/5.0.27"
     assert headers["Content-Type"] == "application/json"
 
 

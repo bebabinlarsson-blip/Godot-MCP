@@ -39,7 +39,7 @@ class RemoteGodotClient:
         headers = {
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "User-Agent": "GodotAI-RemoteClient/5.0.26",
+            "User-Agent": "GodotAI-RemoteClient/5.0.27",
         }
         if self.auth_token:
             headers["Authorization"] = f"Bearer {self.auth_token}"

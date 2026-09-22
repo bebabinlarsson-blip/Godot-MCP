@@ -5,6 +5,27 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.27 (2026-09-22)
+
+Direct ChatGPT URL access mode with zero configuration, web browsing landing page with comprehensive AI instructions, full GET/POST query execution on /api/v1/call and all 100 tools, direct file read/write at /api/v1/files, project tree hierarchy at /api/v1/tree, capability auth bypass for root paths, and tunnel CLI provider selection.
+
+### Added
+
+- **Direct URL Access for ChatGPT**:
+  - `godot_ai.transport.rest_gateway`: Added rich HTML/Markdown landing page at `/`, `/index.html`, `/chatgpt`, and `/docs`. When pasting the tunnel URL directly into standard ChatGPT without custom actions or API keys, ChatGPT's web browsing tool immediately reads engine status, available endpoints, and direct instructions.
+  - JSON format support at `/?format=json` or via `Accept: application/json` header.
+- **Universal Tool Invocation via GET & POST**:
+  - `/api/v1/call`: Supports both `POST` and `GET`. ChatGPT can execute any tool directly via URL query parameters (`GET /api/v1/call?tool=<name>&arg=val`) with automatic type coercion.
+  - `/api/v1/tools/{tool_name}`: Supports both `POST` and `GET` for direct tool routing.
+- **Direct Project File and Tree Endpoints**:
+  - `/api/v1/files`: Direct file read (`GET ?path=res://...`) and write (`POST ?path=res://...`). Supports `&raw=true` or `text/plain` for raw text responses.
+  - `/api/v1/tree`: Project file and directory hierarchy inspection (`GET ?path=res://`).
+- **Security Middleware Root Path Bypass**:
+  - `godot_ai.transport.security`: Allowed root paths (`/`, `/index.html`, `/chatgpt`, `/docs`, `/health`) to bypass transport capability auth so standard HTTP clients and AI crawlers can access documentation and tool discovery freely.
+- **CLI Tunnel Enhancements**:
+  - `godot_ai.__init__`: Added `--provider` flag to `godot-ai tunnel` subcommand (`ssh`, `pinggy`, `localhost.run`, `cloudflare`).
+  - Auto-promoted transport to `streamable-http` when `--tunnel` is specified.
+
 ## 5.0.26 (2026-09-22)
 
 OpenAI Custom GPT 30-action schema adaptation, zero-install SSH cloud tunneling via OpenSSH, cloud container sandbox execution, and exact 100-tool ceiling completion across 81 domains with 4 new engine domains: Global Illumination and Decals in gi_manage, input simulation and macro replay in input_event_manage, direct 2D/3D physics space state raycasts in physics_query_manage, and curves, bezier splines, and gradients in curve_manage.
