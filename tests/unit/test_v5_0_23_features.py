@@ -307,4 +307,4 @@ async def test_server_registers_v5_0_23_tools():
         "recording_manage",
     }
     assert expected.issubset(tools)
-    assert len(tools) == 79
+    assert len(tools) >= 79

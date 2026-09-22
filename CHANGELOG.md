@@ -5,6 +5,80 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.24 (2026-09-22)
+
+Complete Godot 4 engine coverage closing all remaining subsystem gaps: texture and image processing in texture_manage, font resources and variations in font_manage, low-level TCP/UDP and WebSocket scaffolding in network_manage, visual shader node graphs in visual_shader_manage, animation state machines and blend trees in animation_tree_manage, animated sprites, MultiMesh, and Line2D in sprite_manage, persistent editor settings in editor_settings_manage, 2D and 3D physics joints in joint_manage, 2D and 3D occlusion culling in occluder_manage, ConfigFile INI and JSON utilities in config_manage, and parallax background and canvas layers in parallax_manage.
+
+### Added
+
+- **Texture and Image Resource Pipeline (`texture_manage`)**:
+  - Introduced `texture_manage` tool and `TextureManageHandler` for Image, AtlasTexture, and CurveTexture creation.
+  - `create_image`: Create new Image resources with customizable width, height, mipmaps, format (RGBA8, RGB8, R8), fill color, and save to disk.
+  - `create_atlas`: Create AtlasTexture resources referencing sub-regions of existing textures with filter clipping.
+  - `get_texture_info`: Inspect dimensions, format, and class of texture and image resources.
+  - `create_curve_texture`: Generate procedural CurveTexture resources from control points.
+- **Font Resources and Typography (`font_manage`)**:
+  - Introduced `font_manage` tool and `FontHandler` for typography, SystemFont, and LabelSettings.
+  - `create_system_font`: Instantiate SystemFont resources querying operating system font fallback lists.
+  - `create_font_variation`: Create FontVariation resources with custom boldness, OpenType tags, and spacing.
+  - `create_label_settings`: Create reusable LabelSettings with font styling, outline, and shadow configurations.
+  - `get_font_info`: Inspect properties and type of font resources.
+- **Low-Level Networking and Sockets (`network_manage`)**:
+  - Introduced `network_manage` tool and `NetworkHandler` for TCP, UDP, and WebSocket networking.
+  - `scaffold_tcp_server`: Scaffold TCP server listener nodes with port and bind address configurations.
+  - `scaffold_websocket_peer`: Scaffold WebSocket client and peer nodes for real-time networking.
+  - `scaffold_udp_peer`: Scaffold UDP packet peer nodes for low-latency datagram networking.
+  - `get_network_interfaces`: Inspect local host IP addresses and network adapter interfaces via IP.
+- **VisualShader Graph Construction (`visual_shader_manage`)**:
+  - Introduced `visual_shader_manage` tool and `VisualShaderHandler` for visual shader node graphs.
+  - `create_visual_shader`: Create VisualShader resources for spatial, canvas_item, particles, sky, and fog.
+  - `add_node`: Add VisualShaderNode elements into shader stages with position coordinates.
+  - `connect_nodes`: Connect node output ports to input ports in visual shader graphs.
+  - `get_graph`: Enumerate all nodes, positions, and connections in a VisualShader graph.
+- **AnimationTree State Machines and Blend Trees (`animation_tree_manage`)**:
+  - Introduced `animation_tree_manage` tool and `AnimationTreeHandler` for state machines and blend trees.
+  - `scaffold_state_machine`: Scaffold AnimationTree nodes with AnimationNodeStateMachine root.
+  - `add_state`: Add animation states into state machines referencing AnimationPlayer animations.
+  - `add_transition`: Create transitions between animation states with auto-advance and switch modes.
+  - `scaffold_blend_tree`: Scaffold AnimationTree nodes with AnimationNodeBlendTree root.
+  - `get_tree_info`: Inspect tree root class, active state, and connected animation players.
+- **Sprites, MultiMesh, and Vector Lines (`sprite_manage`)**:
+  - Introduced `sprite_manage` tool and `SpriteHandler` for 2D/3D sprite animation and instancing.
+  - `create_sprite_frames`: Create SpriteFrames resources with multiple named animations and frame rates.
+  - `scaffold_animated_sprite`: Scaffold AnimatedSprite2D and AnimatedSprite3D nodes.
+  - `scaffold_multimesh`: Scaffold high-performance MultiMeshInstance2D and MultiMeshInstance3D nodes.
+  - `configure_line_2d`: Configure points, width, and colors for Line2D vector rendering.
+- **Persistent Editor Settings (`editor_settings_manage`)**:
+  - Introduced `editor_settings_manage` tool and `EditorSettingsHandler` for editor preferences and paths.
+  - `get_setting`: Read editor configuration values by path via EditorInterface.get_editor_settings().
+  - `set_setting`: Write editor preferences and configurations persistently.
+  - `list_settings`: Search and enumerate editor setting key paths by prefix.
+  - `get_editor_paths`: Retrieve configuration, data, and cache directory locations via EditorPaths.
+- **2D and 3D Physics Joints (`joint_manage`)**:
+  - Introduced `joint_manage` tool and `JointHandler` for physics body constraints.
+  - `scaffold_joint_2d`: Create PinJoint2D, GrooveJoint2D, and DampedSpringJoint2D constraints.
+  - `scaffold_joint_3d`: Create PinJoint3D, HingeJoint3D, SliderJoint3D, ConeTwistJoint3D, and Generic6DOFJoint3D.
+  - `configure_joint`: Update joint parameters, softness, bias, and angular/linear limits.
+  - `get_joint_info`: Inspect joint type, connected node paths, and active properties.
+- **2D and 3D Occlusion Culling (`occluder_manage`)**:
+  - Introduced `occluder_manage` tool and `OccluderHandler` for visibility culling optimization.
+  - `scaffold_occluder_3d`: Create OccluderInstance3D nodes with BoxOccluder3D, SphereOccluder3D, or QuadOccluder3D.
+  - `scaffold_occluder_2d`: Create LightOccluder2D nodes with OccluderPolygon2D shapes.
+  - `get_occluder_info`: Inspect occluder nodes and attached shape resources.
+- **ConfigFile, JSON, and Expression Utilities (`config_manage`)**:
+  - Introduced `config_manage` tool and `ConfigHandler` for game configuration and data serialization.
+  - `config_read`: Read INI-formatted ConfigFile resources by section and key or entire dictionaries.
+  - `config_write`: Write section and key values into INI-formatted ConfigFile resources.
+  - `json_parse`: Parse JSON strings safely into Godot Variant data structures.
+  - `json_generate`: Serialize Godot Variant data into formatted JSON strings.
+  - `expression_eval`: Compile and execute math and logic expressions dynamically via Godot Expression.
+- **Parallax Backgrounds and Canvas Layers (`parallax_manage`)**:
+  - Introduced `parallax_manage` tool and `ParallaxHandler` for layered 2D rendering and visibility.
+  - `scaffold_parallax`: Create Parallax2D or ParallaxBackground nodes with scroll scale and repeat size.
+  - `scaffold_canvas_layer`: Create CanvasLayer nodes with custom layer depth and follow viewport mode.
+  - `scaffold_visibility_notifier`: Create VisibleOnScreenNotifier2D and VisibleOnScreenNotifier3D nodes.
+  - `get_parallax_info`: Inspect parallax and canvas layer node properties.
+
 ## 5.0.23 (2026-09-22)
 
 PCK virtual packaging and DLC loading, OS/hardware introspection and time controls, 2D/3D lighting and decals, in-engine HTTP networking and downloads, global shader parameters, and viewport capture and MovieWriter automation: PCKPacker and ProjectSettings.load_resource_pack in pck_manage, OS/Time/DisplayServer and Engine.time_scale in system_manage, Directional/Omni/Spot lights, Decals, and Reflection/GI probes in light_manage, HTTPRequest scaffolding, REST requests, and file downloads in http_manage, project-wide uniform variables via RenderingServer.global_shader_parameter in shader_global_manage, and viewport image export and MovieWriter video capture in recording_manage.

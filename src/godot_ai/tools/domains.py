@@ -86,6 +86,17 @@ DOMAINS: tuple[str, ...] = (
     "http",
     "shader_global",
     "recording",
+    "texture",
+    "font",
+    "network",
+    "visual_shader",
+    "animation_tree",
+    "sprite",
+    "editor_settings",
+    "joint",
+    "occluder",
+    "config",
+    "parallax",
 )
 
 ## Domains that contain at least one core (always-loaded) tool. When the

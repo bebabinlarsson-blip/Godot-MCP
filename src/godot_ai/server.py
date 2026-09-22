@@ -74,6 +74,7 @@ from godot_ai.telemetry import (
     shutdown_if_initialized,
 )
 from godot_ai.tools.animation import register_animation_tools
+from godot_ai.tools.animation_tree import register_animation_tree_tools
 from godot_ai.tools.api import register_api_tools
 from godot_ai.tools.audio import register_audio_tools
 from godot_ai.tools.autoload import register_autoload_tools
@@ -82,6 +83,7 @@ from godot_ai.tools.camera import register_camera_tools
 from godot_ai.tools.character import register_character_tools
 from godot_ai.tools.client import register_client_tools
 from godot_ai.tools.compute import register_compute_tools
+from godot_ai.tools.config import register_config_tools
 from godot_ai.tools.crypto import register_crypto_tools
 from godot_ai.tools.csg import register_csg_tools
 from godot_ai.tools.custom import register_custom_tools
@@ -89,14 +91,17 @@ from godot_ai.tools.dialogue import register_dialogue_tools
 from godot_ai.tools.display import register_display_tools
 from godot_ai.tools.domains import CORE_BEARING_DOMAINS, CORE_TOOLS
 from godot_ai.tools.editor import register_editor_tools
+from godot_ai.tools.editor_settings import register_editor_settings_tools
 from godot_ai.tools.export import register_export_tools
 from godot_ai.tools.filesystem import register_filesystem_tools
+from godot_ai.tools.font import register_font_tools
 from godot_ai.tools.fsm import register_fsm_tools
 from godot_ai.tools.game import register_game_tools
 from godot_ai.tools.geometry import register_geometry_tools
 from godot_ai.tools.gridmap import register_gridmap_tools
 from godot_ai.tools.http import register_http_tools
 from godot_ai.tools.input_map import register_input_map_tools
+from godot_ai.tools.joint import register_joint_tools
 from godot_ai.tools.light import register_light_tools
 from godot_ai.tools.loader import register_loader_tools
 from godot_ai.tools.localization import register_localization_tools
@@ -104,8 +109,11 @@ from godot_ai.tools.material import register_material_tools
 from godot_ai.tools.mesh import register_mesh_tools
 from godot_ai.tools.multiplayer import register_multiplayer_tools
 from godot_ai.tools.navigation import register_navigation_tools
+from godot_ai.tools.network import register_network_tools
 from godot_ai.tools.node import register_node_tools
+from godot_ai.tools.occluder import register_occluder_tools
 from godot_ai.tools.omni import register_omni_tools
+from godot_ai.tools.parallax import register_parallax_tools
 from godot_ai.tools.particle import register_particle_tools
 from godot_ai.tools.path import register_path_tools
 from godot_ai.tools.pck import register_pck_tools
@@ -124,8 +132,10 @@ from godot_ai.tools.shader import register_shader_tools
 from godot_ai.tools.shader_global import register_shader_global_tools
 from godot_ai.tools.signal import register_signal_tools
 from godot_ai.tools.skeleton import register_skeleton_tools
+from godot_ai.tools.sprite import register_sprite_tools
 from godot_ai.tools.system import register_system_tools
 from godot_ai.tools.testing import register_testing_tools
+from godot_ai.tools.texture import register_texture_tools
 from godot_ai.tools.theme import register_theme_tools
 from godot_ai.tools.tilemap import register_tilemap_tools
 from godot_ai.tools.tileset import register_tileset_tools
@@ -133,6 +143,7 @@ from godot_ai.tools.tween import register_tween_tools
 from godot_ai.tools.ui import register_ui_tools
 from godot_ai.tools.undo_redo import register_undo_redo_tools
 from godot_ai.tools.viewport import register_viewport_tools
+from godot_ai.tools.visual_shader import register_visual_shader_tools
 from godot_ai.tools.xr import register_xr_tools
 from godot_ai.transport.capability import (
     LaunchCapabilities,
@@ -492,6 +503,61 @@ _ROLLUP_BLOCKS: tuple[tuple[str | None, str], ...] = (
         "recording",
         "  recording_manage capture_viewport, configure_movie_writer,\n"
         "                   get_writer_status\n",
+    ),
+    (
+        "texture",
+        "  texture_manage   create_image, create_atlas, get_texture_info,\n"
+        "                   create_curve_texture\n",
+    ),
+    (
+        "font",
+        "  font_manage      create_system_font, create_font_variation,\n"
+        "                   create_label_settings, get_font_info\n",
+    ),
+    (
+        "network",
+        "  network_manage   scaffold_tcp_server, scaffold_websocket_peer,\n"
+        "                   scaffold_udp_peer, get_network_interfaces\n",
+    ),
+    (
+        "visual_shader",
+        "  visual_shader_manage create_visual_shader, add_node, connect_nodes,\n"
+        "                   get_graph\n",
+    ),
+    (
+        "animation_tree",
+        "  animation_tree_manage scaffold_state_machine, add_state, add_transition,\n"
+        "                   scaffold_blend_tree, get_tree_info\n",
+    ),
+    (
+        "sprite",
+        "  sprite_manage    create_sprite_frames, scaffold_animated_sprite,\n"
+        "                   scaffold_multimesh, configure_line_2d\n",
+    ),
+    (
+        "editor_settings",
+        "  editor_settings_manage get_setting, set_setting, list_settings,\n"
+        "                   get_editor_paths\n",
+    ),
+    (
+        "joint",
+        "  joint_manage     scaffold_joint_2d, scaffold_joint_3d, configure_joint,\n"
+        "                   get_joint_info\n",
+    ),
+    (
+        "occluder",
+        "  occluder_manage  scaffold_occluder_3d, scaffold_occluder_2d,\n"
+        "                   get_occluder_info\n",
+    ),
+    (
+        "config",
+        "  config_manage    config_read, config_write, json_parse, json_generate,\n"
+        "                   expression_eval\n",
+    ),
+    (
+        "parallax",
+        "  parallax_manage  scaffold_parallax, scaffold_canvas_layer,\n"
+        "                   scaffold_visibility_notifier, get_parallax_info\n",
     ),
 )
 
@@ -1146,6 +1212,28 @@ def create_server(
         register_shader_global_tools(mcp)
     if "recording" not in exclude:
         register_recording_tools(mcp)
+    if "texture" not in exclude:
+        register_texture_tools(mcp)
+    if "font" not in exclude:
+        register_font_tools(mcp)
+    if "network" not in exclude:
+        register_network_tools(mcp)
+    if "visual_shader" not in exclude:
+        register_visual_shader_tools(mcp)
+    if "animation_tree" not in exclude:
+        register_animation_tree_tools(mcp)
+    if "sprite" not in exclude:
+        register_sprite_tools(mcp)
+    if "editor_settings" not in exclude:
+        register_editor_settings_tools(mcp)
+    if "joint" not in exclude:
+        register_joint_tools(mcp)
+    if "occluder" not in exclude:
+        register_occluder_tools(mcp)
+    if "config" not in exclude:
+        register_config_tools(mcp)
+    if "parallax" not in exclude:
+        register_parallax_tools(mcp)
 
 
     register_session_resources(mcp)

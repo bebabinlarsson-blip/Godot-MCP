@@ -425,6 +425,17 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy_handler("http", HANDLERS_DIR + "http_handler.gd", [undo, _connection])
 	_dispatcher.register_lazy_handler("shader_global", HANDLERS_DIR + "shader_global_handler.gd", [undo, _connection])
 	_dispatcher.register_lazy_handler("recording", HANDLERS_DIR + "recording_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("texture", HANDLERS_DIR + "texture_manage_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("font", HANDLERS_DIR + "font_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("network", HANDLERS_DIR + "network_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("visual_shader", HANDLERS_DIR + "visual_shader_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("animation_tree", HANDLERS_DIR + "animation_tree_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("sprite", HANDLERS_DIR + "sprite_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("editor_settings", HANDLERS_DIR + "editor_settings_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("joint", HANDLERS_DIR + "joint_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("occluder", HANDLERS_DIR + "occluder_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("config", HANDLERS_DIR + "config_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("parallax", HANDLERS_DIR + "parallax_handler.gd", [undo, _connection])
 
 	_dispatcher.register_lazy("get_editor_state", "editor", &"get_editor_state")
 	_dispatcher.register_lazy("get_scene_tree", "scene", &"get_scene_tree")
@@ -804,6 +815,62 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy("recording_capture_viewport", "recording", &"capture_viewport")
 	_dispatcher.register_lazy("recording_configure_movie_writer", "recording", &"configure_movie_writer")
 	_dispatcher.register_lazy("recording_get_writer_status", "recording", &"get_writer_status")
+
+	_dispatcher.register_lazy("texture_create_image", "texture", &"create_image")
+	_dispatcher.register_lazy("texture_create_atlas", "texture", &"create_atlas")
+	_dispatcher.register_lazy("texture_get_texture_info", "texture", &"get_texture_info")
+	_dispatcher.register_lazy("texture_create_curve_texture", "texture", &"create_curve_texture")
+
+	_dispatcher.register_lazy("font_create_system_font", "font", &"create_system_font")
+	_dispatcher.register_lazy("font_create_font_variation", "font", &"create_font_variation")
+	_dispatcher.register_lazy("font_create_label_settings", "font", &"create_label_settings")
+	_dispatcher.register_lazy("font_get_font_info", "font", &"get_font_info")
+
+	_dispatcher.register_lazy("network_scaffold_tcp_server", "network", &"scaffold_tcp_server")
+	_dispatcher.register_lazy("network_scaffold_websocket_peer", "network", &"scaffold_websocket_peer")
+	_dispatcher.register_lazy("network_scaffold_udp_peer", "network", &"scaffold_udp_peer")
+	_dispatcher.register_lazy("network_get_network_interfaces", "network", &"get_network_interfaces")
+
+	_dispatcher.register_lazy("visual_shader_create_visual_shader", "visual_shader", &"create_visual_shader")
+	_dispatcher.register_lazy("visual_shader_add_node", "visual_shader", &"add_node")
+	_dispatcher.register_lazy("visual_shader_connect_nodes", "visual_shader", &"connect_nodes")
+	_dispatcher.register_lazy("visual_shader_get_graph", "visual_shader", &"get_graph")
+
+	_dispatcher.register_lazy("animation_tree_scaffold_state_machine", "animation_tree", &"scaffold_state_machine")
+	_dispatcher.register_lazy("animation_tree_add_state", "animation_tree", &"add_state")
+	_dispatcher.register_lazy("animation_tree_add_transition", "animation_tree", &"add_transition")
+	_dispatcher.register_lazy("animation_tree_scaffold_blend_tree", "animation_tree", &"scaffold_blend_tree")
+	_dispatcher.register_lazy("animation_tree_get_tree_info", "animation_tree", &"get_tree_info")
+
+	_dispatcher.register_lazy("sprite_create_sprite_frames", "sprite", &"create_sprite_frames")
+	_dispatcher.register_lazy("sprite_scaffold_animated_sprite", "sprite", &"scaffold_animated_sprite")
+	_dispatcher.register_lazy("sprite_scaffold_multimesh", "sprite", &"scaffold_multimesh")
+	_dispatcher.register_lazy("sprite_configure_line_2d", "sprite", &"configure_line_2d")
+
+	_dispatcher.register_lazy("editor_settings_get_setting", "editor_settings", &"get_setting")
+	_dispatcher.register_lazy("editor_settings_set_setting", "editor_settings", &"set_setting")
+	_dispatcher.register_lazy("editor_settings_list_settings", "editor_settings", &"list_settings")
+	_dispatcher.register_lazy("editor_settings_get_editor_paths", "editor_settings", &"get_editor_paths")
+
+	_dispatcher.register_lazy("joint_scaffold_joint_2d", "joint", &"scaffold_joint_2d")
+	_dispatcher.register_lazy("joint_scaffold_joint_3d", "joint", &"scaffold_joint_3d")
+	_dispatcher.register_lazy("joint_configure_joint", "joint", &"configure_joint")
+	_dispatcher.register_lazy("joint_get_joint_info", "joint", &"get_joint_info")
+
+	_dispatcher.register_lazy("occluder_scaffold_occluder_3d", "occluder", &"scaffold_occluder_3d")
+	_dispatcher.register_lazy("occluder_scaffold_occluder_2d", "occluder", &"scaffold_occluder_2d")
+	_dispatcher.register_lazy("occluder_get_occluder_info", "occluder", &"get_occluder_info")
+
+	_dispatcher.register_lazy("config_config_read", "config", &"config_read")
+	_dispatcher.register_lazy("config_config_write", "config", &"config_write")
+	_dispatcher.register_lazy("config_json_parse", "config", &"json_parse")
+	_dispatcher.register_lazy("config_json_generate", "config", &"json_generate")
+	_dispatcher.register_lazy("config_expression_eval", "config", &"expression_eval")
+
+	_dispatcher.register_lazy("parallax_scaffold_parallax", "parallax", &"scaffold_parallax")
+	_dispatcher.register_lazy("parallax_scaffold_canvas_layer", "parallax", &"scaffold_canvas_layer")
+	_dispatcher.register_lazy("parallax_scaffold_visibility_notifier", "parallax", &"scaffold_visibility_notifier")
+	_dispatcher.register_lazy("parallax_get_parallax_info", "parallax", &"get_parallax_info")
 
 	_connection.dispatcher = _dispatcher
 	add_child(_connection)
