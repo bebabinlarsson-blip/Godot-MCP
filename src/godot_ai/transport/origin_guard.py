@@ -54,7 +54,7 @@ from http import HTTPStatus
 from typing import Any
 from urllib.parse import urlsplit
 
-from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 IPNetwork = ipaddress.IPv4Network | ipaddress.IPv6Network
 
@@ -317,22 +317,78 @@ def evaluate_loopback(
     )
 
 
+class CORSMiddleware:
+    """ASGI middleware to append standard CORS headers for remote browser access."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.app, name)
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        if scope.get("method") == "OPTIONS":
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": HTTPStatus.NO_CONTENT,
+                    "headers": [
+                        (b"access-control-allow-origin", b"*"),
+                        (b"access-control-allow-methods", b"GET, POST, PUT, DELETE, OPTIONS"),
+                        (
+                            b"access-control-allow-headers",
+                            b"Authorization, Content-Type, X-Godot-AI-Key, *",
+                        ),
+                        (b"access-control-max-age", b"86400"),
+                        (b"content-length", b"0"),
+                    ],
+                }
+            )
+            await send({"type": "http.response.body", "body": b"", "more_body": False})
+            return
+
+        async def send_cors(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                headers.append((b"access-control-allow-origin", b"*"))
+                headers.append(
+                    (b"access-control-allow-methods", b"GET, POST, PUT, DELETE, OPTIONS")
+                )
+                headers.append(
+                    (
+                        b"access-control-allow-headers",
+                        b"Authorization, Content-Type, X-Godot-AI-Key, *",
+                    )
+                )
+                message["headers"] = headers
+            await send(message)
+
+        await self.app(scope, receive, send_cors)
+
+
 class LocalhostOnlyHTTPMiddleware:
     """ASGI middleware that rejects HTTP requests off the loopback allowlist.
 
     Wraps the FastMCP ASGI app so the guard runs *before* the MCP
     streamable-HTTP session manager, before ``/godot-ai/status``, and
     before any inner middleware. Non-HTTP scopes (lifespan) pass through.
+    Public REST endpoints and remote bridges bypass this guard.
     """
 
     def __init__(
         self,
         app: ASGIApp,
         allowed_networks: Sequence[IPNetwork] | None = None,
+        allow_remote: bool = False,
     ) -> None:
         self.app = app
         # #421: empty/None keeps the loopback-only behavior byte-for-byte.
         self.allowed_networks = list(allowed_networks) if allowed_networks else None
+        self.allow_remote = allow_remote
 
     def __getattr__(self, name: str) -> Any:
         # Mirror StaleMcpSessionDiagnosticMiddleware: FastMCP / uvicorn
@@ -341,6 +397,18 @@ class LocalhostOnlyHTTPMiddleware:
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        path = scope.get("path", "")
+        # Public REST endpoints, docs, and CORS preflights are accessible remotely
+        if (
+            self.allow_remote
+            or scope.get("method") == "OPTIONS"
+            or path in ("", "/", "/index.html", "/chatgpt", "/docs", "/health")
+            or path.startswith("/openapi")
+            or path.startswith("/api/v1/")
+        ):
             await self.app(scope, receive, send)
             return
 

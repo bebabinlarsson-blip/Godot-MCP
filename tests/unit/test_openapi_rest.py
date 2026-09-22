@@ -90,6 +90,19 @@ def test_rest_gateway_endpoints(server_instance):
     res_tree = client.get("/api/v1/tree")
     assert res_tree.status_code in (200, 400)
 
+    # Remote external host and CORS (ChatGPT / remote machine simulation)
+    remote_headers = {
+        "Host": "tunnel-subdomain.lhr.life",
+        "Origin": "https://chatgpt.com",
+    }
+    res_remote = client.get("/", headers=remote_headers)
+    assert res_remote.status_code == 200
+    assert res_remote.headers.get("access-control-allow-origin") == "*"
+
+    res_cors_preflight = client.options("/api/v1/call", headers=remote_headers)
+    assert res_cors_preflight.status_code == 204
+    assert res_cors_preflight.headers.get("access-control-allow-origin") == "*"
+
 
 def test_remote_godot_client_headers():
     client = RemoteGodotClient("http://localhost:8000", auth_token="secret-123")

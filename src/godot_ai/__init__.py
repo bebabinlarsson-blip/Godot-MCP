@@ -322,6 +322,11 @@ def main(argv: Sequence[str] | None = None) -> None:
         default=None,
         help="Bearer token for REST gateway and cloud tunnel endpoints.",
     )
+    parser.add_argument(
+        "--allow-remote",
+        action="store_true",
+        help="Allow connections from outside localhost (e.g. cloud tunnels or internet).",
+    )
     args = parser.parse_args(effective_argv)
 
     if args.auth_token:
@@ -329,6 +334,44 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     if args.tunnel and args.transport == "stdio":
         args.transport = "streamable-http"
+
+    if getattr(args, "tunnel", None) and args.tunnel != "manual":
+        probe_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        probe_sock.settimeout(1.0)
+        server_already_running = False
+        try:
+            probe_sock.connect(("127.0.0.1", args.port))
+            probe_sock.close()
+            server_already_running = True
+        except OSError:
+            pass
+
+        if server_already_running:
+            from godot_ai.transport.tunnel import (
+                start_cloudflare_quick_tunnel,
+                start_ssh_tunnel,
+            )
+
+            print(
+                f"Godot AI server is already active on port {args.port} "
+                "(managed by Godot Editor)."
+            )
+            print("Starting public tunnel to forward to active server...")
+            if args.tunnel == "cloudflare":
+                tunnel_info = start_cloudflare_quick_tunnel(args.port)
+            elif args.tunnel == "pinggy":
+                tunnel_info = start_ssh_tunnel(args.port, "pinggy")
+            else:
+                tunnel_info = start_ssh_tunnel(args.port, "localhost.run")
+
+            print(f"Public tunnel active ({tunnel_info.provider}): {tunnel_info.public_url}")
+            print(f"OpenAPI Action Schema: {tunnel_info.openapi_url}")
+            if tunnel_info.process:
+                try:
+                    tunnel_info.process.wait()
+                except KeyboardInterrupt:
+                    tunnel_info.process.terminate()
+            return
 
     from godot_ai.tools.domains import parse_exclude_list
 
@@ -457,6 +500,7 @@ def _serve(
         owner_pid=owner_pid,
         allow_host_networks=allow_host_networks,
         ws_socket=held_ws,
+        allow_remote=getattr(args, "allow_remote", False) or bool(getattr(args, "tunnel", None)),
     )
 
     transport_kwargs = {}

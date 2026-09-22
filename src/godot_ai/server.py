@@ -163,7 +163,11 @@ from godot_ai.transport.capability import (
     validate_launch_capabilities,
     write_capabilities,
 )
-from godot_ai.transport.origin_guard import IPNetwork, LocalhostOnlyHTTPMiddleware
+from godot_ai.transport.origin_guard import (
+    CORSMiddleware,
+    IPNetwork,
+    LocalhostOnlyHTTPMiddleware,
+)
 from godot_ai.transport.rest_gateway import register_rest_gateway
 from godot_ai.transport.security import BoundedHTTPMiddleware, CapabilityAuthMiddleware
 from godot_ai.transport.websocket import GodotWebSocketServer
@@ -204,6 +208,7 @@ class GodotAIFastMCP(FastMCP):
         transport = kwargs.get("transport", "http")
         if transport in ("http", "streamable-http"):
             app = StaleMcpSessionDiagnosticMiddleware(app)
+        app = CORSMiddleware(app)
         app = BoundedHTTPMiddleware(app)
         app = CapabilityAuthMiddleware(app, self._transport_capabilities.http)
         ## Outermost wrap: refuse non-loopback Host/Origin (DNS-rebinding
@@ -211,7 +216,11 @@ class GodotAIFastMCP(FastMCP):
         ## including ``sse`` so ``/godot-ai/status`` and the FastMCP
         ## endpoints are guarded uniformly. ``--allow-host`` (#421) widens
         ## only the Host allowlist to named LAN CIDRs; None = loopback-only.
-        return LocalhostOnlyHTTPMiddleware(app, getattr(self, "_allow_host_networks", None))
+        return LocalhostOnlyHTTPMiddleware(
+            app,
+            getattr(self, "_allow_host_networks", None),
+            getattr(self, "_allow_remote", False),
+        )
 
 
 ## ---------------------------------------------------------------------------
@@ -731,6 +740,7 @@ def create_server(
     owner_pid: int | None = None,
     allow_host_networks: Sequence[IPNetwork] | None = None,
     ws_socket: socket.socket | None = None,
+    allow_remote: bool = False,
 ) -> FastMCP:
     logging.basicConfig(level=logging.INFO, format="%(name)s | %(message)s")
     capabilities = validate_launch_capabilities(capabilities.http, capabilities.websocket)
@@ -945,6 +955,7 @@ def create_server(
     ## #421: stash the --allow-host CIDRs where http_app() reads them when it
     ## installs the rebinding guard middleware. None = loopback-only (default).
     mcp._allow_host_networks = list(allow_host_networks) if allow_host_networks else None
+    mcp._allow_remote = allow_remote
 
     ## Middleware registration order is load-bearing — do not reorder
     ## without reading the rationale below. Locked by
