@@ -37,7 +37,7 @@ func create_image(params: Dictionary) -> Dictionary:
 			save_path = "res://" + save_path
 		var err := img.save_png(save_path)
 		if err != OK:
-			return {"error": "Failed to save image to: %s" % save_path, "code": ErrorCodes.RESOURCE_OPERATION_FAILED}
+			return {"error": "Failed to save image to: %s" % save_path, "code": ErrorCodes.INTERNAL_ERROR}
 
 	return {
 		"success": true,
@@ -55,7 +55,7 @@ func create_atlas(params: Dictionary) -> Dictionary:
 	var save_path: String = params.get("save_path", "")
 
 	if atlas_path.is_empty():
-		return {"error": "atlas_path is required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "atlas_path is required", "code": ErrorCodes.INVALID_PARAMS}
 	if not atlas_path.begins_with("res://"):
 		atlas_path = "res://" + atlas_path
 
@@ -77,7 +77,7 @@ func create_atlas(params: Dictionary) -> Dictionary:
 			save_path = "res://" + save_path
 		var err := ResourceSaver.save(atlas_tex, save_path)
 		if err != OK:
-			return {"error": "Failed to save AtlasTexture to: %s" % save_path, "code": ErrorCodes.RESOURCE_OPERATION_FAILED}
+			return {"error": "Failed to save AtlasTexture to: %s" % save_path, "code": ErrorCodes.INTERNAL_ERROR}
 
 	return {
 		"success": true,
@@ -90,7 +90,7 @@ func create_atlas(params: Dictionary) -> Dictionary:
 func get_texture_info(params: Dictionary) -> Dictionary:
 	var path: String = params.get("path", "")
 	if path.is_empty():
-		return {"error": "path is required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "path is required", "code": ErrorCodes.INVALID_PARAMS}
 	if not path.begins_with("res://"):
 		path = "res://" + path
 
@@ -130,7 +130,7 @@ func create_curve_texture(params: Dictionary) -> Dictionary:
 			save_path = "res://" + save_path
 		var err := ResourceSaver.save(tex, save_path)
 		if err != OK:
-			return {"error": "Failed to save CurveTexture to: %s" % save_path, "code": ErrorCodes.RESOURCE_OPERATION_FAILED}
+			return {"error": "Failed to save CurveTexture to: %s" % save_path, "code": ErrorCodes.INTERNAL_ERROR}
 
 	return {
 		"success": true,

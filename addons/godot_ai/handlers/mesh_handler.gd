@@ -138,19 +138,19 @@ func deform_mesh(params: Dictionary) -> Dictionary:
 	var save_path: String = params.get("save_path", "")
 
 	if mesh_path.is_empty():
-		return {"error": "mesh_path is required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "mesh_path is required", "code": ErrorCodes.INVALID_PARAMS}
 
 	if not mesh_path.begins_with("res://"):
 		mesh_path = "res://" + mesh_path
 
 	var res := ResourceLoader.load(mesh_path)
 	if not (res is ArrayMesh):
-		return {"error": "Target resource is not an ArrayMesh: %s" % mesh_path, "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "Target resource is not an ArrayMesh: %s" % mesh_path, "code": ErrorCodes.INVALID_PARAMS}
 
 	var mdt := MeshDataTool.new()
 	var err := mdt.create_from_surface(res, 0)
 	if err != OK:
-		return {"error": "Failed to create MeshDataTool from surface 0", "code": ErrorCodes.RESOURCE_OPERATION_FAILED}
+		return {"error": "Failed to create MeshDataTool from surface 0", "code": ErrorCodes.INTERNAL_ERROR}
 
 	var vert_count := mdt.get_vertex_count()
 	for i in range(vert_count):

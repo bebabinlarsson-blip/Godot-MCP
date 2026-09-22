@@ -62,11 +62,11 @@ func capture_viewport(params: Dictionary) -> Dictionary:
 
 	var tex: ViewportTexture = target_vp.get_texture()
 	if tex == null:
-		return {"error": "Viewport has no valid texture", "code": ErrorCodes.RESOURCE_OPERATION_FAILED}
+		return {"error": "Viewport has no valid texture", "code": ErrorCodes.INTERNAL_ERROR}
 
 	var img: Image = tex.get_image()
 	if img == null or img.is_empty():
-		return {"error": "Failed to extract image from ViewportTexture", "code": ErrorCodes.RESOURCE_OPERATION_FAILED}
+		return {"error": "Failed to extract image from ViewportTexture", "code": ErrorCodes.INTERNAL_ERROR}
 
 	var err := img.save_png(target_path)
 	return {

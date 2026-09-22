@@ -21,7 +21,7 @@ func get_system_info(_params: Dictionary) -> Dictionary:
 	var proc_count := OS.get_processor_count()
 	var model := OS.get_model_name()
 	var video_adapter := RenderingServer.get_video_adapter_name()
-	var video_vendor := RenderingServer.get_video_adapter_vendor_name()
+	var video_vendor := RenderingServer.get_video_adapter_vendor()
 
 	return {
 		"success": true,
@@ -85,7 +85,7 @@ func set_clipboard(params: Dictionary) -> Dictionary:
 func get_env(params: Dictionary) -> Dictionary:
 	var var_name: String = params.get("var_name", "")
 	if var_name.is_empty():
-		return {"error": "var_name is required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "var_name is required", "code": ErrorCodes.INVALID_PARAMS}
 
 	var val := OS.get_environment(var_name)
 	return {
@@ -100,7 +100,7 @@ func set_env(params: Dictionary) -> Dictionary:
 	var var_name: String = params.get("var_name", "")
 	var val: String = params.get("value", "")
 	if var_name.is_empty():
-		return {"error": "var_name is required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "var_name is required", "code": ErrorCodes.INVALID_PARAMS}
 
 	OS.set_environment(var_name, val)
 	return {

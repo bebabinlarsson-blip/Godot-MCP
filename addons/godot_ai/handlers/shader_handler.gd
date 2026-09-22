@@ -145,14 +145,14 @@ func create_shader(params: Dictionary) -> Dictionary:
 		DirAccess.make_dir_recursive_absolute(dir_path)
 
 	if FileAccess.file_exists(path) and not overwrite:
-		return ErrorCodes.make(ErrorCodes.FILE_ALREADY_EXISTS, "Shader file already exists at %s" % path)
+		return ErrorCodes.make(ErrorCodes.INVALID_PARAMS, "Shader file already exists at %s" % path)
 
 	if code.strip_edges().is_empty():
 		code = "shader_type %s;\n\nvoid fragment() {\n\t// Place fragment shader code here.\n}\n" % shader_type
 
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
-		return ErrorCodes.make(ErrorCodes.FILE_NOT_FOUND, "Failed to write shader file: %s" % error_string(FileAccess.get_open_error()))
+		return ErrorCodes.make(ErrorCodes.RESOURCE_NOT_FOUND, "Failed to write shader file: %s" % error_string(FileAccess.get_open_error()))
 	file.store_string(code)
 	file.close()
 

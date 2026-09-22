@@ -363,7 +363,7 @@ func create_dialogue(params: Dictionary) -> Dictionary:
 		return path_err
 
 	if FileAccess.file_exists(path) and not overwrite:
-		return ErrorCodes.make(ErrorCodes.FILE_ALREADY_EXISTS, "Dialogue file already exists at: %s (set overwrite=true)" % path)
+		return ErrorCodes.make(ErrorCodes.INVALID_PARAMS, "Dialogue file already exists at: %s (set overwrite=true)" % path)
 
 	var base_dir := path.get_base_dir()
 	if not DirAccess.dir_exists_absolute(base_dir):

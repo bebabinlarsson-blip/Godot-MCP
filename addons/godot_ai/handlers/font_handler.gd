@@ -33,7 +33,7 @@ func create_system_font(params: Dictionary) -> Dictionary:
 			save_path = "res://" + save_path
 		var err := ResourceSaver.save(font, save_path)
 		if err != OK:
-			return {"error": "Failed to save SystemFont to: %s" % save_path, "code": ErrorCodes.RESOURCE_OPERATION_FAILED}
+			return {"error": "Failed to save SystemFont to: %s" % save_path, "code": ErrorCodes.INTERNAL_ERROR}
 
 	return {
 		"success": true,
@@ -50,7 +50,7 @@ func create_font_variation(params: Dictionary) -> Dictionary:
 	var save_path: String = params.get("save_path", "")
 
 	if base_font_path.is_empty():
-		return {"error": "base_font_path is required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "base_font_path is required", "code": ErrorCodes.INVALID_PARAMS}
 	if not base_font_path.begins_with("res://"):
 		base_font_path = "res://" + base_font_path
 
@@ -70,7 +70,7 @@ func create_font_variation(params: Dictionary) -> Dictionary:
 			save_path = "res://" + save_path
 		var err := ResourceSaver.save(variation, save_path)
 		if err != OK:
-			return {"error": "Failed to save FontVariation to: %s" % save_path, "code": ErrorCodes.RESOURCE_OPERATION_FAILED}
+			return {"error": "Failed to save FontVariation to: %s" % save_path, "code": ErrorCodes.INTERNAL_ERROR}
 
 	return {
 		"success": true,
@@ -111,7 +111,7 @@ func create_label_settings(params: Dictionary) -> Dictionary:
 			save_path = "res://" + save_path
 		var err := ResourceSaver.save(settings, save_path)
 		if err != OK:
-			return {"error": "Failed to save LabelSettings to: %s" % save_path, "code": ErrorCodes.RESOURCE_OPERATION_FAILED}
+			return {"error": "Failed to save LabelSettings to: %s" % save_path, "code": ErrorCodes.INTERNAL_ERROR}
 
 	return {
 		"success": true,
@@ -123,7 +123,7 @@ func create_label_settings(params: Dictionary) -> Dictionary:
 func get_font_info(params: Dictionary) -> Dictionary:
 	var font_path: String = params.get("font_path", "")
 	if font_path.is_empty():
-		return {"error": "font_path is required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "font_path is required", "code": ErrorCodes.INVALID_PARAMS}
 	if not font_path.begins_with("res://"):
 		font_path = "res://" + font_path
 

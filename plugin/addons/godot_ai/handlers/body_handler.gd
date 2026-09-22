@@ -41,7 +41,7 @@ func _resolve_node(scene_root: Node, node_path: String) -> Node:
 func configure_body(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var node_path: String = params.get("node_path", "")
 	var node: Node = _resolve_node(scene_root, node_path)
@@ -62,7 +62,7 @@ func configure_body(params: Dictionary) -> Dictionary:
 func apply_impulse(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var node_path: String = params.get("node_path", "")
 	var node: Node = _resolve_node(scene_root, node_path)
@@ -105,7 +105,7 @@ func apply_impulse(params: Dictionary) -> Dictionary:
 	else:
 		return {
 			"error": "Target node is not a RigidBody2D or RigidBody3D: %s" % node.get_class(),
-			"code": ErrorCodes.INVALID_ARGUMENT
+			"code": ErrorCodes.INVALID_PARAMS
 		}
 
 	return {"success": true, "node_path": node_path, "class": node.get_class()}
@@ -114,7 +114,7 @@ func apply_impulse(params: Dictionary) -> Dictionary:
 func set_collision_layer_mask(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var node_path: String = params.get("node_path", "")
 	var node: Node = _resolve_node(scene_root, node_path)
@@ -124,7 +124,7 @@ func set_collision_layer_mask(params: Dictionary) -> Dictionary:
 	if not (node is CollisionObject2D or node is CollisionObject3D):
 		return {
 			"error": "Target node is not a CollisionObject2D or CollisionObject3D",
-			"code": ErrorCodes.INVALID_ARGUMENT
+			"code": ErrorCodes.INVALID_PARAMS
 		}
 
 	if params.has("collision_layer"):
@@ -145,7 +145,7 @@ func set_collision_layer_mask(params: Dictionary) -> Dictionary:
 func scaffold_character_body(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent: Node = _resolve_node(scene_root, parent_path)
@@ -189,7 +189,7 @@ func scaffold_character_body(params: Dictionary) -> Dictionary:
 func get_body_info(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var node_path: String = params.get("node_path", "")
 	var node: Node = _resolve_node(scene_root, node_path)

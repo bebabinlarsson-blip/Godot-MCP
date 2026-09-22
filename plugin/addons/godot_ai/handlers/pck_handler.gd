@@ -20,7 +20,7 @@ func create_pck(params: Dictionary) -> Dictionary:
 	var alignment: int = int(params.get("alignment", 32))
 
 	if pck_path.is_empty():
-		return {"error": "pck_path is required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "pck_path is required", "code": ErrorCodes.INVALID_PARAMS}
 
 	if not pck_path.begins_with("res://") and not pck_path.begins_with("user://"):
 		pck_path = "res://" + pck_path
@@ -28,7 +28,7 @@ func create_pck(params: Dictionary) -> Dictionary:
 	var packer := PCKPacker.new()
 	var err := packer.pck_start(pck_path, alignment)
 	if err != OK:
-		return {"error": "Failed to start PCKPacker for: %s (code %d)" % [pck_path, err], "code": ErrorCodes.RESOURCE_OPERATION_FAILED}
+		return {"error": "Failed to start PCKPacker for: %s (code %d)" % [pck_path, err], "code": ErrorCodes.INTERNAL_ERROR}
 
 	var packed_count := 0
 	for f in files:
@@ -36,13 +36,13 @@ func create_pck(params: Dictionary) -> Dictionary:
 		if not file_str.begins_with("res://"):
 			file_str = "res://" + file_str
 		if FileAccess.file_exists(file_str):
-			var add_err := packer.pck_add_file(file_str, file_str)
+			var add_err: int = packer.pck_add_file(file_str, file_str)
 			if add_err == OK:
 				packed_count += 1
 
-	var flush_err := packer.flush(true)
+	var flush_err: int = packer.flush(true)
 	if flush_err != OK:
-		return {"error": "Failed to flush PCKPacker", "code": ErrorCodes.RESOURCE_OPERATION_FAILED}
+		return {"error": "Failed to flush PCKPacker", "code": ErrorCodes.INTERNAL_ERROR}
 
 	return {
 		"success": true,
@@ -56,7 +56,7 @@ func load_pck(params: Dictionary) -> Dictionary:
 	var replace_files: bool = params.get("replace_files", true)
 
 	if pck_path.is_empty():
-		return {"error": "pck_path is required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "pck_path is required", "code": ErrorCodes.INVALID_PARAMS}
 
 	if not pck_path.begins_with("res://") and not pck_path.begins_with("user://"):
 		pck_path = "res://" + pck_path
@@ -73,7 +73,7 @@ func inspect_pck(params: Dictionary) -> Dictionary:
 	var pck_path: String = params.get("pck_path", "")
 
 	if pck_path.is_empty():
-		return {"error": "pck_path is required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "pck_path is required", "code": ErrorCodes.INVALID_PARAMS}
 
 	if not pck_path.begins_with("res://") and not pck_path.begins_with("user://"):
 		pck_path = "res://" + pck_path

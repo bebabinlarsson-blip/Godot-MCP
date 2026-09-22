@@ -131,7 +131,7 @@ func create_curve_3d(params: Dictionary) -> Dictionary:
 func scaffold_path(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent: Node = _resolve_node(scene_root, parent_path)
@@ -189,7 +189,7 @@ func sample_baked_points(params: Dictionary) -> Dictionary:
 		interval = 0.01
 
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var node := _resolve_node(scene_root, path_node_path)
 	if node == null:
@@ -215,7 +215,7 @@ func sample_baked_points(params: Dictionary) -> Dictionary:
 			sampled_points.append([pos.x, pos.y])
 			dist += interval
 	else:
-		return {"error": "Node is not a Path2D or Path3D with a valid curve", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "Node is not a Path2D or Path3D with a valid curve", "code": ErrorCodes.INVALID_PARAMS}
 
 	return {
 		"success": true,

@@ -55,7 +55,7 @@ func query_path_2d(params: Dictionary) -> Dictionary:
 			map_rid = maps[0]
 
 	if not map_rid.is_valid():
-		return {"error": "No valid Navigation2D map found", "code": ErrorCodes.NOT_FOUND}
+		return {"error": "No valid Navigation2D map found", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var path_points: PackedVector2Array = NavigationServer2D.map_get_path(
 		map_rid, start, end, optimize
@@ -88,7 +88,7 @@ func query_path_3d(params: Dictionary) -> Dictionary:
 			map_rid = maps[0]
 
 	if not map_rid.is_valid():
-		return {"error": "No valid Navigation3D map found", "code": ErrorCodes.NOT_FOUND}
+		return {"error": "No valid Navigation3D map found", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var path_points: PackedVector3Array = NavigationServer3D.map_get_path(
 		map_rid, start, end, optimize
@@ -107,7 +107,7 @@ func query_path_3d(params: Dictionary) -> Dictionary:
 func scaffold_nav_link(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent: Node = _resolve_node(scene_root, parent_path)
@@ -149,7 +149,7 @@ func scaffold_nav_link(params: Dictionary) -> Dictionary:
 func scaffold_nav_obstacle(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent: Node = _resolve_node(scene_root, parent_path)

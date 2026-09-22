@@ -506,7 +506,7 @@ func generate_procedural_sfx(params: Dictionary) -> Dictionary:
 	var f := FileAccess.open(dest_path, FileAccess.WRITE)
 	if not f:
 		return ErrorCodes.make(
-			ErrorCodes.FILE_WRITE_ERROR,
+			ErrorCodes.INTERNAL_ERROR,
 			"Cannot open '%s' for writing: %s" % [dest_path, error_string(FileAccess.get_open_error())]
 		)
 	f.store_buffer(wav_bytes)
@@ -831,7 +831,7 @@ func bus_add(params: Dictionary) -> Dictionary:
 
 	for i in range(AudioServer.bus_count):
 		if AudioServer.get_bus_name(i) == bus_name:
-			return ErrorCodes.make(ErrorCodes.NODE_ALREADY_EXISTS, "Audio bus '%s' already exists at index %d" % [bus_name, i])
+			return ErrorCodes.make(ErrorCodes.INVALID_PARAMS, "Audio bus '%s' already exists at index %d" % [bus_name, i])
 
 	var at_pos: int = int(params.get("at_pos", -1))
 	AudioServer.add_bus(at_pos)
@@ -861,7 +861,7 @@ func bus_remove(params: Dictionary) -> Dictionary:
 	if idx < 0:
 		return ErrorCodes.make(ErrorCodes.NODE_NOT_FOUND, "Audio bus not found: %s" % str(bus_val))
 	if idx == 0:
-		return ErrorCodes.make(ErrorCodes.OPERATION_FAILED, "Cannot remove Master audio bus (index 0)")
+		return ErrorCodes.make(ErrorCodes.INTERNAL_ERROR, "Cannot remove Master audio bus (index 0)")
 
 	var removed_name := AudioServer.get_bus_name(idx)
 	AudioServer.remove_bus(idx)
@@ -977,7 +977,7 @@ func bus_add_effect(params: Dictionary) -> Dictionary:
 func bus_save_layout(params: Dictionary = {}) -> Dictionary:
 	var path: String = params.get("path", "res://default_bus_layout.tres")
 	if not path.begins_with("res://"):
-		return ErrorCodes.make(ErrorCodes.INVALID_PATH, "Path must begin with res://")
+		return ErrorCodes.make(ErrorCodes.INVALID_PARAMS, "Path must begin with res://")
 
 	var layout: AudioBusLayout = AudioServer.generate_bus_layout()
 	var err := ResourceSaver.save(layout, path)

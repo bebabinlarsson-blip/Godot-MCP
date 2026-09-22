@@ -17,14 +17,14 @@ func _init(undo_redo: EditorUndoRedoManager = null, connection: McpConnection = 
 func config_read(params: Dictionary) -> Dictionary:
 	var file_path: String = params.get("file_path", "")
 	if file_path.is_empty():
-		return {"error": "file_path is required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "file_path is required", "code": ErrorCodes.INVALID_PARAMS}
 	if not file_path.begins_with("res://") and not file_path.begins_with("user://"):
 		file_path = "res://" + file_path
 
 	var cfg := ConfigFile.new()
 	var err := cfg.load(file_path)
 	if err != OK:
-		return {"error": "Failed to load ConfigFile: %s (code %d)" % [file_path, err], "code": ErrorCodes.RESOURCE_OPERATION_FAILED}
+		return {"error": "Failed to load ConfigFile: %s (code %d)" % [file_path, err], "code": ErrorCodes.INTERNAL_ERROR}
 
 	var section: String = params.get("section", "")
 	var key: String = params.get("key", "")
@@ -56,7 +56,7 @@ func config_write(params: Dictionary) -> Dictionary:
 	var key: String = params.get("key", "")
 
 	if file_path.is_empty() or section.is_empty() or key.is_empty() or not params.has("value"):
-		return {"error": "file_path, section, key, and value are required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "file_path, section, key, and value are required", "code": ErrorCodes.INVALID_PARAMS}
 
 	if not file_path.begins_with("res://") and not file_path.begins_with("user://"):
 		file_path = "res://" + file_path
@@ -68,7 +68,7 @@ func config_write(params: Dictionary) -> Dictionary:
 	cfg.set_value(section, key, params["value"])
 	var err := cfg.save(file_path)
 	if err != OK:
-		return {"error": "Failed to save ConfigFile: %s (code %d)" % [file_path, err], "code": ErrorCodes.RESOURCE_OPERATION_FAILED}
+		return {"error": "Failed to save ConfigFile: %s (code %d)" % [file_path, err], "code": ErrorCodes.INTERNAL_ERROR}
 
 	return {
 		"success": true,
@@ -82,7 +82,7 @@ func json_parse(params: Dictionary) -> Dictionary:
 	var json_string: String = params.get("json_string", "")
 	var parsed = JSON.parse_string(json_string)
 	if parsed == null and not json_string.strip_edges() == "null":
-		return {"error": "Failed to parse JSON string", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "Failed to parse JSON string", "code": ErrorCodes.INVALID_PARAMS}
 
 	return {
 		"success": true,
@@ -92,7 +92,7 @@ func json_parse(params: Dictionary) -> Dictionary:
 
 func json_generate(params: Dictionary) -> Dictionary:
 	if not params.has("data"):
-		return {"error": "data parameter is required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "data parameter is required", "code": ErrorCodes.INVALID_PARAMS}
 
 	var indent: String = params.get("indent", "")
 	var json_str := JSON.stringify(params["data"], indent)
@@ -106,7 +106,7 @@ func json_generate(params: Dictionary) -> Dictionary:
 func expression_eval(params: Dictionary) -> Dictionary:
 	var expr_str: String = params.get("expression_string", "")
 	if expr_str.is_empty():
-		return {"error": "expression_string is required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "expression_string is required", "code": ErrorCodes.INVALID_PARAMS}
 
 	var expr := Expression.new()
 	var input_names: Array = params.get("input_names", [])
@@ -118,11 +118,11 @@ func expression_eval(params: Dictionary) -> Dictionary:
 
 	var err := expr.parse(expr_str, names_packed)
 	if err != OK:
-		return {"error": "Failed to parse expression: %s (code %d)" % [expr.get_error_text_or_empty() if expr.has_method("get_error_text_or_empty") else str(err), err], "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "Failed to parse expression: %s (code %d)" % [expr.get_error_text_or_empty() if expr.has_method("get_error_text_or_empty") else str(err), err], "code": ErrorCodes.INVALID_PARAMS}
 
 	var result = expr.execute(input_values, null, true)
 	if expr.has_execute_failed():
-		return {"error": "Expression execution failed", "code": ErrorCodes.RESOURCE_OPERATION_FAILED}
+		return {"error": "Expression execution failed", "code": ErrorCodes.INTERNAL_ERROR}
 
 	return {
 		"success": true,

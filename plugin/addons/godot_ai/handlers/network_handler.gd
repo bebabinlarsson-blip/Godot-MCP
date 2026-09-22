@@ -41,7 +41,7 @@ func _resolve_node(scene_root: Node, node_path: String) -> Node:
 func scaffold_tcp_server(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent: Node = _resolve_node(scene_root, parent_path)
@@ -68,7 +68,7 @@ func scaffold_tcp_server(params: Dictionary) -> Dictionary:
 func scaffold_websocket_peer(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent: Node = _resolve_node(scene_root, parent_path)
@@ -93,7 +93,7 @@ func scaffold_websocket_peer(params: Dictionary) -> Dictionary:
 func scaffold_udp_peer(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent: Node = _resolve_node(scene_root, parent_path)

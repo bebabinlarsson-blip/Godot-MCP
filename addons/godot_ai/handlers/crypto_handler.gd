@@ -22,13 +22,13 @@ func hash_file(params: Dictionary) -> Dictionary:
 	var algo: String = params.get("algorithm", "sha256").to_lower()
 
 	if file_path.is_empty():
-		return {"error": "file_path is required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "file_path is required", "code": ErrorCodes.INVALID_PARAMS}
 
 	if not file_path.begins_with("res://") and not file_path.begins_with("user://"):
 		file_path = "res://" + file_path
 
 	if not FileAccess.file_exists(file_path):
-		return {"error": "File does not exist: %s" % file_path, "code": ErrorCodes.FILE_NOT_FOUND}
+		return {"error": "File does not exist: %s" % file_path, "code": ErrorCodes.RESOURCE_NOT_FOUND}
 
 	var ctx := HashingContext.new()
 	var hash_type := HashingContext.HASH_SHA256
@@ -39,11 +39,11 @@ func hash_file(params: Dictionary) -> Dictionary:
 
 	var err := ctx.start(hash_type)
 	if err != OK:
-		return {"error": "Failed to initialize HashingContext", "code": ErrorCodes.UNKNOWN_ERROR}
+		return {"error": "Failed to initialize HashingContext", "code": ErrorCodes.INTERNAL_ERROR}
 
 	var f := FileAccess.open(file_path, FileAccess.READ)
 	if f == null:
-		return {"error": "Failed to open file: %s" % file_path, "code": ErrorCodes.FILE_OPEN_FAILED}
+		return {"error": "Failed to open file: %s" % file_path, "code": ErrorCodes.INTERNAL_ERROR}
 
 	while f.get_position() < f.get_length():
 		var chunk := f.get_buffer(65536)
@@ -113,7 +113,7 @@ func generate_rsa_key(params: Dictionary) -> Dictionary:
 	var save_path: String = params.get("save_path", "")
 	var key := _crypto.generate_rsa(key_size)
 	if key == null:
-		return {"error": "Failed to generate RSA key", "code": ErrorCodes.UNKNOWN_ERROR}
+		return {"error": "Failed to generate RSA key", "code": ErrorCodes.INTERNAL_ERROR}
 
 	var saved := false
 	if not save_path.is_empty():
@@ -144,13 +144,13 @@ func generate_self_signed_cert(params: Dictionary) -> Dictionary:
 		key = CryptoKey.new()
 		var load_err := key.load(key_path)
 		if load_err != OK:
-			return {"error": "Failed to load CryptoKey from: %s" % key_path, "code": ErrorCodes.FILE_OPEN_FAILED}
+			return {"error": "Failed to load CryptoKey from: %s" % key_path, "code": ErrorCodes.INTERNAL_ERROR}
 	else:
 		key = _crypto.generate_rsa(2048)
 
 	var cert := _crypto.generate_self_signed_certificate(key, "CN=" + common_name + ",O=" + issuer_name)
 	if cert == null:
-		return {"error": "Failed to generate self-signed certificate", "code": ErrorCodes.UNKNOWN_ERROR}
+		return {"error": "Failed to generate self-signed certificate", "code": ErrorCodes.INTERNAL_ERROR}
 
 	var saved := false
 	if not cert_save_path.is_empty():

@@ -42,7 +42,7 @@ func _resolve_node(scene_root: Node, node_path: String) -> Node:
 func create_subviewport(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return ErrorCodes.make(ErrorCodes.NO_ACTIVE_SCENE, "No active scene to create SubViewport in")
+		return ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY, "No active scene to create SubViewport in")
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent := _resolve_node(scene_root, parent_path)
@@ -106,7 +106,7 @@ func create_subviewport(params: Dictionary) -> Dictionary:
 func scaffold_splitscreen(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return ErrorCodes.make(ErrorCodes.NO_ACTIVE_SCENE, "No active scene to scaffold splitscreen in")
+		return ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY, "No active scene to scaffold splitscreen in")
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent := _resolve_node(scene_root, parent_path)
@@ -219,15 +219,15 @@ func scaffold_splitscreen(params: Dictionary) -> Dictionary:
 func wire_render_texture(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return ErrorCodes.make(ErrorCodes.NO_ACTIVE_SCENE, "No active scene to wire render texture in")
+		return ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY, "No active scene to wire render texture in")
 
 	var vp_path: String = params.get("viewport_path", "")
 	if vp_path.is_empty():
-		return ErrorCodes.make(ErrorCodes.INVALID_ARGUMENT, "viewport_path must be specified")
+		return ErrorCodes.make(ErrorCodes.INVALID_PARAMS, "viewport_path must be specified")
 
 	var target_path: String = params.get("target_node_path", "")
 	if target_path.is_empty():
-		return ErrorCodes.make(ErrorCodes.INVALID_ARGUMENT, "target_node_path must be specified")
+		return ErrorCodes.make(ErrorCodes.INVALID_PARAMS, "target_node_path must be specified")
 
 	var vp_node := _resolve_node(scene_root, vp_path)
 	if vp_node == null or not (vp_node is Viewport):
@@ -284,7 +284,7 @@ func wire_render_texture(params: Dictionary) -> Dictionary:
 func get_viewport_tree(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return ErrorCodes.make(ErrorCodes.NO_ACTIVE_SCENE, "No active scene to inspect viewports in")
+		return ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY, "No active scene to inspect viewports in")
 
 	var viewports: Array = []
 	_collect_viewports(scene_root, viewports)
@@ -337,7 +337,7 @@ func _collect_viewports(node: Node, out_viewports: Array) -> void:
 func set_viewport_properties(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return ErrorCodes.make(ErrorCodes.NO_ACTIVE_SCENE, "No active scene")
+		return ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY, "No active scene")
 
 	var vp_path: String = params.get("viewport_path", "")
 	var target_node := _resolve_node(scene_root, vp_path)

@@ -59,7 +59,7 @@ func _find_world_environment(scene_root: Node, path_hint: String = "") -> WorldE
 func scaffold_world_environment(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent: Node = _resolve_node(scene_root, parent_path)
@@ -93,7 +93,7 @@ func scaffold_world_environment(params: Dictionary) -> Dictionary:
 
 	match tonemap_mode_str:
 		"reinhard":
-			env.tonemap_mode = Environment.TONE_MAPPER_REINHARD
+			env.tonemap_mode = Environment.TONE_MAPPER_REINHARDT
 		"filmic":
 			env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 		"linear":
@@ -116,7 +116,7 @@ func scaffold_world_environment(params: Dictionary) -> Dictionary:
 func set_environment_effects(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var node_path: String = params.get("node_path", "")
 	var env_node := _find_world_environment(scene_root, node_path)
@@ -160,7 +160,7 @@ func set_environment_effects(params: Dictionary) -> Dictionary:
 func set_camera_attributes(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var camera_path: String = params.get("camera_path", "")
 	var node := _resolve_node(scene_root, camera_path)
@@ -195,7 +195,7 @@ func set_camera_attributes(params: Dictionary) -> Dictionary:
 func apply_lighting_preset(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var node_path: String = params.get("node_path", "")
 	var env_node := _find_world_environment(scene_root, node_path)
@@ -275,7 +275,7 @@ func apply_lighting_preset(params: Dictionary) -> Dictionary:
 func get_environment_info(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var node_path: String = params.get("node_path", "")
 	var env_node := _find_world_environment(scene_root, node_path)

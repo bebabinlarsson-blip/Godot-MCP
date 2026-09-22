@@ -18,7 +18,7 @@ func _init(undo_redo: EditorUndoRedoManager, connection: McpConnection = null) -
 func scaffold_csv(params: Dictionary) -> Dictionary:
 	var path: String = params.get("path", "res://localization.csv")
 	if not path.begins_with("res://"):
-		return ErrorCodes.make(ErrorCodes.INVALID_PATH, "Path must begin with res://")
+		return ErrorCodes.make(ErrorCodes.INVALID_PARAMS, "Path must begin with res://")
 
 	var languages: Array = params.get("languages", ["en", "es", "fr", "de", "ja", "zh"])
 	if languages.is_empty():
@@ -75,7 +75,7 @@ func add_entry(params: Dictionary) -> Dictionary:
 		return ErrorCodes.make(ErrorCodes.MISSING_REQUIRED_PARAM, "Missing required param: key")
 
 	if not FileAccess.file_exists(path):
-		return ErrorCodes.make(ErrorCodes.FILE_NOT_FOUND, "Translation file not found at %s" % path)
+		return ErrorCodes.make(ErrorCodes.RESOURCE_NOT_FOUND, "Translation file not found at %s" % path)
 
 	var read_file := FileAccess.open(path, FileAccess.READ)
 	if read_file == null:
@@ -93,7 +93,7 @@ func add_entry(params: Dictionary) -> Dictionary:
 
 	var header := lines[0].split(",")
 	if header.size() < 2 or header[0].strip_edges() != "keys":
-		return ErrorCodes.make(ErrorCodes.INVALID_FORMAT, "Invalid CSV header at %s. Expected 'keys,lang1,lang2...'" % path)
+		return ErrorCodes.make(ErrorCodes.INVALID_PARAMS, "Invalid CSV header at %s. Expected 'keys,lang1,lang2...'" % path)
 
 	var lang_indices: Dictionary = {}
 	for i in range(1, header.size()):

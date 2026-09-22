@@ -42,7 +42,7 @@ func _resolve_node(scene_root: Node, node_path: String) -> Node:
 func scaffold_xr_rig(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return ErrorCodes.make(ErrorCodes.NO_ACTIVE_SCENE, "No active scene to scaffold XR rig in")
+		return ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY, "No active scene to scaffold XR rig in")
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent := _resolve_node(scene_root, parent_path)
@@ -107,9 +107,11 @@ func get_xr_status(_params: Dictionary) -> Dictionary:
 	var interfaces_list: Array = []
 	for iface in XRServer.get_interfaces():
 		if iface != null:
+			var iface_name: String = iface.get("name", "")
+			var xr_iface: XRInterface = XRServer.find_interface(iface_name)
 			interfaces_list.append({
-				"name": iface.get_name(),
-				"is_initialized": iface.is_initialized(),
+				"name": iface_name,
+				"is_initialized": xr_iface.is_initialized() if xr_iface != null else false,
 			})
 
 	return {
@@ -134,7 +136,7 @@ func _ready() -> void:
 	xr_interface = XRServer.find_interface("OpenXR")
 	if xr_interface and xr_interface.is_initialized():
 		print("OpenXR initialized successfully")
-		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_MODE_DISABLED)
+		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 		get_viewport().use_xr = true
 	else:
 		print("OpenXR not initialized or headset not connected")
@@ -147,14 +149,14 @@ func _ready() -> void:
 
 	var file := FileAccess.open(save_path, FileAccess.WRITE)
 	if file == null:
-		return ErrorCodes.make(ErrorCodes.FILE_NOT_FOUND, "Failed to write %s: %d" % [save_path, FileAccess.get_open_error()])
+		return ErrorCodes.make(ErrorCodes.RESOURCE_NOT_FOUND, "Failed to write %s: %d" % [save_path, FileAccess.get_open_error()])
 
 	file.store_string(script_content)
 	file.close()
 
 	if Engine.has_singleton("EditorInterface"):
 		var editor_interface := Engine.get_singleton("EditorInterface")
-		var fs := editor_interface.get_resource_filesystem()
+		var fs = editor_interface.get_resource_filesystem()
 		if fs != null:
 			fs.update_file(save_path)
 

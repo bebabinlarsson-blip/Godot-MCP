@@ -56,7 +56,7 @@ func create_sprite_frames(params: Dictionary) -> Dictionary:
 			save_path = "res://" + save_path
 		var err := ResourceSaver.save(sf, save_path)
 		if err != OK:
-			return {"error": "Failed to save SpriteFrames to: %s" % save_path, "code": ErrorCodes.RESOURCE_OPERATION_FAILED}
+			return {"error": "Failed to save SpriteFrames to: %s" % save_path, "code": ErrorCodes.INTERNAL_ERROR}
 
 	return {
 		"success": true,
@@ -68,7 +68,7 @@ func create_sprite_frames(params: Dictionary) -> Dictionary:
 func scaffold_animated_sprite(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent: Node = _resolve_node(scene_root, parent_path)
@@ -107,7 +107,7 @@ func scaffold_animated_sprite(params: Dictionary) -> Dictionary:
 func scaffold_multimesh(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent: Node = _resolve_node(scene_root, parent_path)
@@ -153,7 +153,7 @@ func scaffold_multimesh(params: Dictionary) -> Dictionary:
 func configure_line_2d(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var node_path: String = params.get("node_path", "")
 	var node: Node = _resolve_node(scene_root, node_path)

@@ -41,7 +41,7 @@ func _resolve_node(scene_root: Node, node_path: String) -> Node:
 func scaffold_state_machine(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent: Node = _resolve_node(scene_root, parent_path)
@@ -70,7 +70,7 @@ func scaffold_state_machine(params: Dictionary) -> Dictionary:
 func add_state(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var tree_path: String = params.get("tree_path", "")
 	var tree_node: Node = _resolve_node(scene_root, tree_path)
@@ -84,7 +84,7 @@ func add_state(params: Dictionary) -> Dictionary:
 	var sm: AnimationNodeStateMachine = at.tree_root
 	var state_name: String = params.get("state_name", "")
 	if state_name.is_empty():
-		return {"error": "state_name is required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "state_name is required", "code": ErrorCodes.INVALID_PARAMS}
 
 	var anim_name: String = params.get("animation_name", "")
 	var node_anim := AnimationNodeAnimation.new()
@@ -109,7 +109,7 @@ func add_state(params: Dictionary) -> Dictionary:
 func add_transition(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var tree_path: String = params.get("tree_path", "")
 	var tree_node: Node = _resolve_node(scene_root, tree_path)
@@ -126,7 +126,7 @@ func add_transition(params: Dictionary) -> Dictionary:
 	var auto_advance: bool = params.get("auto_advance", false)
 
 	if from_state.is_empty() or to_state.is_empty():
-		return {"error": "from_state and to_state are required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "from_state and to_state are required", "code": ErrorCodes.INVALID_PARAMS}
 
 	var tr := AnimationNodeStateMachineTransition.new()
 	tr.advance_mode = AnimationNodeStateMachineTransition.ADVANCE_MODE_AUTO if auto_advance else AnimationNodeStateMachineTransition.ADVANCE_MODE_ENABLED
@@ -144,7 +144,7 @@ func add_transition(params: Dictionary) -> Dictionary:
 func scaffold_blend_tree(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent: Node = _resolve_node(scene_root, parent_path)
@@ -173,7 +173,7 @@ func scaffold_blend_tree(params: Dictionary) -> Dictionary:
 func get_tree_info(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var tree_path: String = params.get("tree_path", "")
 	var tree_node: Node = _resolve_node(scene_root, tree_path)

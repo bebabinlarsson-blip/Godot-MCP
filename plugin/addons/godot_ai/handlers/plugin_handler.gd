@@ -80,7 +80,7 @@ func set_plugin_enabled(params: Dictionary) -> Dictionary:
 	if plugin_id.is_empty():
 		plugin_id = params.get("plugin_id", "")
 	if plugin_id.is_empty():
-		return {"error": "plugin_name or plugin_id is required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "plugin_name or plugin_id is required", "code": ErrorCodes.INVALID_PARAMS}
 
 	var enabled: bool = bool(params.get("enabled", true))
 

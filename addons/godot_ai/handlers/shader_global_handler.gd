@@ -37,7 +37,7 @@ func list_globals(_params: Dictionary) -> Dictionary:
 func set_global(params: Dictionary) -> Dictionary:
 	var g_name: String = params.get("name", "")
 	if g_name.is_empty():
-		return {"error": "name is required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "name is required", "code": ErrorCodes.INVALID_PARAMS}
 
 	var val = params.get("value")
 	var g_type := RenderingServer.global_shader_parameter_get_type(g_name)
@@ -63,7 +63,7 @@ func set_global(params: Dictionary) -> Dictionary:
 func add_global(params: Dictionary) -> Dictionary:
 	var g_name: String = params.get("name", "")
 	if g_name.is_empty():
-		return {"error": "name is required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "name is required", "code": ErrorCodes.INVALID_PARAMS}
 
 	var type_str: String = params.get("type", "float").to_lower()
 	var val = params.get("value")
@@ -123,7 +123,7 @@ func add_global(params: Dictionary) -> Dictionary:
 func remove_global(params: Dictionary) -> Dictionary:
 	var g_name: String = params.get("name", "")
 	if g_name.is_empty():
-		return {"error": "name is required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "name is required", "code": ErrorCodes.INVALID_PARAMS}
 
 	RenderingServer.global_shader_parameter_remove(g_name)
 

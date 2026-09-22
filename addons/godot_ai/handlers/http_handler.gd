@@ -41,7 +41,7 @@ func _resolve_node(scene_root: Node, node_path: String) -> Node:
 func scaffold_http_request(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent: Node = _resolve_node(scene_root, parent_path)
@@ -65,7 +65,7 @@ func scaffold_http_request(params: Dictionary) -> Dictionary:
 func send_request(params: Dictionary) -> Dictionary:
 	var url: String = params.get("url", "")
 	if url.is_empty():
-		return {"error": "url is required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "url is required", "code": ErrorCodes.INVALID_PARAMS}
 
 	var method_str: String = params.get("method", "GET").to_upper()
 	var method := HTTPClient.METHOD_GET
@@ -87,7 +87,7 @@ func send_request(params: Dictionary) -> Dictionary:
 
 	var tree := Engine.get_main_loop() as SceneTree
 	if tree == null or tree.root == null:
-		return {"error": "No active scene tree for HTTP execution", "code": ErrorCodes.RUNTIME_NOT_INITIALIZED}
+		return {"error": "No active scene tree for HTTP execution", "code": ErrorCodes.EDITOR_NOT_READY}
 
 	var req := HTTPRequest.new()
 	req.timeout = float(params.get("timeout", 10.0))
@@ -96,7 +96,7 @@ func send_request(params: Dictionary) -> Dictionary:
 	var err := req.request(url, headers, method, body)
 	if err != OK:
 		req.queue_free()
-		return {"error": "HTTPRequest.request failed with code: %d" % err, "code": ErrorCodes.NETWORK_ERROR}
+		return {"error": "HTTPRequest.request failed with code: %d" % err, "code": ErrorCodes.INTERNAL_ERROR}
 
 	var result: Array = await req.request_completed
 	req.queue_free()
@@ -122,14 +122,14 @@ func download_file(params: Dictionary) -> Dictionary:
 	var target_path: String = params.get("target_path", "")
 
 	if url.is_empty() or target_path.is_empty():
-		return {"error": "url and target_path are required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "url and target_path are required", "code": ErrorCodes.INVALID_PARAMS}
 
 	if not target_path.begins_with("res://") and not target_path.begins_with("user://"):
 		target_path = "res://" + target_path
 
 	var tree := Engine.get_main_loop() as SceneTree
 	if tree == null or tree.root == null:
-		return {"error": "No active scene tree for download", "code": ErrorCodes.RUNTIME_NOT_INITIALIZED}
+		return {"error": "No active scene tree for download", "code": ErrorCodes.EDITOR_NOT_READY}
 
 	var req := HTTPRequest.new()
 	req.timeout = float(params.get("timeout", 30.0))
@@ -139,7 +139,7 @@ func download_file(params: Dictionary) -> Dictionary:
 	var err := req.request(url)
 	if err != OK:
 		req.queue_free()
-		return {"error": "Download failed to initiate with code: %d" % err, "code": ErrorCodes.NETWORK_ERROR}
+		return {"error": "Download failed to initiate with code: %d" % err, "code": ErrorCodes.INTERNAL_ERROR}
 
 	var result: Array = await req.request_completed
 	req.queue_free()

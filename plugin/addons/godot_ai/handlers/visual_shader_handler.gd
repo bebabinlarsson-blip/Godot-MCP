@@ -35,7 +35,7 @@ func create_visual_shader(params: Dictionary) -> Dictionary:
 			save_path = "res://" + save_path
 		var err := ResourceSaver.save(vs, save_path)
 		if err != OK:
-			return {"error": "Failed to save VisualShader to: %s" % save_path, "code": ErrorCodes.RESOURCE_OPERATION_FAILED}
+			return {"error": "Failed to save VisualShader to: %s" % save_path, "code": ErrorCodes.INTERNAL_ERROR}
 
 	return {
 		"success": true,
@@ -51,7 +51,7 @@ func add_node(params: Dictionary) -> Dictionary:
 	var pos_array: Array = params.get("position", [0, 0])
 
 	if shader_path.is_empty():
-		return {"error": "shader_path is required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "shader_path is required", "code": ErrorCodes.INVALID_PARAMS}
 	if not shader_path.begins_with("res://"):
 		shader_path = "res://" + shader_path
 
@@ -64,7 +64,7 @@ func add_node(params: Dictionary) -> Dictionary:
 
 	var vs: VisualShader = res
 	if not ClassDB.class_exists(node_type):
-		return {"error": "Unknown VisualShaderNode type: %s" % node_type, "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "Unknown VisualShaderNode type: %s" % node_type, "code": ErrorCodes.INVALID_PARAMS}
 
 	var node_inst = ClassDB.instantiate(node_type)
 	if not node_inst is VisualShaderNode:
@@ -78,7 +78,7 @@ func add_node(params: Dictionary) -> Dictionary:
 	vs.add_node(shader_type_enum, node_inst, pos, id)
 	var err := ResourceSaver.save(vs, shader_path)
 	if err != OK:
-		return {"error": "Failed to save updated VisualShader", "code": ErrorCodes.RESOURCE_OPERATION_FAILED}
+		return {"error": "Failed to save updated VisualShader", "code": ErrorCodes.INTERNAL_ERROR}
 
 	return {
 		"success": true,
@@ -97,7 +97,7 @@ func connect_nodes(params: Dictionary) -> Dictionary:
 	var to_port: int = int(params.get("to_port", 0))
 
 	if shader_path.is_empty():
-		return {"error": "shader_path is required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "shader_path is required", "code": ErrorCodes.INVALID_PARAMS}
 	if not shader_path.begins_with("res://"):
 		shader_path = "res://" + shader_path
 
@@ -111,11 +111,11 @@ func connect_nodes(params: Dictionary) -> Dictionary:
 	var vs: VisualShader = res
 	var err := vs.connect_nodes(shader_type_enum, from_node, from_port, to_node, to_port)
 	if err != OK:
-		return {"error": "Failed to connect nodes in VisualShader (code %d)" % err, "code": ErrorCodes.RESOURCE_OPERATION_FAILED}
+		return {"error": "Failed to connect nodes in VisualShader (code %d)" % err, "code": ErrorCodes.INTERNAL_ERROR}
 
 	var save_err := ResourceSaver.save(vs, shader_path)
 	if save_err != OK:
-		return {"error": "Failed to save connected VisualShader", "code": ErrorCodes.RESOURCE_OPERATION_FAILED}
+		return {"error": "Failed to save connected VisualShader", "code": ErrorCodes.INTERNAL_ERROR}
 
 	return {
 		"success": true,
@@ -131,7 +131,7 @@ func get_graph(params: Dictionary) -> Dictionary:
 	var shader_type_enum: int = int(params.get("shader_type_enum", 0))
 
 	if shader_path.is_empty():
-		return {"error": "shader_path is required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "shader_path is required", "code": ErrorCodes.INVALID_PARAMS}
 	if not shader_path.begins_with("res://"):
 		shader_path = "res://" + shader_path
 

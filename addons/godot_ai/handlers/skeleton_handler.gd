@@ -58,7 +58,7 @@ func _find_skeleton(scene_root: Node, path_hint: String = "") -> Skeleton3D:
 func get_skeleton_info(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var skel_path: String = params.get("skeleton_path", "")
 	var skel := _find_skeleton(scene_root, skel_path)
@@ -95,7 +95,7 @@ func get_skeleton_info(params: Dictionary) -> Dictionary:
 func set_bone_pose(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var skel_path: String = params.get("skeleton_path", "")
 	var skel := _find_skeleton(scene_root, skel_path)
@@ -133,7 +133,7 @@ func set_bone_pose(params: Dictionary) -> Dictionary:
 func scaffold_bone_attachment(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var skel_path: String = params.get("skeleton_path", "")
 	var skel := _find_skeleton(scene_root, skel_path)
@@ -163,7 +163,7 @@ func scaffold_bone_attachment(params: Dictionary) -> Dictionary:
 func scaffold_ragdoll(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var skel_path: String = params.get("skeleton_path", "")
 	var skel := _find_skeleton(scene_root, skel_path)
@@ -172,7 +172,7 @@ func scaffold_ragdoll(params: Dictionary) -> Dictionary:
 
 	var bone_count := skel.get_bone_count()
 	if bone_count == 0:
-		return {"error": "Skeleton3D has no bones", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "Skeleton3D has no bones", "code": ErrorCodes.INVALID_PARAMS}
 
 	var col_layer: int = int(params.get("collision_layer", 1))
 	var col_mask: int = int(params.get("collision_mask", 1))

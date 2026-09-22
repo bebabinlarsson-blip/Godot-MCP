@@ -33,7 +33,7 @@ func run_script(params: Dictionary) -> Dictionary:
 	var inline_code: String = params.get("inline_code", "")
 
 	if script_path.is_empty() and inline_code.is_empty():
-		return {"error": "Must provide either script_path or inline_code", "code": ErrorCodes.INVALID_ARGUMENT}
+		return {"error": "Must provide either script_path or inline_code", "code": ErrorCodes.INVALID_PARAMS}
 
 	if not script_path.is_empty():
 		var godot_bin := OS.get_executable_path()
@@ -55,7 +55,7 @@ func run_script(params: Dictionary) -> Dictionary:
 	)
 	var err := script.reload()
 	if err != OK:
-		return {"error": "Failed to compile inline script: %d" % err, "code": ErrorCodes.INVALID_ARGUMENT}
+		return {"error": "Failed to compile inline script: %d" % err, "code": ErrorCodes.INVALID_PARAMS}
 
 	var instance = script.new()
 	var result = null
@@ -71,7 +71,7 @@ func run_script(params: Dictionary) -> Dictionary:
 func run_headless_scene(params: Dictionary) -> Dictionary:
 	var scene_path: String = params.get("scene_path", "")
 	if scene_path.is_empty():
-		return {"error": "scene_path is required", "code": ErrorCodes.INVALID_ARGUMENT}
+		return {"error": "scene_path is required", "code": ErrorCodes.INVALID_PARAMS}
 
 	var godot_bin := OS.get_executable_path()
 	var args := PackedStringArray(["--headless", scene_path, "--quit-after", str(params.get("quit_after_frames", 60))])
@@ -90,7 +90,7 @@ func export_project_cli(params: Dictionary) -> Dictionary:
 	var preset: String = params.get("preset", "")
 	var output_path: String = params.get("output_path", "")
 	if preset.is_empty() or output_path.is_empty():
-		return {"error": "preset and output_path are required", "code": ErrorCodes.INVALID_ARGUMENT}
+		return {"error": "preset and output_path are required", "code": ErrorCodes.INVALID_PARAMS}
 
 	var is_debug: bool = params.get("is_debug", false)
 	var godot_bin := OS.get_executable_path()

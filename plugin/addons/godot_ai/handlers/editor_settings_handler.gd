@@ -17,7 +17,7 @@ func _init(undo_redo: EditorUndoRedoManager = null, connection: McpConnection = 
 func get_setting(params: Dictionary) -> Dictionary:
 	var setting_name: String = params.get("setting_name", "")
 	if setting_name.is_empty():
-		return {"error": "setting_name is required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "setting_name is required", "code": ErrorCodes.INVALID_PARAMS}
 
 	var settings := EditorInterface.get_editor_settings()
 	if settings == null:
@@ -36,7 +36,7 @@ func get_setting(params: Dictionary) -> Dictionary:
 func set_setting(params: Dictionary) -> Dictionary:
 	var setting_name: String = params.get("setting_name", "")
 	if setting_name.is_empty() or not params.has("value"):
-		return {"error": "setting_name and value are required", "code": ErrorCodes.INVALID_ARGUMENTS}
+		return {"error": "setting_name and value are required", "code": ErrorCodes.INVALID_PARAMS}
 
 	var settings := EditorInterface.get_editor_settings()
 	if settings == null:

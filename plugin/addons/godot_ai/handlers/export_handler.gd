@@ -29,7 +29,7 @@ func list_presets(_params: Dictionary) -> Dictionary:
 	var config := ConfigFile.new()
 	var err := config.load(cfg_path)
 	if err != OK:
-		return ErrorCodes.make(ErrorCodes.FILE_NOT_FOUND, "Failed to load export_presets.cfg: %d" % err)
+		return ErrorCodes.make(ErrorCodes.RESOURCE_NOT_FOUND, "Failed to load export_presets.cfg: %d" % err)
 
 	var presets: Array = []
 	for section in config.get_sections():
@@ -59,16 +59,16 @@ func list_presets(_params: Dictionary) -> Dictionary:
 func get_preset_info(params: Dictionary) -> Dictionary:
 	var preset_name: String = params.get("preset_name", "")
 	if preset_name.is_empty():
-		return ErrorCodes.make(ErrorCodes.INVALID_ARGUMENT, "preset_name must be specified")
+		return ErrorCodes.make(ErrorCodes.INVALID_PARAMS, "preset_name must be specified")
 
 	var cfg_path := "res://export_presets.cfg"
 	if not FileAccess.file_exists(cfg_path):
-		return ErrorCodes.make(ErrorCodes.FILE_NOT_FOUND, "export_presets.cfg does not exist")
+		return ErrorCodes.make(ErrorCodes.RESOURCE_NOT_FOUND, "export_presets.cfg does not exist")
 
 	var config := ConfigFile.new()
 	var err := config.load(cfg_path)
 	if err != OK:
-		return ErrorCodes.make(ErrorCodes.FILE_NOT_FOUND, "Failed to parse export_presets.cfg: %d" % err)
+		return ErrorCodes.make(ErrorCodes.RESOURCE_NOT_FOUND, "Failed to parse export_presets.cfg: %d" % err)
 
 	var target_section := ""
 	for section in config.get_sections():
@@ -104,7 +104,7 @@ func get_preset_info(params: Dictionary) -> Dictionary:
 func run_export(params: Dictionary) -> Dictionary:
 	var preset_name: String = params.get("preset_name", "")
 	if preset_name.is_empty():
-		return ErrorCodes.make(ErrorCodes.INVALID_ARGUMENT, "preset_name must be specified")
+		return ErrorCodes.make(ErrorCodes.INVALID_PARAMS, "preset_name must be specified")
 
 	var output_path: String = params.get("output_path", "")
 	var is_debug: bool = bool(params.get("debug", false))

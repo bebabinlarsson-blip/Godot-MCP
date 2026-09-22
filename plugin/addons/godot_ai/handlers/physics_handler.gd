@@ -15,7 +15,7 @@ func _init(undo_redo: EditorUndoRedoManager, connection: McpConnection = null) -
 func raycast_2d(params: Dictionary) -> Dictionary:
 	var scene_root := EditorInterface.get_edited_scene_root()
 	if scene_root == null:
-		return ErrorCodes.make(ErrorCodes.SCENE_NOT_OPEN, "No active scene open")
+		return ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY, "No active scene open")
 
 	var world_2d := scene_root.get_viewport().find_world_2d() if scene_root.get_viewport() != null else null
 	if world_2d == null:
@@ -64,7 +64,7 @@ func raycast_2d(params: Dictionary) -> Dictionary:
 func raycast_3d(params: Dictionary) -> Dictionary:
 	var scene_root := EditorInterface.get_edited_scene_root()
 	if scene_root == null:
-		return ErrorCodes.make(ErrorCodes.SCENE_NOT_OPEN, "No active scene open")
+		return ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY, "No active scene open")
 
 	var world_3d := scene_root.get_viewport().find_world_3d() if scene_root.get_viewport() != null else null
 	if world_3d == null:
@@ -113,7 +113,7 @@ func raycast_3d(params: Dictionary) -> Dictionary:
 func query_point_2d(params: Dictionary) -> Dictionary:
 	var scene_root := EditorInterface.get_edited_scene_root()
 	if scene_root == null:
-		return ErrorCodes.make(ErrorCodes.SCENE_NOT_OPEN, "No active scene open")
+		return ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY, "No active scene open")
 
 	var world_2d := scene_root.get_viewport().find_world_2d() if scene_root.get_viewport() != null else null
 	if world_2d == null:
@@ -158,7 +158,7 @@ func query_point_2d(params: Dictionary) -> Dictionary:
 func scaffold_sensor(params: Dictionary) -> Dictionary:
 	var scene_root := EditorInterface.get_edited_scene_root()
 	if scene_root == null:
-		return ErrorCodes.make(ErrorCodes.SCENE_NOT_OPEN, "No active scene open")
+		return ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY, "No active scene open")
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent: Node = scene_root
@@ -213,7 +213,7 @@ func scaffold_sensor(params: Dictionary) -> Dictionary:
 func query_point_3d(params: Dictionary) -> Dictionary:
 	var scene_root := EditorInterface.get_edited_scene_root()
 	if scene_root == null:
-		return ErrorCodes.make(ErrorCodes.SCENE_NOT_OPEN, "No active scene open")
+		return ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY, "No active scene open")
 
 	var world_3d := scene_root.get_viewport().find_world_3d() if scene_root.get_viewport() != null else null
 	if world_3d == null:
@@ -258,7 +258,7 @@ func query_point_3d(params: Dictionary) -> Dictionary:
 func shapecast_scaffold(params: Dictionary) -> Dictionary:
 	var scene_root := EditorInterface.get_edited_scene_root()
 	if scene_root == null:
-		return ErrorCodes.make(ErrorCodes.SCENE_NOT_OPEN, "No active scene open")
+		return ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY, "No active scene open")
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent: Node = scene_root

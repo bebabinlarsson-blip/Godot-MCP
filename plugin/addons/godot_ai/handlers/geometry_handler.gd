@@ -146,7 +146,7 @@ func convex_hull(params: Dictionary) -> Dictionary:
 func scaffold_polygon_2d(params: Dictionary) -> Dictionary:
 	var scene_root := EditorInterface.get_edited_scene_root()
 	if scene_root == null:
-		return ErrorCodes.make(ErrorCodes.SCENE_NOT_OPEN, "No active scene open")
+		return ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY, "No active scene open")
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent: Node = scene_root
@@ -293,7 +293,7 @@ func generate_mesh(params: Dictionary) -> Dictionary:
 
 	if not dest_path.is_empty():
 		if not dest_path.begins_with("res://"):
-			return ErrorCodes.make(ErrorCodes.INVALID_PATH, "dest_path must start with res://")
+			return ErrorCodes.make(ErrorCodes.INVALID_PARAMS, "dest_path must start with res://")
 		var err := ResourceSaver.save(array_mesh, dest_path)
 		if err != OK:
 			return ErrorCodes.make(ErrorCodes.INTERNAL_ERROR, "Failed to save mesh to %s (error %d)" % [dest_path, err])

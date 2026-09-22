@@ -129,14 +129,14 @@ func _on_connection_failed() -> void:
 
 	var file := FileAccess.open(save_path, FileAccess.WRITE)
 	if file == null:
-		return ErrorCodes.make(ErrorCodes.FILE_NOT_FOUND, "Failed to open %s for writing: %d" % [save_path, FileAccess.get_open_error()])
+		return ErrorCodes.make(ErrorCodes.RESOURCE_NOT_FOUND, "Failed to open %s for writing: %d" % [save_path, FileAccess.get_open_error()])
 
 	file.store_string(script_content)
 	file.close()
 
 	if Engine.has_singleton("EditorInterface"):
 		var editor_interface := Engine.get_singleton("EditorInterface")
-		var fs := editor_interface.get_resource_filesystem()
+		var fs = editor_interface.get_resource_filesystem()
 		if fs != null:
 			fs.update_file(save_path)
 
@@ -162,7 +162,7 @@ func _on_connection_failed() -> void:
 func scaffold_spawner(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return ErrorCodes.make(ErrorCodes.NO_ACTIVE_SCENE, "No active scene to scaffold MultiplayerSpawner in")
+		return ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY, "No active scene to scaffold MultiplayerSpawner in")
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent := _resolve_node(scene_root, parent_path)
@@ -210,7 +210,7 @@ func scaffold_spawner(params: Dictionary) -> Dictionary:
 func scaffold_synchronizer(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return ErrorCodes.make(ErrorCodes.NO_ACTIVE_SCENE, "No active scene to scaffold MultiplayerSynchronizer in")
+		return ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY, "No active scene to scaffold MultiplayerSynchronizer in")
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent := _resolve_node(scene_root, parent_path)

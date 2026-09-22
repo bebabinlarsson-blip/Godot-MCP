@@ -18,7 +18,7 @@ func _init(undo_redo: EditorUndoRedoManager = null, connection: McpConnection = 
 func start_load(params: Dictionary) -> Dictionary:
 	var path: String = params.get("path", "")
 	if path.is_empty():
-		return ErrorCodes.make(ErrorCodes.INVALID_ARGUMENT, "path must be specified")
+		return ErrorCodes.make(ErrorCodes.INVALID_PARAMS, "path must be specified")
 
 	var type_hint: String = params.get("type_hint", "")
 	var use_sub_threads: bool = bool(params.get("use_sub_threads", false))
@@ -26,7 +26,7 @@ func start_load(params: Dictionary) -> Dictionary:
 
 	var err := ResourceLoader.load_threaded_request(path, type_hint, use_sub_threads, cache_mode)
 	if err != OK:
-		return ErrorCodes.make(ErrorCodes.FILE_NOT_FOUND, "Failed to start threaded load for %s: %d" % [path, err])
+		return ErrorCodes.make(ErrorCodes.RESOURCE_NOT_FOUND, "Failed to start threaded load for %s: %d" % [path, err])
 
 	return {
 		"data": {
@@ -40,7 +40,7 @@ func start_load(params: Dictionary) -> Dictionary:
 func get_status(params: Dictionary) -> Dictionary:
 	var path: String = params.get("path", "")
 	if path.is_empty():
-		return ErrorCodes.make(ErrorCodes.INVALID_ARGUMENT, "path must be specified")
+		return ErrorCodes.make(ErrorCodes.INVALID_PARAMS, "path must be specified")
 
 	var progress: Array = []
 	var status_code := ResourceLoader.load_threaded_get_status(path, progress)
@@ -70,11 +70,11 @@ func get_status(params: Dictionary) -> Dictionary:
 func get_resource(params: Dictionary) -> Dictionary:
 	var path: String = params.get("path", "")
 	if path.is_empty():
-		return ErrorCodes.make(ErrorCodes.INVALID_ARGUMENT, "path must be specified")
+		return ErrorCodes.make(ErrorCodes.INVALID_PARAMS, "path must be specified")
 
 	var res := ResourceLoader.load_threaded_get(path)
 	if res == null:
-		return ErrorCodes.make(ErrorCodes.FILE_NOT_FOUND, "Resource not loaded or failed: %s" % path)
+		return ErrorCodes.make(ErrorCodes.RESOURCE_NOT_FOUND, "Resource not loaded or failed: %s" % path)
 
 	return {
 		"data": {
@@ -139,14 +139,14 @@ func _process(_delta: float) -> void:
 
 	var file := FileAccess.open(save_path, FileAccess.WRITE)
 	if file == null:
-		return ErrorCodes.make(ErrorCodes.FILE_NOT_FOUND, "Failed to write %s: %d" % [save_path, FileAccess.get_open_error()])
+		return ErrorCodes.make(ErrorCodes.RESOURCE_NOT_FOUND, "Failed to write %s: %d" % [save_path, FileAccess.get_open_error()])
 
 	file.store_string(script_content)
 	file.close()
 
 	if Engine.has_singleton("EditorInterface"):
 		var editor_interface := Engine.get_singleton("EditorInterface")
-		var fs := editor_interface.get_resource_filesystem()
+		var fs = editor_interface.get_resource_filesystem()
 		if fs != null:
 			fs.update_file(save_path)
 

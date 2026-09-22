@@ -41,7 +41,7 @@ func _resolve_node(scene_root: Node, node_path: String) -> Node:
 func scaffold_light_3d(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent: Node = _resolve_node(scene_root, parent_path)
@@ -89,7 +89,7 @@ func scaffold_light_3d(params: Dictionary) -> Dictionary:
 func scaffold_light_2d(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent: Node = _resolve_node(scene_root, parent_path)
@@ -128,7 +128,7 @@ func scaffold_light_2d(params: Dictionary) -> Dictionary:
 func scaffold_decal(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent: Node = _resolve_node(scene_root, parent_path)
@@ -161,7 +161,7 @@ func scaffold_decal(params: Dictionary) -> Dictionary:
 func scaffold_probe(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent: Node = _resolve_node(scene_root, parent_path)
@@ -198,7 +198,7 @@ func scaffold_probe(params: Dictionary) -> Dictionary:
 func set_light_properties(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var light_path: String = params.get("light_path", "")
 	var node := _resolve_node(scene_root, light_path)
@@ -228,7 +228,7 @@ func set_light_properties(params: Dictionary) -> Dictionary:
 func get_light_info(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var light_path: String = params.get("light_path", "")
 	var node := _resolve_node(scene_root, light_path)
@@ -253,4 +253,4 @@ func get_light_info(params: Dictionary) -> Dictionary:
 			"color": [node.color.r, node.color.g, node.color.b]
 		}
 
-	return {"error": "Node is not a Light2D or Light3D", "code": ErrorCodes.INVALID_ARGUMENTS}
+	return {"error": "Node is not a Light2D or Light3D", "code": ErrorCodes.INVALID_PARAMS}

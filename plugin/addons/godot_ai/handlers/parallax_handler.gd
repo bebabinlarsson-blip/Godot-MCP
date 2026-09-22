@@ -41,14 +41,14 @@ func _resolve_node(scene_root: Node, node_path: String) -> Node:
 func scaffold_parallax(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent: Node = _resolve_node(scene_root, parent_path)
 	if parent == null:
 		return {"error": "Parent node not found: %s" % parent_path, "code": ErrorCodes.NODE_NOT_FOUND}
 
-	var node := Node2D.new()
+	var node: Node = null
 	if ClassDB.class_exists("Parallax2D"):
 		node = ClassDB.instantiate("Parallax2D")
 		var scroll_scale: Array = params.get("scroll_scale", [1.0, 1.0])
@@ -74,7 +74,7 @@ func scaffold_parallax(params: Dictionary) -> Dictionary:
 func scaffold_canvas_layer(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent: Node = _resolve_node(scene_root, parent_path)
@@ -99,7 +99,7 @@ func scaffold_canvas_layer(params: Dictionary) -> Dictionary:
 func scaffold_visibility_notifier(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent: Node = _resolve_node(scene_root, parent_path)
@@ -132,7 +132,7 @@ func scaffold_visibility_notifier(params: Dictionary) -> Dictionary:
 func get_parallax_info(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return {"error": "No edited scene root available", "code": ErrorCodes.SCENE_NOT_FOUND}
+		return {"error": "No edited scene root available", "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var node_path: String = params.get("node_path", "")
 	var node: Node = _resolve_node(scene_root, node_path)

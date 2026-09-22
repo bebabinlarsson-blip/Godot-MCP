@@ -84,11 +84,11 @@ func _parse_variant(val: Variant, current_val: Variant) -> Variant:
 func create_tween(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return ErrorCodes.make(ErrorCodes.NO_ACTIVE_SCENE, "No active scene to create tween in")
+		return ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY, "No active scene to create tween in")
 
 	var node_path: String = params.get("node_path", "")
 	if node_path.is_empty():
-		return ErrorCodes.make(ErrorCodes.INVALID_ARGUMENT, "node_path must be specified")
+		return ErrorCodes.make(ErrorCodes.INVALID_PARAMS, "node_path must be specified")
 
 	var target_node := _resolve_node(scene_root, node_path)
 	if target_node == null:
@@ -96,7 +96,7 @@ func create_tween(params: Dictionary) -> Dictionary:
 
 	var prop: String = params.get("property", "")
 	if prop.is_empty():
-		return ErrorCodes.make(ErrorCodes.INVALID_ARGUMENT, "property must be specified")
+		return ErrorCodes.make(ErrorCodes.INVALID_PARAMS, "property must be specified")
 
 	var current_val = target_node.get_indexed(NodePath(prop))
 	var raw_target = params.get("target_value")
@@ -138,7 +138,7 @@ func create_tween(params: Dictionary) -> Dictionary:
 func preset_animation(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return ErrorCodes.make(ErrorCodes.NO_ACTIVE_SCENE, "No active scene to execute preset animation in")
+		return ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY, "No active scene to execute preset animation in")
 
 	var node_path: String = params.get("node_path", "")
 	var target_node := _resolve_node(scene_root, node_path)
@@ -221,7 +221,7 @@ func preset_animation(params: Dictionary) -> Dictionary:
 			details = {"preset": "spin", "revolutions": revolutions}
 
 		_:
-			return ErrorCodes.make(ErrorCodes.INVALID_ARGUMENT, "Unknown preset: %s" % preset)
+			return ErrorCodes.make(ErrorCodes.INVALID_PARAMS, "Unknown preset: %s" % preset)
 
 	return {
 		"data": {

@@ -91,10 +91,10 @@ func get_display_info(_params: Dictionary) -> Dictionary:
 
 	var vsync_str := "enabled"
 	match vsync_mode:
-		DisplayServer.VSYNC_MODE_DISABLED: vsync_str = "disabled"
-		DisplayServer.VSYNC_MODE_ENABLED: vsync_str = "enabled"
-		DisplayServer.VSYNC_MODE_ADAPTIVE: vsync_str = "adaptive"
-		DisplayServer.VSYNC_MODE_MAILBOX: vsync_str = "mailbox"
+		DisplayServer.VSYNC_DISABLED: vsync_str = "disabled"
+		DisplayServer.VSYNC_ENABLED: vsync_str = "enabled"
+		DisplayServer.VSYNC_ADAPTIVE: vsync_str = "adaptive"
+		DisplayServer.VSYNC_MAILBOX: vsync_str = "mailbox"
 
 	var mouse_mode_str := "visible"
 	match mouse_mode:
@@ -140,13 +140,13 @@ func set_window_rect(params: Dictionary) -> Dictionary:
 
 func set_vsync(params: Dictionary) -> Dictionary:
 	var vsync_str: String = params.get("vsync_mode", "enabled").to_lower()
-	var mode := DisplayServer.VSYNC_MODE_ENABLED
+	var mode := DisplayServer.VSYNC_ENABLED
 	match vsync_str:
-		"disabled": mode = DisplayServer.VSYNC_MODE_DISABLED
-		"enabled": mode = DisplayServer.VSYNC_MODE_ENABLED
-		"adaptive": mode = DisplayServer.VSYNC_MODE_ADAPTIVE
-		"mailbox": mode = DisplayServer.VSYNC_MODE_MAILBOX
-		_: mode = DisplayServer.VSYNC_MODE_ENABLED
+		"disabled": mode = DisplayServer.VSYNC_DISABLED
+		"enabled": mode = DisplayServer.VSYNC_ENABLED
+		"adaptive": mode = DisplayServer.VSYNC_ADAPTIVE
+		"mailbox": mode = DisplayServer.VSYNC_MAILBOX
+		_: mode = DisplayServer.VSYNC_ENABLED
 
 	DisplayServer.window_set_vsync_mode(mode)
 	return {"data": {"vsync_mode": vsync_str}}
@@ -170,7 +170,7 @@ func set_mouse_mode(params: Dictionary) -> Dictionary:
 func scaffold_subwindow(params: Dictionary) -> Dictionary:
 	var scene_root := _get_scene_root()
 	if scene_root == null:
-		return ErrorCodes.make(ErrorCodes.NO_ACTIVE_SCENE, "No active scene to scaffold subwindow in")
+		return ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY, "No active scene to scaffold subwindow in")
 
 	var parent_path: String = params.get("parent_path", "")
 	var parent := _resolve_node(scene_root, parent_path)

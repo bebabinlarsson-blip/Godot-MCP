@@ -27,7 +27,7 @@ func add_effect_to_bus(params: Dictionary) -> Dictionary:
 	var bus_val = params.get("bus_name", "Master")
 	var bus_idx := _resolve_bus_index(bus_val)
 	if bus_idx < 0 or bus_idx >= AudioServer.bus_count:
-		return {"error": "Audio bus not found: %s" % str(bus_val), "code": ErrorCodes.NOT_FOUND}
+		return {"error": "Audio bus not found: %s" % str(bus_val), "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var effect_class: String = params.get("effect_class", "AudioEffectReverb")
 	if not effect_class.begins_with("AudioEffect"):
@@ -36,14 +36,14 @@ func add_effect_to_bus(params: Dictionary) -> Dictionary:
 	if not ClassDB.class_exists(effect_class):
 		return {
 			"error": "Unknown AudioEffect class: %s" % effect_class,
-			"code": ErrorCodes.INVALID_ARGUMENT
+			"code": ErrorCodes.INVALID_PARAMS
 		}
 
 	var effect_obj = ClassDB.instantiate(effect_class)
 	if not (effect_obj is AudioEffect):
 		return {
 			"error": "Instantiated class is not an AudioEffect: %s" % effect_class,
-			"code": ErrorCodes.INVALID_ARGUMENT
+			"code": ErrorCodes.INVALID_PARAMS
 		}
 
 	var at_pos: int = int(params.get("at_position", -1))
@@ -69,18 +69,18 @@ func configure_effect(params: Dictionary) -> Dictionary:
 	var bus_val = params.get("bus_name", "Master")
 	var bus_idx := _resolve_bus_index(bus_val)
 	if bus_idx < 0 or bus_idx >= AudioServer.bus_count:
-		return {"error": "Audio bus not found: %s" % str(bus_val), "code": ErrorCodes.NOT_FOUND}
+		return {"error": "Audio bus not found: %s" % str(bus_val), "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var effect_idx: int = int(params.get("effect_index", 0))
 	if effect_idx < 0 or effect_idx >= AudioServer.get_bus_effect_count(bus_idx):
 		return {
 			"error": "Effect index %d out of bounds on bus %d" % [effect_idx, bus_idx],
-			"code": ErrorCodes.INDEX_OUT_OF_BOUNDS
+			"code": ErrorCodes.VALUE_OUT_OF_RANGE
 		}
 
 	var effect: AudioEffect = AudioServer.get_bus_effect(bus_idx, effect_idx)
 	if effect == null:
-		return {"error": "Effect at index %d is null" % effect_idx, "code": ErrorCodes.NOT_FOUND}
+		return {"error": "Effect at index %d is null" % effect_idx, "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var properties: Dictionary = params.get("properties", {})
 	for prop in properties:
@@ -103,13 +103,13 @@ func remove_effect(params: Dictionary) -> Dictionary:
 	var bus_val = params.get("bus_name", "Master")
 	var bus_idx := _resolve_bus_index(bus_val)
 	if bus_idx < 0 or bus_idx >= AudioServer.bus_count:
-		return {"error": "Audio bus not found: %s" % str(bus_val), "code": ErrorCodes.NOT_FOUND}
+		return {"error": "Audio bus not found: %s" % str(bus_val), "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var effect_idx: int = int(params.get("effect_index", 0))
 	if effect_idx < 0 or effect_idx >= AudioServer.get_bus_effect_count(bus_idx):
 		return {
 			"error": "Effect index %d out of bounds on bus %d" % [effect_idx, bus_idx],
-			"code": ErrorCodes.INDEX_OUT_OF_BOUNDS
+			"code": ErrorCodes.VALUE_OUT_OF_RANGE
 		}
 
 	AudioServer.remove_bus_effect(bus_idx, effect_idx)
@@ -126,7 +126,7 @@ func list_bus_effects(params: Dictionary) -> Dictionary:
 	var bus_val = params.get("bus_name", "Master")
 	var bus_idx := _resolve_bus_index(bus_val)
 	if bus_idx < 0 or bus_idx >= AudioServer.bus_count:
-		return {"error": "Audio bus not found: %s" % str(bus_val), "code": ErrorCodes.NOT_FOUND}
+		return {"error": "Audio bus not found: %s" % str(bus_val), "code": ErrorCodes.NODE_NOT_FOUND}
 
 	var count := AudioServer.get_bus_effect_count(bus_idx)
 	var effects: Array = []

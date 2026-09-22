@@ -43,14 +43,14 @@ void main() {
 
 	var file := FileAccess.open(shader_path, FileAccess.WRITE)
 	if file == null:
-		return ErrorCodes.make(ErrorCodes.FILE_NOT_FOUND, "Failed to write %s: %d" % [shader_path, FileAccess.get_open_error()])
+		return ErrorCodes.make(ErrorCodes.RESOURCE_NOT_FOUND, "Failed to write %s: %d" % [shader_path, FileAccess.get_open_error()])
 
 	file.store_string(final_code)
 	file.close()
 
 	if Engine.has_singleton("EditorInterface"):
 		var editor_interface := Engine.get_singleton("EditorInterface")
-		var fs := editor_interface.get_resource_filesystem()
+		var fs = editor_interface.get_resource_filesystem()
 		if fs != null:
 			fs.update_file(shader_path)
 
@@ -68,7 +68,7 @@ func get_device_info(_params: Dictionary) -> Dictionary:
 		rd = RenderingServer.create_local_rendering_device()
 
 	if rd == null:
-		return ErrorCodes.make(ErrorCodes.UNKNOWN_ERROR, "RenderingDevice is not available in current rendering method")
+		return ErrorCodes.make(ErrorCodes.INTERNAL_ERROR, "RenderingDevice is not available in current rendering method")
 
 	return {
 		"data": {
@@ -89,20 +89,20 @@ func get_device_info(_params: Dictionary) -> Dictionary:
 func run_compute(params: Dictionary) -> Dictionary:
 	var shader_path: String = params.get("shader_path", "")
 	if shader_path.is_empty():
-		return ErrorCodes.make(ErrorCodes.INVALID_ARGUMENT, "shader_path must be specified")
+		return ErrorCodes.make(ErrorCodes.INVALID_PARAMS, "shader_path must be specified")
 
 	var rd := RenderingServer.create_local_rendering_device()
 	if rd == null:
-		return ErrorCodes.make(ErrorCodes.UNKNOWN_ERROR, "Failed to create local RenderingDevice")
+		return ErrorCodes.make(ErrorCodes.INTERNAL_ERROR, "Failed to create local RenderingDevice")
 
 	var shader_file = load(shader_path)
 	if shader_file == null or not (shader_file is RDShaderFile):
-		return ErrorCodes.make(ErrorCodes.FILE_NOT_FOUND, "RDShaderFile not found or invalid at %s" % shader_path)
+		return ErrorCodes.make(ErrorCodes.RESOURCE_NOT_FOUND, "RDShaderFile not found or invalid at %s" % shader_path)
 
 	var spirv: RDShaderSPIRV = shader_file.get_spirv()
 	var shader := rd.shader_create_from_spirv(spirv)
 	if not shader.is_valid():
-		return ErrorCodes.make(ErrorCodes.UNKNOWN_ERROR, "Failed to compile compute shader from SPIR-V")
+		return ErrorCodes.make(ErrorCodes.INTERNAL_ERROR, "Failed to compile compute shader from SPIR-V")
 
 	var raw_floats: Array = params.get("input_buffer", [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0])
 	var input_data := PackedFloat32Array()

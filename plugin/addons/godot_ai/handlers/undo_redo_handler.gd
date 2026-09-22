@@ -43,9 +43,9 @@ func get_history(_params: Dictionary) -> Dictionary:
 			}
 		}
 
-	var action_name := _undo_redo.get_current_action_name()
-	var has_undo := _undo_redo.has_undo()
-	var has_redo := _undo_redo.has_redo()
+	var action_name = _undo_redo.get_current_action_name()
+	var has_undo = _undo_redo.has_undo()
+	var has_redo = _undo_redo.has_redo()
 
 	var history_id := 0
 	var scene_root := _get_scene_root()
@@ -65,7 +65,7 @@ func get_history(_params: Dictionary) -> Dictionary:
 
 func undo(_params: Dictionary) -> Dictionary:
 	if _undo_redo == null:
-		return ErrorCodes.make(ErrorCodes.UNKNOWN_ERROR, "EditorUndoRedoManager is not available")
+		return ErrorCodes.make(ErrorCodes.INTERNAL_ERROR, "EditorUndoRedoManager is not available")
 
 	if not _undo_redo.has_undo():
 		return {
@@ -75,8 +75,8 @@ func undo(_params: Dictionary) -> Dictionary:
 			}
 		}
 
-	var prev_action := _undo_redo.get_current_action_name()
-	var success := _undo_redo.undo()
+	var prev_action = _undo_redo.get_current_action_name()
+	var success = _undo_redo.undo()
 
 	return {
 		"data": {
@@ -88,7 +88,7 @@ func undo(_params: Dictionary) -> Dictionary:
 
 func redo(_params: Dictionary) -> Dictionary:
 	if _undo_redo == null:
-		return ErrorCodes.make(ErrorCodes.UNKNOWN_ERROR, "EditorUndoRedoManager is not available")
+		return ErrorCodes.make(ErrorCodes.INTERNAL_ERROR, "EditorUndoRedoManager is not available")
 
 	if not _undo_redo.has_redo():
 		return {
@@ -98,8 +98,8 @@ func redo(_params: Dictionary) -> Dictionary:
 			}
 		}
 
-	var success := _undo_redo.redo()
-	var new_action := _undo_redo.get_current_action_name()
+	var success = _undo_redo.redo()
+	var new_action = _undo_redo.get_current_action_name()
 
 	return {
 		"data": {

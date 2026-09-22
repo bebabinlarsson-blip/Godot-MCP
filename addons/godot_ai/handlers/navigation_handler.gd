@@ -44,7 +44,7 @@ func setup_region_2d(params: Dictionary) -> Dictionary:
 		"both":
 			nav_poly.parsed_geometry_type = NavigationPolygon.PARSED_GEOMETRY_BOTH
 		_:
-			nav_poly.parsed_geometry_type = NavigationPolygon.PARSED_GEOMETRY_MESH_INSTANCES_AND_COLLIDERS
+			nav_poly.parsed_geometry_type = NavigationPolygon.PARSED_GEOMETRY_BOTH
 
 	var points_param = params.get("polygon", null)
 	var outline := PackedVector2Array()
@@ -87,7 +87,7 @@ func setup_region_2d(params: Dictionary) -> Dictionary:
 func attach_agent_2d(params: Dictionary) -> Dictionary:
 	var node_path: String = params.get("node_path", "")
 	if node_path.is_empty():
-		return ErrorCodes.make(ErrorCodes.MISSING_PARAMETER, "node_path is required")
+		return ErrorCodes.make(ErrorCodes.MISSING_REQUIRED_PARAM, "node_path is required")
 
 	var scene_check := McpNodeValidator.require_scene_or_error()
 	if scene_check.has("error"):
@@ -153,7 +153,7 @@ func attach_agent_2d(params: Dictionary) -> Dictionary:
 func bake_2d(params: Dictionary) -> Dictionary:
 	var region_path: String = params.get("region_path", "")
 	if region_path.is_empty():
-		return ErrorCodes.make(ErrorCodes.MISSING_PARAMETER, "region_path is required")
+		return ErrorCodes.make(ErrorCodes.MISSING_REQUIRED_PARAM, "region_path is required")
 
 	var scene_check := McpNodeValidator.require_scene_or_error()
 	if scene_check.has("error"):
@@ -166,7 +166,7 @@ func bake_2d(params: Dictionary) -> Dictionary:
 	var node: Node = resolved.node
 
 	if not (node is NavigationRegion2D):
-		return ErrorCodes.make(ErrorCodes.INVALID_TYPE, "Node '%s' is not a NavigationRegion2D" % region_path)
+		return ErrorCodes.make(ErrorCodes.WRONG_TYPE, "Node '%s' is not a NavigationRegion2D" % region_path)
 
 	var region: NavigationRegion2D = node
 	var on_thread: bool = bool(params.get("on_thread", false))
@@ -231,7 +231,7 @@ func setup_region_3d(params: Dictionary) -> Dictionary:
 func attach_agent_3d(params: Dictionary) -> Dictionary:
 	var node_path: String = params.get("node_path", "")
 	if node_path.is_empty():
-		return ErrorCodes.make(ErrorCodes.MISSING_PARAMETER, "node_path is required")
+		return ErrorCodes.make(ErrorCodes.MISSING_REQUIRED_PARAM, "node_path is required")
 
 	var scene_check := McpNodeValidator.require_scene_or_error()
 	if scene_check.has("error"):
@@ -301,7 +301,7 @@ func attach_agent_3d(params: Dictionary) -> Dictionary:
 func bake_3d(params: Dictionary) -> Dictionary:
 	var region_path: String = params.get("region_path", "")
 	if region_path.is_empty():
-		return ErrorCodes.make(ErrorCodes.MISSING_PARAMETER, "region_path is required")
+		return ErrorCodes.make(ErrorCodes.MISSING_REQUIRED_PARAM, "region_path is required")
 
 	var scene_check := McpNodeValidator.require_scene_or_error()
 	if scene_check.has("error"):
@@ -314,7 +314,7 @@ func bake_3d(params: Dictionary) -> Dictionary:
 	var node: Node = resolved.node
 
 	if not (node is NavigationRegion3D):
-		return ErrorCodes.make(ErrorCodes.INVALID_TYPE, "Node '%s' is not a NavigationRegion3D" % region_path)
+		return ErrorCodes.make(ErrorCodes.WRONG_TYPE, "Node '%s' is not a NavigationRegion3D" % region_path)
 
 	var region: NavigationRegion3D = node
 	var on_thread: bool = bool(params.get("on_thread", false))
