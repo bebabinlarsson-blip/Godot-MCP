@@ -103,6 +103,10 @@ DOMAINS: tuple[str, ...] = (
     "nav_query",
     "headless",
     "cloud",
+    "gi",
+    "input_event",
+    "physics_query",
+    "curve",
 )
 
 ## Domains that contain at least one core (always-loaded) tool. When the

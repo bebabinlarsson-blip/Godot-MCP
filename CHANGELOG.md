@@ -5,6 +5,52 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.26 (2026-09-22)
+
+OpenAI Custom GPT 30-action schema adaptation, zero-install SSH cloud tunneling via OpenSSH, cloud container sandbox execution, and exact 100-tool ceiling completion across 81 domains with 4 new engine domains: Global Illumination and Decals in gi_manage, input simulation and macro replay in input_event_manage, direct 2D/3D physics space state raycasts in physics_query_manage, and curves, bezier splines, and gradients in curve_manage.
+
+### Added
+
+- **OpenAI Custom GPT 30-Action Adaptation**:
+  - `godot_ai.transport.openapi`: Added compact schema mode (under 25 operations) respecting OpenAI's strict 30-operation cap on Custom GPT Actions. Exposes universal router `/api/v1/call` allowing cloud GPTs to invoke any of the 100 tools dynamically.
+  - `godot_ai.transport.rest_gateway`: `/openapi.json` now defaults to compact schema for instant ChatGPT Custom GPT Action import; added `/openapi-full.json` and `?mode=full` for unrestricted clients.
+- **Zero-Install Cloud Tunneling via SSH**:
+  - `godot_ai.transport.tunnel`: Added automated SSH reverse tunneling (`--tunnel ssh`, `pinggy`, `localhost.run`) using built-in system OpenSSH (`ssh`), enabling public HTTPS tunnels on Windows, macOS, and Linux without installing third-party binaries.
+- **Cloud Container Headless Sandbox**:
+  - `godot_ai.cloud_sandbox`: Standalone headless Godot runner for ChatGPT Code Interpreter / cloud containers; automatically provisions official Godot 4 headless Linux binaries, runs GDScript scripts, and validates scenes in cloud sandboxes without display servers.
+  - `godot_ai.remote`: Added `check_connection` and `batch` helper methods to `RemoteGodotClient`.
+- **Global Illumination & Decal Management (`gi_manage`)**:
+  - Introduced `gi_manage` tool and `GIHandler` for lighting and projection.
+  - `create_decal`: Create Decal nodes with dimensions and PBR textures.
+  - `configure_decal`: Tune decal emission, fade, and texture maps.
+  - `create_reflection_probe`: Create ReflectionProbe nodes for local specular reflections.
+  - `create_voxel_gi`: Create VoxelGI nodes for real-time indirect bounce lighting.
+  - `create_lightmap_gi`: Create LightmapGI nodes for baked lighting.
+  - `get_gi_info`: Inspect active lighting probe and decal settings.
+- **Input Simulation & Macro Replay (`input_event_manage`)**:
+  - Introduced `input_event_manage` tool and `InputEventHandler` for gameplay testing.
+  - `simulate_action`: Simulate virtual action presses and releases with custom strength.
+  - `simulate_key`: Simulate keyboard key taps and hold events.
+  - `simulate_mouse_button`: Simulate mouse button clicks at specified coordinates.
+  - `simulate_mouse_motion`: Simulate mouse motion and velocity.
+  - `replay_macro`: Replay sequential input events for automated game testing.
+  - `get_input_state`: Query action pressed states and strengths.
+- **Physics Space State Direct Queries (`physics_query_manage`)**:
+  - Introduced `physics_query_manage` tool and `PhysicsQueryHandler` for space state queries without scene tree node allocation.
+  - `intersect_ray_3d` / `intersect_ray_2d`: Perform direct 3D and 2D physics raycasts.
+  - `intersect_point_3d` / `intersect_point_2d`: Query colliders overlapping a point in world space.
+  - `intersect_shape_3d`: Query colliders overlapping shapes in 3D.
+  - `cast_motion_3d`: Predict collision fractions for moving shapes.
+- **Curves, Splines, and Gradients (`curve_manage`)**:
+  - Introduced `curve_manage` tool and `CurveHandler` for mathematical curves and ramps.
+  - `create_curve_1d`: Generate 1D interpolation and easing Curve resources.
+  - `create_curve_2d`: Generate 2D bezier spline Curve2D resources.
+  - `create_curve_3d`: Generate 3D bezier spline Curve3D resources.
+  - `create_gradient`: Generate multi-stop color ramp Gradient resources.
+  - `create_gradient_texture`: Generate GradientTexture1D and GradientTexture2D resources.
+  - `sample_curve`: Sample curve values or baked positions.
+  - `sample_gradient`: Sample RGBA colors on gradients.
+
 ## 5.0.25 (2026-09-22)
 
 ChatGPT Web & Cloud Computer Mode integration, OpenAPI 3.1 REST gateway, public tunnel automation, and complete engine expansion with 6 new domains: physics bodies in body_manage, world environment and fog in world_manage, audio DSP effects in audio_effect_manage, navigation pathfinding queries in nav_query_manage, standalone CLI execution in headless_manage, and cloud bridge status in cloud_manage.

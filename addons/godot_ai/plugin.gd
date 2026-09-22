@@ -442,6 +442,10 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy_handler("nav_query", HANDLERS_DIR + "nav_query_handler.gd", [undo, _connection])
 	_dispatcher.register_lazy_handler("headless", HANDLERS_DIR + "headless_handler.gd", [undo, _connection])
 	_dispatcher.register_lazy_handler("cloud", HANDLERS_DIR + "cloud_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("gi", HANDLERS_DIR + "gi_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("input_event", HANDLERS_DIR + "input_event_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("physics_query", HANDLERS_DIR + "physics_query_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("curve", HANDLERS_DIR + "curve_handler.gd", [undo, _connection])
 
 	_dispatcher.register_lazy("get_editor_state", "editor", &"get_editor_state")
 	_dispatcher.register_lazy("get_scene_tree", "scene", &"get_scene_tree")
@@ -910,6 +914,35 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy("cloud_get_tunnel_status", "cloud", &"get_tunnel_status")
 	_dispatcher.register_lazy("cloud_get_action_schema_url", "cloud", &"get_action_schema_url")
 	_dispatcher.register_lazy("cloud_test_cloud_connection", "cloud", &"test_cloud_connection")
+
+	_dispatcher.register_lazy("gi_create_decal", "gi", &"create_decal")
+	_dispatcher.register_lazy("gi_configure_decal", "gi", &"configure_decal")
+	_dispatcher.register_lazy("gi_create_reflection_probe", "gi", &"create_reflection_probe")
+	_dispatcher.register_lazy("gi_create_voxel_gi", "gi", &"create_voxel_gi")
+	_dispatcher.register_lazy("gi_create_lightmap_gi", "gi", &"create_lightmap_gi")
+	_dispatcher.register_lazy("gi_get_gi_info", "gi", &"get_gi_info")
+
+	_dispatcher.register_lazy("input_event_simulate_action", "input_event", &"simulate_action")
+	_dispatcher.register_lazy("input_event_simulate_key", "input_event", &"simulate_key")
+	_dispatcher.register_lazy("input_event_simulate_mouse_button", "input_event", &"simulate_mouse_button")
+	_dispatcher.register_lazy("input_event_simulate_mouse_motion", "input_event", &"simulate_mouse_motion")
+	_dispatcher.register_lazy("input_event_replay_macro", "input_event", &"replay_macro")
+	_dispatcher.register_lazy("input_event_get_input_state", "input_event", &"get_input_state")
+
+	_dispatcher.register_lazy("physics_query_intersect_ray_3d", "physics_query", &"intersect_ray_3d")
+	_dispatcher.register_lazy("physics_query_intersect_ray_2d", "physics_query", &"intersect_ray_2d")
+	_dispatcher.register_lazy("physics_query_intersect_point_3d", "physics_query", &"intersect_point_3d")
+	_dispatcher.register_lazy("physics_query_intersect_point_2d", "physics_query", &"intersect_point_2d")
+	_dispatcher.register_lazy("physics_query_intersect_shape_3d", "physics_query", &"intersect_shape_3d")
+	_dispatcher.register_lazy("physics_query_cast_motion_3d", "physics_query", &"cast_motion_3d")
+
+	_dispatcher.register_lazy("curve_create_curve_1d", "curve", &"create_curve_1d")
+	_dispatcher.register_lazy("curve_create_curve_2d", "curve", &"create_curve_2d")
+	_dispatcher.register_lazy("curve_create_curve_3d", "curve", &"create_curve_3d")
+	_dispatcher.register_lazy("curve_create_gradient", "curve", &"create_gradient")
+	_dispatcher.register_lazy("curve_create_gradient_texture", "curve", &"create_gradient_texture")
+	_dispatcher.register_lazy("curve_sample_curve", "curve", &"sample_curve")
+	_dispatcher.register_lazy("curve_sample_gradient", "curve", &"sample_gradient")
 
 	_connection.dispatcher = _dispatcher
 	add_child(_connection)

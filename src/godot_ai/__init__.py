@@ -289,7 +289,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     parser.add_argument(
         "--tunnel",
-        choices=["cloudflare", "ngrok", "manual"],
+        choices=["cloudflare", "ngrok", "ssh", "pinggy", "localhost.run", "manual"],
         default=None,
         help="Start automated public HTTPS tunnel for remote cloud access (e.g. ChatGPT).",
     )
@@ -447,13 +447,25 @@ def _serve(
             access_log=http_access_log_enabled()
         )
 
-    if getattr(args, "tunnel", None) == "cloudflare":
-        from godot_ai.transport.tunnel import start_cloudflare_quick_tunnel
+    if getattr(args, "tunnel", None) and args.tunnel != "manual":
+        from godot_ai.transport.tunnel import (
+            start_cloudflare_quick_tunnel,
+            start_ssh_tunnel,
+        )
 
         try:
-            tunnel_info = start_cloudflare_quick_tunnel(args.port)
-            print(f"Public tunnel active: {tunnel_info.public_url}")
-            print(f"OpenAPI Action Schema: {tunnel_info.openapi_url}")
+            if args.tunnel == "cloudflare":
+                tunnel_info = start_cloudflare_quick_tunnel(args.port)
+            elif args.tunnel in ("ssh", "localhost.run"):
+                tunnel_info = start_ssh_tunnel(args.port, "localhost.run")
+            elif args.tunnel == "pinggy":
+                tunnel_info = start_ssh_tunnel(args.port, "pinggy")
+            else:
+                tunnel_info = None
+
+            if tunnel_info:
+                print(f"Public tunnel active: {tunnel_info.public_url}")
+                print(f"OpenAPI Action Schema: {tunnel_info.openapi_url}")
         except Exception as exc:
             print(f"Failed to start tunnel: {exc}", file=sys.stderr)
 

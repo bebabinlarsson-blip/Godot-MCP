@@ -7,22 +7,51 @@ from typing import Any
 
 from fastmcp import FastMCP
 
+COMPACT_PRIMARY_TOOLS: tuple[str, ...] = (
+    "scene_manage",
+    "node_manage",
+    "script_manage",
+    "project_manage",
+    "editor_manage",
+    "game_manage",
+    "ui_manage",
+    "physics_manage",
+    "animation_manage",
+    "resource_manage",
+    "body_manage",
+    "world_manage",
+    "headless_manage",
+    "cloud_manage",
+    "input_event_manage",
+    "physics_query_manage",
+    "gi_manage",
+    "curve_manage",
+)
+
 
 async def generate_openapi_spec(
     mcp: FastMCP,
     *,
     server_url: str = "http://localhost:8000",
     title: str = "Godot AI Engine Control",
-    version: str = "5.0.25",
+    version: str = "5.0.26",
+    mode: str = "compact",
     tools: Sequence[Any] | None = None,
 ) -> dict[str, Any]:
-    """Generate an OpenAPI 3.1.0 specification dictionary from registered tools."""
+    """Generate an OpenAPI 3.1.0 specification dictionary from registered tools.
+
+    In 'compact' mode (default), generates <= 25 operations to strictly respect
+    OpenAI's 30-operation limit for Custom GPT Actions.
+    In 'full' mode, generates endpoints for all registered tools.
+    """
     paths: dict[str, Any] = {}
     tool_list = await mcp.list_tools() if tools is None else tools
 
     for tool in tool_list:
         tool_name = getattr(tool, "name", "")
         if not tool_name:
+            continue
+        if mode == "compact" and tool_name not in COMPACT_PRIMARY_TOOLS:
             continue
         description = getattr(tool, "description", "") or f"Execute {tool_name} tool."
         parameters = getattr(tool, "parameters", None)

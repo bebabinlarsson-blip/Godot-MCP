@@ -39,10 +39,23 @@ def register_rest_gateway(
     @mcp.custom_route("/openapi.json", methods=["GET"], include_in_schema=False)
     async def openapi_endpoint(request: Request) -> JSONResponse:
         base_url = public_url or str(request.base_url).rstrip("/")
+        mode = request.query_params.get("mode", "compact")
         spec = await generate_openapi_spec(
             mcp,
             server_url=base_url,
             version=_SERVER_VERSION,
+            mode=mode,
+        )
+        return JSONResponse(spec)
+
+    @mcp.custom_route("/openapi-full.json", methods=["GET"], include_in_schema=False)
+    async def openapi_full_endpoint(request: Request) -> JSONResponse:
+        base_url = public_url or str(request.base_url).rstrip("/")
+        spec = await generate_openapi_spec(
+            mcp,
+            server_url=base_url,
+            version=_SERVER_VERSION,
+            mode="full",
         )
         return JSONResponse(spec)
 

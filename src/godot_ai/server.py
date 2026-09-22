@@ -89,6 +89,7 @@ from godot_ai.tools.compute import register_compute_tools
 from godot_ai.tools.config import register_config_tools
 from godot_ai.tools.crypto import register_crypto_tools
 from godot_ai.tools.csg import register_csg_tools
+from godot_ai.tools.curve import register_curve_tools
 from godot_ai.tools.custom import register_custom_tools
 from godot_ai.tools.dialogue import register_dialogue_tools
 from godot_ai.tools.display import register_display_tools
@@ -101,9 +102,11 @@ from godot_ai.tools.font import register_font_tools
 from godot_ai.tools.fsm import register_fsm_tools
 from godot_ai.tools.game import register_game_tools
 from godot_ai.tools.geometry import register_geometry_tools
+from godot_ai.tools.gi import register_gi_tools
 from godot_ai.tools.gridmap import register_gridmap_tools
 from godot_ai.tools.headless import register_headless_tools
 from godot_ai.tools.http import register_http_tools
+from godot_ai.tools.input_event import register_input_event_tools
 from godot_ai.tools.input_map import register_input_map_tools
 from godot_ai.tools.joint import register_joint_tools
 from godot_ai.tools.light import register_light_tools
@@ -123,6 +126,7 @@ from godot_ai.tools.particle import register_particle_tools
 from godot_ai.tools.path import register_path_tools
 from godot_ai.tools.pck import register_pck_tools
 from godot_ai.tools.physics import register_physics_tools
+from godot_ai.tools.physics_query import register_physics_query_tools
 from godot_ai.tools.plugin import register_plugin_tools
 from godot_ai.tools.profiler import register_profiler_tools
 from godot_ai.tools.project import register_project_tools
@@ -596,6 +600,27 @@ _ROLLUP_BLOCKS: tuple[tuple[str | None, str], ...] = (
         "cloud",
         "  cloud_manage     get_tunnel_status, get_action_schema_url,\n"
         "                   test_cloud_connection\n",
+    ),
+    (
+        "gi",
+        "  gi_manage        create_decal, configure_decal, create_reflection_probe,\n"
+        "                   create_voxel_gi, create_lightmap_gi, get_gi_info\n",
+    ),
+    (
+        "input_event",
+        "  input_event_manage simulate_action, simulate_key, simulate_mouse_button,\n"
+        "                   simulate_mouse_motion, replay_macro, get_input_state\n",
+    ),
+    (
+        "physics_query",
+        "  physics_query_manage intersect_ray_3d, intersect_ray_2d, intersect_point_3d,\n"
+        "                   intersect_point_2d, intersect_shape_3d, cast_motion_3d\n",
+    ),
+    (
+        "curve",
+        "  curve_manage     create_curve_1d, create_curve_2d, create_curve_3d,\n"
+        "                   create_gradient, create_gradient_texture,\n"
+        "                   sample_curve, sample_gradient\n",
     ),
 )
 
@@ -1284,6 +1309,14 @@ def create_server(
         register_headless_tools(mcp)
     if "cloud" not in exclude:
         register_cloud_tools(mcp)
+    if "gi" not in exclude:
+        register_gi_tools(mcp)
+    if "input_event" not in exclude:
+        register_input_event_tools(mcp)
+    if "physics_query" not in exclude:
+        register_physics_query_tools(mcp)
+    if "curve" not in exclude:
+        register_curve_tools(mcp)
 
     register_rest_gateway(mcp)
 

@@ -94,7 +94,7 @@ class CapabilityAuthMiddleware(_Wrapper):
             await self.app(scope, receive, send)
             return
         path = scope.get("path", "")
-        if path == "/openapi.json" or path.startswith("/api/v1/"):
+        if path.startswith("/openapi") or path.startswith("/api/v1/"):
             await self.app(scope, receive, send)
             return
         values = _headers(scope, b"authorization")

@@ -39,7 +39,7 @@ class RemoteGodotClient:
         headers = {
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "User-Agent": "GodotAI-RemoteClient/5.0.25",
+            "User-Agent": "GodotAI-RemoteClient/5.0.26",
         }
         if self.auth_token:
             headers["Authorization"] = f"Bearer {self.auth_token}"
@@ -59,6 +59,14 @@ class RemoteGodotClient:
             raise RemoteGodotError(f"HTTP {exc.code}: {body}", status_code=exc.code) from exc
         except Exception as exc:
             raise RemoteGodotError(f"Connection failed: {exc}") from exc
+
+    def check_connection(self) -> bool:
+        """Verify if the remote Godot server is accessible and online."""
+        try:
+            res = self.status()
+            return res.get("status") == "online"
+        except Exception:
+            return False
 
     def list_tools(self) -> list[dict[str, Any]]:
         """List all available MCP tools registered on the remote server."""
@@ -107,3 +115,7 @@ class RemoteGodotClient:
             raise
         except Exception as exc:
             raise RemoteGodotError(f"Tool call failed: {exc}") from exc
+
+    def batch(self, commands: list[dict[str, Any]], undo: bool = True) -> Any:
+        """Execute a list of plugin commands sequentially in one request."""
+        return self.call("batch_execute", {"commands": commands, "undo": undo})

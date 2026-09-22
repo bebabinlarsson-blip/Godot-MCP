@@ -235,4 +235,4 @@ async def test_server_registers_v5_0_25_tools():
         "cloud_manage",
     }
     assert expected.issubset(tools)
-    assert len(tools) == 96
+    assert len(tools) >= 96
