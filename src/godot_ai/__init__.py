@@ -183,18 +183,42 @@ def main(argv: Sequence[str] | None = None) -> None:
         return
 
     if effective_argv[:1] == ["tunnel"]:
-        from godot_ai.transport.tunnel import start_cloudflare_quick_tunnel
+        from godot_ai.transport.tunnel import (
+            start_cloudflare_quick_tunnel,
+            start_ssh_tunnel,
+        )
 
-        tunnel_port = 8000
-        if "--port" in effective_argv:
-            idx = effective_argv.index("--port")
-            if idx + 1 < len(effective_argv):
-                tunnel_port = int(effective_argv[idx + 1])
-        info = start_cloudflare_quick_tunnel(tunnel_port)
-        print(f"Cloudflare Quick Tunnel established: {info.public_url}")
+        tunnel_parser = argparse.ArgumentParser(
+            prog="godot-ai tunnel",
+            description="Start public cloud tunnel for remote ChatGPT access",
+        )
+        tunnel_parser.add_argument(
+            "--port",
+            type=int,
+            default=8000,
+            help="Local port to tunnel (default: 8000)",
+        )
+        tunnel_parser.add_argument(
+            "--provider",
+            choices=["ssh", "pinggy", "localhost.run", "cloudflare"],
+            default="ssh",
+            help="Tunnel provider (default: ssh using system OpenSSH)",
+        )
+        t_args = tunnel_parser.parse_args(effective_argv[1:])
+        if t_args.provider == "cloudflare":
+            info = start_cloudflare_quick_tunnel(t_args.port)
+        elif t_args.provider == "pinggy":
+            info = start_ssh_tunnel(t_args.port, "pinggy")
+        else:
+            info = start_ssh_tunnel(t_args.port, "localhost.run")
+
+        print(f"Public tunnel active ({info.provider}): {info.public_url}")
         print(f"OpenAPI Action Schema: {info.openapi_url}")
         if info.process:
-            info.process.wait()
+            try:
+                info.process.wait()
+            except KeyboardInterrupt:
+                info.process.terminate()
         return
 
     parser = argparse.ArgumentParser(
@@ -302,6 +326,9 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     if args.auth_token:
         os.environ["GODOT_AI_AUTH_TOKEN"] = args.auth_token
+
+    if args.tunnel and args.transport == "stdio":
+        args.transport = "streamable-http"
 
     from godot_ai.tools.domains import parse_exclude_list
 
