@@ -182,6 +182,21 @@ def main(argv: Sequence[str] | None = None) -> None:
         attach_main(effective_argv[1:])
         return
 
+    if effective_argv[:1] == ["tunnel"]:
+        from godot_ai.transport.tunnel import start_cloudflare_quick_tunnel
+
+        tunnel_port = 8000
+        if "--port" in effective_argv:
+            idx = effective_argv.index("--port")
+            if idx + 1 < len(effective_argv):
+                tunnel_port = int(effective_argv[idx + 1])
+        info = start_cloudflare_quick_tunnel(tunnel_port)
+        print(f"Cloudflare Quick Tunnel established: {info.public_url}")
+        print(f"OpenAPI Action Schema: {info.openapi_url}")
+        if info.process:
+            info.process.wait()
+        return
+
     parser = argparse.ArgumentParser(
         description="Godot AI server",
         epilog=(
@@ -272,7 +287,21 @@ def main(argv: Sequence[str] | None = None) -> None:
             "a client's hard tool-count cap (Antigravity limits to 100)."
         ),
     )
+    parser.add_argument(
+        "--tunnel",
+        choices=["cloudflare", "ngrok", "manual"],
+        default=None,
+        help="Start automated public HTTPS tunnel for remote cloud access (e.g. ChatGPT).",
+    )
+    parser.add_argument(
+        "--auth-token",
+        default=None,
+        help="Bearer token for REST gateway and cloud tunnel endpoints.",
+    )
     args = parser.parse_args(effective_argv)
+
+    if args.auth_token:
+        os.environ["GODOT_AI_AUTH_TOKEN"] = args.auth_token
 
     from godot_ai.tools.domains import parse_exclude_list
 
@@ -417,5 +446,15 @@ def _serve(
         transport_kwargs["uvicorn_config"] = hardened_uvicorn_config(
             access_log=http_access_log_enabled()
         )
+
+    if getattr(args, "tunnel", None) == "cloudflare":
+        from godot_ai.transport.tunnel import start_cloudflare_quick_tunnel
+
+        try:
+            tunnel_info = start_cloudflare_quick_tunnel(args.port)
+            print(f"Public tunnel active: {tunnel_info.public_url}")
+            print(f"OpenAPI Action Schema: {tunnel_info.openapi_url}")
+        except Exception as exc:
+            print(f"Failed to start tunnel: {exc}", file=sys.stderr)
 
     server.run(transport=args.transport, **transport_kwargs)

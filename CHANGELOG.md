@@ -5,6 +5,58 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.25 (2026-09-22)
+
+ChatGPT Web & Cloud Computer Mode integration, OpenAPI 3.1 REST gateway, public tunnel automation, and complete engine expansion with 6 new domains: physics bodies in body_manage, world environment and fog in world_manage, audio DSP effects in audio_effect_manage, navigation pathfinding queries in nav_query_manage, standalone CLI execution in headless_manage, and cloud bridge status in cloud_manage.
+
+### Added
+
+- **ChatGPT Web & Cloud Computer Mode Integration**:
+  - `godot_ai.transport.openapi`: Automated OpenAPI 3.1.0 schema generator exposing all registered MCP tools as REST endpoints for ChatGPT Custom GPT Actions.
+  - `godot_ai.transport.rest_gateway`: High-performance Starlette REST gateway routes (`/openapi.json`, `/api/v1/tools/{name}`, `/api/v1/call`, `/api/v1/tools`, `/api/v1/status`) supporting optional Bearer token authentication.
+  - `godot_ai.transport.tunnel`: Zero-config Cloudflare Quick Tunnel and ngrok supervisor for exposing local Godot instances to web and cloud assistants with instant public HTTPS URLs.
+  - `godot_ai.remote`: Lightweight `RemoteGodotClient` Python SDK runnable in ChatGPT Advanced Data Analysis / cloud sandboxes or external machines without local engine installation.
+  - CLI enhancements: Added `--tunnel` and `--auth-token` options, plus `godot-ai tunnel` subcommand.
+- **Physics Body & Collision Management (`body_manage`)**:
+  - Introduced `body_manage` tool and `BodyHandler` for RigidBody, CharacterBody, and StaticBody configurations.
+  - `configure_body`: Set mass, gravity_scale, linear_damp, angular_damp, and freeze properties.
+  - `apply_impulse`: Apply 2D and 3D central impulses and offset forces to RigidBody nodes.
+  - `set_collision_layer_mask`: Configure collision_layer, collision_mask, and collision_priority.
+  - `scaffold_character_body`: Scaffold CharacterBody2D and CharacterBody3D with collision shapes.
+  - `get_body_info`: Inspect physics properties, velocity, and collision masks.
+- **WorldEnvironment, Sky, and Fog Pipeline (`world_manage`)**:
+  - Introduced `world_manage` tool and `WorldHandler` for post-processing and volumetric effects.
+  - `configure_world_environment`: Configure ambient light, tonemap, ssao, ssr, sdfgi, and glow.
+  - `create_sky_material`: Setup procedural or panorama sky materials on Environment resources.
+  - `set_volumetric_fog`: Enable and tune volumetric fog density, albedo, emission, and length.
+  - `configure_camera_attributes`: Configure CameraAttributesPractical and Physical settings.
+  - `get_world_info`: Inspect active environment, sky, and post-processing properties.
+- **AudioServer DSP Bus Effects (`audio_effect_manage`)**:
+  - Introduced `audio_effect_manage` tool and `AudioEffectHandler` for audio bus signal processing.
+  - `add_effect_to_bus`: Add AudioEffect instances (Reverb, Delay, Distortion, Chorus, EQ, Compressor, PitchShift) to audio buses.
+  - `configure_effect`: Configure DSP parameters and enabled state on bus effects.
+  - `remove_effect`: Remove audio effects from buses by index.
+  - `list_bus_effects`: List all effects, classes, and active states on an audio bus.
+- **Navigation Queries and Spatial Pathfinding (`nav_query_manage`)**:
+  - Introduced `nav_query_manage` tool and `NavQueryHandler` for direct NavigationServer queries.
+  - `query_path_2d`: Query 2D navigation paths across navmeshes between points.
+  - `query_path_3d`: Query 3D navigation paths across navmeshes between points.
+  - `scaffold_nav_link`: Scaffold NavigationLink2D and NavigationLink3D connecting disjoint regions.
+  - `scaffold_nav_obstacle`: Scaffold NavigationObstacle2D and NavigationObstacle3D for dynamic avoidance.
+  - `get_nav_map_info`: Inspect navigation map cell sizes, margins, and region counts.
+- **Headless CLI & Standalone Engine Execution (`headless_manage`)**:
+  - Introduced `headless_manage` tool and `HeadlessHandler` for CLI and non-GUI operations.
+  - `run_script`: Execute GDScript files or inline code snippets in headless engine mode.
+  - `run_headless_scene`: Execute scenes headlessly with frame limits for simulations or CI tests.
+  - `export_project_cli`: Trigger headless project exports via Godot export presets.
+  - `reimport_assets_cli`: Reimport project assets via headless editor pass.
+  - `get_engine_info`: Inspect Godot version, architecture, and CLI capabilities.
+- **Cloud Bridge and Tunnel Metadata (`cloud_manage`)**:
+  - Introduced `cloud_manage` tool and `CloudHandler` for tunnel and cloud status introspection.
+  - `get_tunnel_status`: Inspect active tunnel state, port, and endpoint URLs.
+  - `get_action_schema_url`: Retrieve OpenAPI schema URL and setup instructions for ChatGPT Custom GPT.
+  - `test_cloud_connection`: Test round-trip latency and operational connectivity between editor and gateway.
+
 ## 5.0.24 (2026-09-22)
 
 Complete Godot 4 engine coverage closing all remaining subsystem gaps: texture and image processing in texture_manage, font resources and variations in font_manage, low-level TCP/UDP and WebSocket scaffolding in network_manage, visual shader node graphs in visual_shader_manage, animation state machines and blend trees in animation_tree_manage, animated sprites, MultiMesh, and Line2D in sprite_manage, persistent editor settings in editor_settings_manage, 2D and 3D physics joints in joint_manage, 2D and 3D occlusion culling in occluder_manage, ConfigFile INI and JSON utilities in config_manage, and parallax background and canvas layers in parallax_manage.

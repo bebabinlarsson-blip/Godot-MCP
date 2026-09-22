@@ -97,6 +97,12 @@ DOMAINS: tuple[str, ...] = (
     "occluder",
     "config",
     "parallax",
+    "body",
+    "world",
+    "audio_effect",
+    "nav_query",
+    "headless",
+    "cloud",
 )
 
 ## Domains that contain at least one core (always-loaded) tool. When the

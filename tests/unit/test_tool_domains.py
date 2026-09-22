@@ -147,7 +147,7 @@ def test_create_server_ignores_unknown_domain_names_via_set_input():
     ## (Unknown names are a no-op here because no registration is gated
     ## on them.)
     trimmed = set(_list_tools(create_server(exclude_domains={"audio", "ghost_domain"})))
-    assert not any(t.startswith("audio_") for t in trimmed)
+    assert "audio_manage" not in trimmed
 
 
 # --- GDScript catalog parity ---

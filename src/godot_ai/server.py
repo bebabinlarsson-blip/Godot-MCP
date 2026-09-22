@@ -77,11 +77,14 @@ from godot_ai.tools.animation import register_animation_tools
 from godot_ai.tools.animation_tree import register_animation_tree_tools
 from godot_ai.tools.api import register_api_tools
 from godot_ai.tools.audio import register_audio_tools
+from godot_ai.tools.audio_effect import register_audio_effect_tools
 from godot_ai.tools.autoload import register_autoload_tools
 from godot_ai.tools.batch import register_batch_tools
+from godot_ai.tools.body import register_body_tools
 from godot_ai.tools.camera import register_camera_tools
 from godot_ai.tools.character import register_character_tools
 from godot_ai.tools.client import register_client_tools
+from godot_ai.tools.cloud import register_cloud_tools
 from godot_ai.tools.compute import register_compute_tools
 from godot_ai.tools.config import register_config_tools
 from godot_ai.tools.crypto import register_crypto_tools
@@ -99,6 +102,7 @@ from godot_ai.tools.fsm import register_fsm_tools
 from godot_ai.tools.game import register_game_tools
 from godot_ai.tools.geometry import register_geometry_tools
 from godot_ai.tools.gridmap import register_gridmap_tools
+from godot_ai.tools.headless import register_headless_tools
 from godot_ai.tools.http import register_http_tools
 from godot_ai.tools.input_map import register_input_map_tools
 from godot_ai.tools.joint import register_joint_tools
@@ -108,6 +112,7 @@ from godot_ai.tools.localization import register_localization_tools
 from godot_ai.tools.material import register_material_tools
 from godot_ai.tools.mesh import register_mesh_tools
 from godot_ai.tools.multiplayer import register_multiplayer_tools
+from godot_ai.tools.nav_query import register_nav_query_tools
 from godot_ai.tools.navigation import register_navigation_tools
 from godot_ai.tools.network import register_network_tools
 from godot_ai.tools.node import register_node_tools
@@ -144,6 +149,7 @@ from godot_ai.tools.ui import register_ui_tools
 from godot_ai.tools.undo_redo import register_undo_redo_tools
 from godot_ai.tools.viewport import register_viewport_tools
 from godot_ai.tools.visual_shader import register_visual_shader_tools
+from godot_ai.tools.world import register_world_tools
 from godot_ai.tools.xr import register_xr_tools
 from godot_ai.transport.capability import (
     LaunchCapabilities,
@@ -154,6 +160,7 @@ from godot_ai.transport.capability import (
     write_capabilities,
 )
 from godot_ai.transport.origin_guard import IPNetwork, LocalhostOnlyHTTPMiddleware
+from godot_ai.transport.rest_gateway import register_rest_gateway
 from godot_ai.transport.security import BoundedHTTPMiddleware, CapabilityAuthMiddleware
 from godot_ai.transport.websocket import GodotWebSocketServer
 
@@ -558,6 +565,37 @@ _ROLLUP_BLOCKS: tuple[tuple[str | None, str], ...] = (
         "parallax",
         "  parallax_manage  scaffold_parallax, scaffold_canvas_layer,\n"
         "                   scaffold_visibility_notifier, get_parallax_info\n",
+    ),
+    (
+        "body",
+        "  body_manage      configure_body, apply_impulse, set_collision_layer_mask,\n"
+        "                   scaffold_character_body, get_body_info\n",
+    ),
+    (
+        "world",
+        "  world_manage     configure_world_environment, create_sky_material,\n"
+        "                   set_volumetric_fog, configure_camera_attributes,\n"
+        "                   get_world_info\n",
+    ),
+    (
+        "audio_effect",
+        "  audio_effect_manage add_effect_to_bus, configure_effect,\n"
+        "                   remove_effect, list_bus_effects\n",
+    ),
+    (
+        "nav_query",
+        "  nav_query_manage query_path_2d, query_path_3d, scaffold_nav_link,\n"
+        "                   scaffold_nav_obstacle, get_nav_map_info\n",
+    ),
+    (
+        "headless",
+        "  headless_manage  run_script, run_headless_scene, export_project_cli,\n"
+        "                   reimport_assets_cli, get_engine_info\n",
+    ),
+    (
+        "cloud",
+        "  cloud_manage     get_tunnel_status, get_action_schema_url,\n"
+        "                   test_cloud_connection\n",
     ),
 )
 
@@ -1234,6 +1272,20 @@ def create_server(
         register_config_tools(mcp)
     if "parallax" not in exclude:
         register_parallax_tools(mcp)
+    if "body" not in exclude:
+        register_body_tools(mcp)
+    if "world" not in exclude:
+        register_world_tools(mcp)
+    if "audio_effect" not in exclude:
+        register_audio_effect_tools(mcp)
+    if "nav_query" not in exclude:
+        register_nav_query_tools(mcp)
+    if "headless" not in exclude:
+        register_headless_tools(mcp)
+    if "cloud" not in exclude:
+        register_cloud_tools(mcp)
+
+    register_rest_gateway(mcp)
 
 
     register_session_resources(mcp)

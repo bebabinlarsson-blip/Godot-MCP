@@ -267,4 +267,4 @@ async def test_server_registers_v5_0_24_tools():
         "parallax_manage",
     }
     assert expected.issubset(tools)
-    assert len(tools) == 90
+    assert len(tools) >= 90

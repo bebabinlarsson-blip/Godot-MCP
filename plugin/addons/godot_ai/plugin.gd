@@ -436,6 +436,12 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy_handler("occluder", HANDLERS_DIR + "occluder_handler.gd", [undo, _connection])
 	_dispatcher.register_lazy_handler("config", HANDLERS_DIR + "config_handler.gd", [undo, _connection])
 	_dispatcher.register_lazy_handler("parallax", HANDLERS_DIR + "parallax_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("body", HANDLERS_DIR + "body_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("world", HANDLERS_DIR + "world_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("audio_effect", HANDLERS_DIR + "audio_effect_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("nav_query", HANDLERS_DIR + "nav_query_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("headless", HANDLERS_DIR + "headless_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("cloud", HANDLERS_DIR + "cloud_handler.gd", [undo, _connection])
 
 	_dispatcher.register_lazy("get_editor_state", "editor", &"get_editor_state")
 	_dispatcher.register_lazy("get_scene_tree", "scene", &"get_scene_tree")
@@ -871,6 +877,39 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy("parallax_scaffold_canvas_layer", "parallax", &"scaffold_canvas_layer")
 	_dispatcher.register_lazy("parallax_scaffold_visibility_notifier", "parallax", &"scaffold_visibility_notifier")
 	_dispatcher.register_lazy("parallax_get_parallax_info", "parallax", &"get_parallax_info")
+
+	_dispatcher.register_lazy("body_configure_body", "body", &"configure_body")
+	_dispatcher.register_lazy("body_apply_impulse", "body", &"apply_impulse")
+	_dispatcher.register_lazy("body_set_collision_layer_mask", "body", &"set_collision_layer_mask")
+	_dispatcher.register_lazy("body_scaffold_character_body", "body", &"scaffold_character_body")
+	_dispatcher.register_lazy("body_get_body_info", "body", &"get_body_info")
+
+	_dispatcher.register_lazy("world_configure_world_environment", "world", &"configure_world_environment")
+	_dispatcher.register_lazy("world_create_sky_material", "world", &"create_sky_material")
+	_dispatcher.register_lazy("world_set_volumetric_fog", "world", &"set_volumetric_fog")
+	_dispatcher.register_lazy("world_configure_camera_attributes", "world", &"configure_camera_attributes")
+	_dispatcher.register_lazy("world_get_world_info", "world", &"get_world_info")
+
+	_dispatcher.register_lazy("audio_effect_add_effect_to_bus", "audio_effect", &"add_effect_to_bus")
+	_dispatcher.register_lazy("audio_effect_configure_effect", "audio_effect", &"configure_effect")
+	_dispatcher.register_lazy("audio_effect_remove_effect", "audio_effect", &"remove_effect")
+	_dispatcher.register_lazy("audio_effect_list_bus_effects", "audio_effect", &"list_bus_effects")
+
+	_dispatcher.register_lazy("nav_query_query_path_2d", "nav_query", &"query_path_2d")
+	_dispatcher.register_lazy("nav_query_query_path_3d", "nav_query", &"query_path_3d")
+	_dispatcher.register_lazy("nav_query_scaffold_nav_link", "nav_query", &"scaffold_nav_link")
+	_dispatcher.register_lazy("nav_query_scaffold_nav_obstacle", "nav_query", &"scaffold_nav_obstacle")
+	_dispatcher.register_lazy("nav_query_get_nav_map_info", "nav_query", &"get_nav_map_info")
+
+	_dispatcher.register_lazy("headless_run_script", "headless", &"run_script")
+	_dispatcher.register_lazy("headless_run_headless_scene", "headless", &"run_headless_scene")
+	_dispatcher.register_lazy("headless_export_project_cli", "headless", &"export_project_cli")
+	_dispatcher.register_lazy("headless_reimport_assets_cli", "headless", &"reimport_assets_cli")
+	_dispatcher.register_lazy("headless_get_engine_info", "headless", &"get_engine_info")
+
+	_dispatcher.register_lazy("cloud_get_tunnel_status", "cloud", &"get_tunnel_status")
+	_dispatcher.register_lazy("cloud_get_action_schema_url", "cloud", &"get_action_schema_url")
+	_dispatcher.register_lazy("cloud_test_cloud_connection", "cloud", &"test_cloud_connection")
 
 	_connection.dispatcher = _dispatcher
 	add_child(_connection)
