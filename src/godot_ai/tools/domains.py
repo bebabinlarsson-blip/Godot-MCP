@@ -80,6 +80,12 @@ DOMAINS: tuple[str, ...] = (
     "skeleton",
     "crypto",
     "plugin",
+    "pck",
+    "system",
+    "light",
+    "http",
+    "shader_global",
+    "recording",
 )
 
 ## Domains that contain at least one core (always-loaded) tool. When the

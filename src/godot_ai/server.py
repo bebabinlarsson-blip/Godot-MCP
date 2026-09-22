@@ -95,7 +95,9 @@ from godot_ai.tools.fsm import register_fsm_tools
 from godot_ai.tools.game import register_game_tools
 from godot_ai.tools.geometry import register_geometry_tools
 from godot_ai.tools.gridmap import register_gridmap_tools
+from godot_ai.tools.http import register_http_tools
 from godot_ai.tools.input_map import register_input_map_tools
+from godot_ai.tools.light import register_light_tools
 from godot_ai.tools.loader import register_loader_tools
 from godot_ai.tools.localization import register_localization_tools
 from godot_ai.tools.material import register_material_tools
@@ -106,10 +108,12 @@ from godot_ai.tools.node import register_node_tools
 from godot_ai.tools.omni import register_omni_tools
 from godot_ai.tools.particle import register_particle_tools
 from godot_ai.tools.path import register_path_tools
+from godot_ai.tools.pck import register_pck_tools
 from godot_ai.tools.physics import register_physics_tools
 from godot_ai.tools.plugin import register_plugin_tools
 from godot_ai.tools.profiler import register_profiler_tools
 from godot_ai.tools.project import register_project_tools
+from godot_ai.tools.recording import register_recording_tools
 from godot_ai.tools.rendering import register_rendering_tools
 from godot_ai.tools.resource import register_resource_tools
 from godot_ai.tools.save import register_save_tools
@@ -117,8 +121,10 @@ from godot_ai.tools.scene import register_scene_tools
 from godot_ai.tools.script import register_script_tools
 from godot_ai.tools.session import register_session_tools
 from godot_ai.tools.shader import register_shader_tools
+from godot_ai.tools.shader_global import register_shader_global_tools
 from godot_ai.tools.signal import register_signal_tools
 from godot_ai.tools.skeleton import register_skeleton_tools
+from godot_ai.tools.system import register_system_tools
 from godot_ai.tools.testing import register_testing_tools
 from godot_ai.tools.theme import register_theme_tools
 from godot_ai.tools.tilemap import register_tilemap_tools
@@ -458,6 +464,34 @@ _ROLLUP_BLOCKS: tuple[tuple[str | None, str], ...] = (
     (
         "plugin",
         "  plugin_manage    list_plugins, set_plugin_enabled, scaffold_plugin\n",
+    ),
+    (
+        "pck",
+        "  pck_manage       create_pck, load_pck, inspect_pck\n",
+    ),
+    (
+        "system",
+        "  system_manage    get_system_info, get_time, set_time_scale,\n"
+        "                   get_clipboard, set_clipboard, get_env, set_env\n",
+    ),
+    (
+        "light",
+        "  light_manage     scaffold_light_3d, scaffold_light_2d, scaffold_decal,\n"
+        "                   scaffold_probe, set_light_properties, get_light_info\n",
+    ),
+    (
+        "http",
+        "  http_manage      scaffold_http_request, send_request, download_file\n",
+    ),
+    (
+        "shader_global",
+        "  shader_global_manage list_globals, set_global, add_global,\n"
+        "                   remove_global\n",
+    ),
+    (
+        "recording",
+        "  recording_manage capture_viewport, configure_movie_writer,\n"
+        "                   get_writer_status\n",
     ),
 )
 
@@ -1100,6 +1134,18 @@ def create_server(
         register_crypto_tools(mcp)
     if "plugin" not in exclude:
         register_plugin_tools(mcp)
+    if "pck" not in exclude:
+        register_pck_tools(mcp)
+    if "system" not in exclude:
+        register_system_tools(mcp)
+    if "light" not in exclude:
+        register_light_tools(mcp)
+    if "http" not in exclude:
+        register_http_tools(mcp)
+    if "shader_global" not in exclude:
+        register_shader_global_tools(mcp)
+    if "recording" not in exclude:
+        register_recording_tools(mcp)
 
 
     register_session_resources(mcp)

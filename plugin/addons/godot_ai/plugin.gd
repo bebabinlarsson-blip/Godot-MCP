@@ -419,6 +419,12 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy_handler("skeleton", HANDLERS_DIR + "skeleton_handler.gd", [undo, _connection])
 	_dispatcher.register_lazy_handler("crypto", HANDLERS_DIR + "crypto_handler.gd", [undo, _connection])
 	_dispatcher.register_lazy_handler("plugin", HANDLERS_DIR + "plugin_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("pck", HANDLERS_DIR + "pck_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("system", HANDLERS_DIR + "system_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("light", HANDLERS_DIR + "light_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("http", HANDLERS_DIR + "http_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("shader_global", HANDLERS_DIR + "shader_global_handler.gd", [undo, _connection])
+	_dispatcher.register_lazy_handler("recording", HANDLERS_DIR + "recording_handler.gd", [undo, _connection])
 
 	_dispatcher.register_lazy("get_editor_state", "editor", &"get_editor_state")
 	_dispatcher.register_lazy("get_scene_tree", "scene", &"get_scene_tree")
@@ -766,6 +772,38 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy("plugin_list_plugins", "plugin", &"list_plugins")
 	_dispatcher.register_lazy("plugin_set_plugin_enabled", "plugin", &"set_plugin_enabled")
 	_dispatcher.register_lazy("plugin_scaffold_plugin", "plugin", &"scaffold_plugin")
+ 
+	_dispatcher.register_lazy("pck_create_pck", "pck", &"create_pck")
+	_dispatcher.register_lazy("pck_load_pck", "pck", &"load_pck")
+	_dispatcher.register_lazy("pck_inspect_pck", "pck", &"inspect_pck")
+
+	_dispatcher.register_lazy("system_get_system_info", "system", &"get_system_info")
+	_dispatcher.register_lazy("system_get_time", "system", &"get_time")
+	_dispatcher.register_lazy("system_set_time_scale", "system", &"set_time_scale")
+	_dispatcher.register_lazy("system_get_clipboard", "system", &"get_clipboard")
+	_dispatcher.register_lazy("system_set_clipboard", "system", &"set_clipboard")
+	_dispatcher.register_lazy("system_get_env", "system", &"get_env")
+	_dispatcher.register_lazy("system_set_env", "system", &"set_env")
+
+	_dispatcher.register_lazy("light_scaffold_light_3d", "light", &"scaffold_light_3d")
+	_dispatcher.register_lazy("light_scaffold_light_2d", "light", &"scaffold_light_2d")
+	_dispatcher.register_lazy("light_scaffold_decal", "light", &"scaffold_decal")
+	_dispatcher.register_lazy("light_scaffold_probe", "light", &"scaffold_probe")
+	_dispatcher.register_lazy("light_set_light_properties", "light", &"set_light_properties")
+	_dispatcher.register_lazy("light_get_light_info", "light", &"get_light_info")
+
+	_dispatcher.register_lazy("http_scaffold_http_request", "http", &"scaffold_http_request")
+	_dispatcher.register_lazy("http_send_request", "http", &"send_request")
+	_dispatcher.register_lazy("http_download_file", "http", &"download_file")
+
+	_dispatcher.register_lazy("shader_global_list_globals", "shader_global", &"list_globals")
+	_dispatcher.register_lazy("shader_global_set_global", "shader_global", &"set_global")
+	_dispatcher.register_lazy("shader_global_add_global", "shader_global", &"add_global")
+	_dispatcher.register_lazy("shader_global_remove_global", "shader_global", &"remove_global")
+
+	_dispatcher.register_lazy("recording_capture_viewport", "recording", &"capture_viewport")
+	_dispatcher.register_lazy("recording_configure_movie_writer", "recording", &"configure_movie_writer")
+	_dispatcher.register_lazy("recording_get_writer_status", "recording", &"get_writer_status")
 
 	_connection.dispatcher = _dispatcher
 	add_child(_connection)

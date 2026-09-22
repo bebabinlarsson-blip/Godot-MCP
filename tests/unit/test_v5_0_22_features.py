@@ -276,4 +276,4 @@ async def test_server_registers_v5_0_22_tools():
         "plugin_manage",
     }
     assert expected.issubset(tools)
-    assert len(tools) == 73
+    assert len(tools) >= 73

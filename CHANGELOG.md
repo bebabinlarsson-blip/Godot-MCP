@@ -5,6 +5,49 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.23 (2026-09-22)
+
+PCK virtual packaging and DLC loading, OS/hardware introspection and time controls, 2D/3D lighting and decals, in-engine HTTP networking and downloads, global shader parameters, and viewport capture and MovieWriter automation: PCKPacker and ProjectSettings.load_resource_pack in pck_manage, OS/Time/DisplayServer and Engine.time_scale in system_manage, Directional/Omni/Spot lights, Decals, and Reflection/GI probes in light_manage, HTTPRequest scaffolding, REST requests, and file downloads in http_manage, project-wide uniform variables via RenderingServer.global_shader_parameter in shader_global_manage, and viewport image export and MovieWriter video capture in recording_manage.
+
+### Added
+
+- **PCK and Mod Virtual Packaging (`pck_manage`)**:
+  - Introduced `pck_manage` tool and `PckHandler` for DLC and virtual resource pack automation.
+  - `create_pck`: Pack project resource files into standalone .pck files via PCKPacker with customizable alignment.
+  - `load_pck`: Dynamically mount .pck files into the virtual filesystem via ProjectSettings.load_resource_pack with replace flag.
+  - `inspect_pck`: Check file existence and size in bytes for a target .pck package.
+- **System, OS, Time, and Engine Controls (`system_manage`)**:
+  - Introduced `system_manage` tool and `SystemHandler` for engine environment and hardware introspection.
+  - `get_system_info`: Inspect OS name, version, processor count, device model, video adapter name/vendor, and locale.
+  - `get_time`: Query high-precision Unix epoch timestamp, ISO 8601 string, timezone offset, and datetime dictionary.
+  - `set_time_scale`: Speed up or slow down the game engine via Engine.time_scale (e.g. for hyper-speed simulation or slow-motion replay).
+  - `get_clipboard` / `set_clipboard`: Read and set operating system clipboard content via DisplayServer.
+  - `get_env` / `set_env`: Read and set environment variables for the running engine process via OS.
+- **2D and 3D Lighting, Shadows, Decals, and Probes (`light_manage`)**:
+  - Introduced `light_manage` tool and `LightHandler` for complete illumination and probe setups.
+  - `scaffold_light_3d`: Instantiate and configure DirectionalLight3D, OmniLight3D, or SpotLight3D with color, energy, range, attenuation, spot angle, and shadows.
+  - `scaffold_light_2d`: Instantiate PointLight2D or DirectionalLight2D with color, energy, and shadows.
+  - `scaffold_decal`: Create Decal projection nodes with size volume and albedo texture.
+  - `scaffold_probe`: Instantiate ReflectionProbe, LightmapGI, or VoxelGI nodes.
+  - `set_light_properties`: Dynamically modify energy, color, shadows, and volumetric fog energy on existing light nodes.
+  - `get_light_info`: Inspect active lighting properties of any 2D or 3D light node.
+- **In-Engine HTTP Networking and Downloads (`http_manage`)**:
+  - Introduced `http_manage` tool and `HttpHandler` for REST and web communication.
+  - `scaffold_http_request`: Instantiate HTTPRequest nodes into scene trees with configurable timeouts.
+  - `send_request`: Execute in-engine HTTP REST requests (GET, POST, PUT, DELETE, HEAD, OPTIONS) through Godot's network stack.
+  - `download_file`: Download remote files directly into the project filesystem (res:// or user://).
+- **Global Shader Parameters (`shader_global_manage`)**:
+  - Introduced `shader_global_manage` tool and `ShaderGlobalHandler` for project-wide shader uniforms.
+  - `list_globals`: Enumerate all global shader parameters defined in RenderingServer.
+  - `set_global`: Update runtime values of global shader parameters (float, int, bool, Color, Vector2/3/4).
+  - `add_global`: Define new global shader parameters and persist to ProjectSettings (shader_globals/).
+  - `remove_global`: Remove global shader parameters from RenderingServer and ProjectSettings.
+- **Viewport Frame Capture and MovieWriter Recording (`recording_manage`)**:
+  - Introduced `recording_manage` tool and `RecordingHandler` for automated rendering capture and video recording.
+  - `capture_viewport`: Extract viewport texture and save directly to PNG image files on disk.
+  - `configure_movie_writer`: Configure editor MovieWriter settings in ProjectSettings (movie_file, fps, mjpeg_quality).
+  - `get_writer_status`: Check if MovieWriter mode is active and inspect configured output video path.
+
 ## 5.0.22 (2026-09-21)
 
 Paths and curves spline automation, procedural 3D mesh synthesis and deformation, WorldEnvironment lighting and post-processing, skeletal rigging and ragdoll scaffolding, cryptography and secure hashing, and editor plugin lifecycle management: Curve2D/Curve3D and spline generation in path_manage, SurfaceTool and MeshDataTool procedural meshes in mesh_manage, post-processing and visual presets in rendering_manage, bone poses and ragdolls in skeleton_manage, secure hashing and TLS certificates in crypto_manage, and addon discovery and EditorPlugin scaffolding in plugin_manage.
