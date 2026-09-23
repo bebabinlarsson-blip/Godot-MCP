@@ -398,12 +398,13 @@ def main(argv: Sequence[str] | None = None) -> None:
             print("Starting public tunnel to forward to active server...", flush=True)
 
             def _on_connect(info):
-                print("==================================================================", flush=True)
+                print("=" * 66, flush=True)
                 print(f"GODOT AI PUBLIC HTTPS ACCESS READY ({info.provider})", flush=True)
                 print(f"Public Link: {info.public_url}", flush=True)
                 print(f"OpenAPI Schema: {info.openapi_url}", flush=True)
-                print("Share this link with ChatGPT Web / Work Mode / Code Interpreter", flush=True)
-                print("==================================================================", flush=True)
+                print("Share this link with ChatGPT Web / Work Mode / Code Interpreter",
+                      flush=True)
+                print("=" * 66, flush=True)
 
             run_tunnel_forever(
                 args.port,
@@ -564,7 +565,7 @@ def _serve(
     if auto_tunnel:
         import threading
 
-        from godot_ai.transport.tunnel import run_tunnel_forever
+        from godot_ai.transport.tunnel import DEFAULT_TUNNEL_PROVIDER, run_tunnel_forever
 
         def _on_connect(info):
             print("==================================================================", flush=True)
