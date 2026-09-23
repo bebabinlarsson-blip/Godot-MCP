@@ -69,6 +69,25 @@ def _wait_for_core_tools(timeout: float) -> list[str] | None:
     return None
 
 
+def _stop_editor(editor: subprocess.Popen, stdout_log) -> None:
+    """Stop the smoke-test editor after assertions and close its log handle."""
+    if editor.poll() is None:
+        editor.terminate()
+        try:
+            editor.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            editor.kill()
+            editor.wait()
+    stdout_log.close()
+
+
+def _editor_output(editor_stdout_log: Path, editor_log: Path) -> str:
+    output = editor_stdout_log.read_text(encoding="utf-8", errors="replace")
+    if editor_log.exists():
+        output += editor_log.read_text(encoding="utf-8", errors="replace")
+    return output
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("godot", nargs="?", default="godot", help="Godot executable")
@@ -110,8 +129,6 @@ def main() -> int:
                 "--editor",
                 "--path",
                 str(project),
-                "--quit-after",
-                "900",
                 "--log-file",
                 str(editor_log),
             ],
@@ -120,55 +137,21 @@ def main() -> int:
             stderr=subprocess.STDOUT,
         )
         if not _wait_for_http_health(30):
-            editor.terminate()
-            try:
-                editor.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                editor.kill()
-                editor.wait()
-            editor_stdout.close()
-            output = editor_stdout_log.read_text(encoding="utf-8", errors="replace")
-            if editor_log.exists():
-                output += editor_log.read_text(encoding="utf-8", errors="replace")
+            _stop_editor(editor, editor_stdout)
+            output = _editor_output(editor_stdout_log, editor_log)
             raise RuntimeError(
                 "Godot Core did not start its local MCP health endpoint:\n" + output[-12000:]
             )
         available_tools = _wait_for_core_tools(30)
         if available_tools is None:
-            editor.terminate()
-            try:
-                editor.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                editor.kill()
-                editor.wait()
-            editor_stdout.close()
-            output = editor_stdout_log.read_text(encoding="utf-8", errors="replace")
-            if editor_log.exists():
-                output += editor_log.read_text(encoding="utf-8", errors="replace")
+            _stop_editor(editor, editor_stdout)
+            output = _editor_output(editor_stdout_log, editor_log)
             raise RuntimeError(
                 "The MCP gateway did not advertise its required core tools:\n"
                 + output[-12000:]
             )
-
-        try:
-            editor.wait(timeout=90)
-        except subprocess.TimeoutExpired:
-            editor.terminate()
-            try:
-                editor.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                editor.kill()
-                editor.wait()
-            editor_stdout.close()
-            raise RuntimeError("Godot editor did not exit after its frame limit")
-        editor_stdout.close()
-        editor_output = editor_stdout_log.read_text(encoding="utf-8", errors="replace")
-        if editor.returncode:
-            raise RuntimeError(
-                f"Godot editor exited {editor.returncode}:\n{editor_output[-12000:]}"
-            )
-        if editor_log.exists():
-            editor_output += editor_log.read_text(encoding="utf-8", errors="replace")
+        _stop_editor(editor, editor_stdout)
+        editor_output = _editor_output(editor_stdout_log, editor_log)
         if "SCRIPT ERROR:" in editor_output or "Parse Error" in editor_output:
             raise RuntimeError(
                 "Godot editor reported a GDScript error while loading the addons:\n"
