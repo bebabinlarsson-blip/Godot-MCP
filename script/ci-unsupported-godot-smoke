@@ -23,6 +23,11 @@ BRIDGE_REFUSAL = (
 def tree_digest(root: Path) -> str:
     digest = hashlib.sha256()
     for path in sorted(root.rglob("*"), key=lambda item: item.relative_to(root).as_posix()):
+        # Godot writes or refreshes these import identifiers while scanning
+        # the disposable project. They are generated metadata, not plugin
+        # source, so their presence must not make an inert-load check fail.
+        if path.is_file() and path.name.endswith(".uid"):
+            continue
         relative = path.relative_to(root).as_posix().encode()
         digest.update(len(relative).to_bytes(4, "big"))
         digest.update(relative)
@@ -46,7 +51,10 @@ def run_case(godot: Path, source: Path, refusal: str, label: str) -> str:
         project = temp / "project"
         addon = project / "addons/godot_ai"
         addon.parent.mkdir(parents=True)
-        shutil.copytree(source, addon, symlinks=True)
+        source_before = tree_digest(source)
+        # Never let Godot's import scan follow a symlink back into the checked
+        # out source tree. Dereference links into this disposable copy.
+        shutil.copytree(source, addon, symlinks=False)
         project.joinpath("project.godot").write_text(
             f"""[application]
 config/name="Godot AI {label} unsupported-floor smoke"
@@ -101,6 +109,9 @@ enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg")
         after = tree_digest(addon)
         if after != before:
             raise AssertionError(f"add-on tree mutated: {before} -> {after}")
+        source_after = tree_digest(source)
+        if source_after != source_before:
+            raise AssertionError(f"source add-on tree mutated: {source_before} -> {source_after}")
         if project.joinpath("project.godot").read_bytes() != project_file_before:
             raise AssertionError("unsupported engine mutated project.godot")
         if capability_dir.exists() and any(capability_dir.iterdir()):

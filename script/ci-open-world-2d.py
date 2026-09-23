@@ -33,19 +33,33 @@ def _run(command: list[str], env: dict[str, str], timeout: int, label: str) -> s
     return output
 
 
-def _wait_for_http_health(timeout: float) -> bool:
+def _request_json(url: str, http_capability: str) -> dict:
+    request = urllib.request.Request(
+        url,
+        headers={"Authorization": f"Bearer {http_capability}"},
+    )
+    with urllib.request.urlopen(request, timeout=1) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def _wait_for_http_server(capability_file: Path, timeout: float) -> str | None:
+    """Wait for the backend and authenticate with its private HTTP capability."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
-            with urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=1) as response:
-                if response.status == 200:
-                    return True
-        except (OSError, urllib.error.URLError):
+            record = json.loads(capability_file.read_text(encoding="utf-8"))
+            http_capability = record.get("http")
+            if not isinstance(http_capability, str) or not http_capability:
+                raise ValueError("capability record has no HTTP capability")
+            status = _request_json("http://127.0.0.1:8000/api/v1/status", http_capability)
+            if status.get("status") == "online":
+                return http_capability
+        except (OSError, urllib.error.URLError, ValueError, json.JSONDecodeError):
             time.sleep(0.25)
-    return False
+    return None
 
 
-def _wait_for_core_tools(timeout: float) -> list[str] | None:
+def _wait_for_core_tools(http_capability: str, timeout: float) -> list[str] | None:
     """Wait until the HTTP gateway advertises every always-on core tool."""
     required = {
         "session_activate",
@@ -56,10 +70,7 @@ def _wait_for_core_tools(timeout: float) -> list[str] | None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
-            with urllib.request.urlopen(
-                "http://127.0.0.1:8000/api/v1/tools", timeout=1
-            ) as response:
-                payload = json.loads(response.read().decode("utf-8"))
+            payload = _request_json("http://127.0.0.1:8000/api/v1/tools", http_capability)
             names = [tool.get("name") for tool in payload.get("tools", [])]
             if required.issubset(names):
                 return names
@@ -109,6 +120,15 @@ def main() -> int:
                 shutil.copytree(source, target, ignore=shutil.ignore_patterns("*.uid"))
 
         env = os.environ.copy()
+        capability_dir = Path(temp) / "capabilities"
+        if os.name == "nt":
+            env["LOCALAPPDATA"] = str(Path(temp) / "local-app-data")
+            capability_file = (
+                Path(env["LOCALAPPDATA"]) / "godot-ai" / "capabilities" / "http-8000.json"
+            )
+        else:
+            env["GODOT_AI_CAPABILITY_DIR"] = str(capability_dir)
+            capability_file = capability_dir / "http-8000.json"
         env.update(
             {
                 "GODOT_AI_ALLOW_HEADLESS": "1",
@@ -136,13 +156,15 @@ def main() -> int:
             stdout=editor_stdout,
             stderr=subprocess.STDOUT,
         )
-        if not _wait_for_http_health(30):
+        http_capability = _wait_for_http_server(capability_file, 30)
+        if http_capability is None:
             _stop_editor(editor, editor_stdout)
             output = _editor_output(editor_stdout_log, editor_log)
             raise RuntimeError(
-                "Godot Core did not start its local MCP health endpoint:\n" + output[-12000:]
+                "Godot Core did not start its authenticated local MCP status endpoint:\n"
+                + output[-12000:]
             )
-        available_tools = _wait_for_core_tools(30)
+        available_tools = _wait_for_core_tools(http_capability, 30)
         if available_tools is None:
             _stop_editor(editor, editor_stdout)
             output = _editor_output(editor_stdout_log, editor_log)
