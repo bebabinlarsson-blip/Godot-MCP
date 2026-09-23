@@ -34,6 +34,27 @@ def _run(command: list[str], env: dict[str, str], timeout: int, label: str) -> s
     return output
 
 
+def _resolve_godot(executable: str) -> str:
+    """Resolve setup-godot's path, including Windows' extensionless launcher."""
+    for candidate in (
+        executable,
+        os.environ.get("GODOT_BIN", ""),
+        os.environ.get("GODOT4_BIN", ""),
+        os.environ.get("GODOT", ""),
+        os.environ.get("GODOT4", ""),
+    ):
+        if not candidate:
+            continue
+        resolved = shutil.which(candidate)
+        if resolved:
+            return resolved
+        if Path(candidate).is_file():
+            return str(Path(candidate))
+    raise FileNotFoundError(
+        "Godot was not found; set GODOT_BIN or let setup-godot provide GODOT/GODOT4"
+    )
+
+
 def _request_json(url: str, auth_token: str | None = None) -> dict:
     headers = {"Authorization": f"Bearer {auth_token}"} if auth_token else {}
     request = urllib.request.Request(url, headers=headers)
@@ -109,6 +130,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("godot", nargs="?", default="godot", help="Godot executable")
     args = parser.parse_args()
+    godot = _resolve_godot(args.godot)
 
     repo_root = Path(__file__).resolve().parent.parent
     fixture = repo_root / "tests/fixtures/open_world_2d"
@@ -146,7 +168,7 @@ def main() -> int:
         editor_stdout = editor_stdout_log.open("w", encoding="utf-8")
         editor = subprocess.Popen(
             [
-                args.godot,
+                godot,
                 "--headless",
                 "--editor",
                 "--path",
@@ -192,7 +214,7 @@ def main() -> int:
 
         game_output = _run(
             [
-                args.godot,
+            godot,
                 "--headless",
                 "--path",
                 str(project),
