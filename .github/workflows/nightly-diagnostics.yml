@@ -106,12 +106,8 @@ jobs:
         shell: bash
         timeout-minutes: 3
         env:
-          # #882: floor on test_run's `total`, catching in-suite discovery
-          # truncation that the script's suite-count gate cannot see (a suite
-          # can register and still run fewer tests than it has). Keep this a
-          # little below the real count so ordinary churn doesn't trip it;
-          # lower it deliberately when tests are legitimately removed.
-          GODOT_AI_MIN_TESTS: "2050"
+          # Clean CI checkouts copy the two tracked smoke suites, which contain 17 tests.
+          GODOT_AI_MIN_TESTS: "17"
         run: bash script/ci-godot-tests
 
       - name: Ten-reload stress test
