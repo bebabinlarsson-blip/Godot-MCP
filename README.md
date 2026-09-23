@@ -361,7 +361,7 @@ machine, editor server, and tunnel process are online.
 Treat any public tunnel as an internet-facing endpoint. Configure the same
 `GODOT_AI_AUTH_TOKEN` in the MCP server and the AI client's Bearer
 authorization. Start Godot with the token set before launching the editor.
-Every automated public tunnel provider refuses to start unless `/health`
+Every automated public tunnel provider refuses to start unless `/api/v1/status`
 rejects anonymous requests and accepts that token. The `ngrok` provider reads
 the endpoint from ngrok's local Agent API at `127.0.0.1:4040`; keep that API
 bound to loopback. Share the URL only with intended clients.

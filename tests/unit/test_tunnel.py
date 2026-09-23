@@ -289,8 +289,41 @@ def test_named_tunnel_checks_that_local_server_requires_and_accepts_token(monkey
     with patch("godot_ai.transport.tunnel.urllib.request.urlopen", side_effect=fake_urlopen):
         _verify_local_auth(8123, "expected-token")
 
-    assert requests[0][0] == "http://127.0.0.1:8123/health"
+    assert requests[0][0] == "http://127.0.0.1:8123/api/v1/status"
+    assert requests[1][0].full_url == "http://127.0.0.1:8123/api/v1/status"
     assert requests[1][0].get_header("Authorization") == "Bearer expected-token"
+
+
+def test_keepalive_uses_authenticated_status_endpoint(monkeypatch):
+    from godot_ai.transport.tunnel import _start_keepalive_worker
+
+    monkeypatch.setenv("GODOT_AI_AUTH_TOKEN", "expected-token")
+    completed = threading.Event()
+    calls = []
+    poll_count = 0
+
+    class Process:
+        def poll(self):
+            nonlocal poll_count
+            poll_count += 1
+            return None if poll_count <= 2 else 0
+
+    def fake_urlopen(request, timeout):
+        calls.append((request, timeout))
+        completed.set()
+        return MagicMock()
+
+    with (
+        patch("godot_ai.transport.tunnel.time.sleep"),
+        patch("godot_ai.transport.tunnel.urllib.request.urlopen", side_effect=fake_urlopen),
+    ):
+        _start_keepalive_worker("https://mcp.example.com", Process(), interval=0)
+        assert completed.wait(1), "keepalive should request the status endpoint"
+
+    request, timeout = calls[0]
+    assert request.full_url == "https://mcp.example.com/api/v1/status"
+    assert request.get_header("Authorization") == "Bearer expected-token"
+    assert timeout == 8
 
 
 @pytest.mark.parametrize(

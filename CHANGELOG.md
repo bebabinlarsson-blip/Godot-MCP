@@ -14,7 +14,7 @@ Fixes the advertised and enforced Godot minimum version, adds named Cloudflare s
 - **Godot compatibility:** the plugin now consistently requires Godot 4.7+, matching the backend and the existing 4.5/4.6 refusal checks.
 - **Tunnel startup:** silent or stalled tunnel processes now time out instead of blocking startup forever.
 - **Tunnel provider dispatch:** ngrok now reads the endpoint matching the requested local port from the current Agent API; an unavailable or unknown provider reports an error instead of silently selecting localhost.run. `manual` no longer binds the server to every interface.
-- **Public endpoint protection:** every automated public provider checks that the local server rejects requests without the configured Bearer token and accepts that token before starting.
+- **Public endpoint protection:** every automated public provider checks that `/api/v1/status` rejects requests without the configured Bearer token and accepts it before starting; keepalive uses the same authenticated route.
 - **Tunnel URL claims:** anonymous tunnel URLs are documented as temporary and may change on reconnect.
 - **Repository metadata:** package links, plugin author fields, version badges, and the release archive name now point to this repository and v5.0.34.
 - **Update polling:** v5 packages no longer contact or offer releases from the v4-only upstream signed updater; v5 updates use this repository's release archive.

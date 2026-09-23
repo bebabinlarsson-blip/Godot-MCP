@@ -132,9 +132,9 @@ def _ssh_keepalive_opts(null_dev: str) -> list[str]:
 def _start_keepalive_worker(
     public_url: str, proc: subprocess.Popen, interval: float = 25.0
 ) -> None:
-    """Send periodic lightweight HTTP pings through the tunnel to prevent idle timeouts."""
+    """Send periodic authenticated status checks through the tunnel."""
     def _worker():
-        health_url = f"{public_url}/health"
+        status_url = f"{public_url}/api/v1/status"
         while proc.poll() is None:
             time.sleep(interval)
             if proc.poll() is not None:
@@ -145,7 +145,7 @@ def _start_keepalive_worker(
                 if auth_token:
                     headers["Authorization"] = f"Bearer {auth_token}"
                 req = urllib.request.Request(
-                    health_url,
+                    status_url,
                     headers=headers,
                 )
                 with urllib.request.urlopen(req, timeout=8) as _:
@@ -297,13 +297,13 @@ def _verify_local_auth(port: int, token: str) -> None:
             "Set GODOT_AI_AUTH_TOKEN before exposing a public tunnel."
         )
 
-    health_url = f"http://127.0.0.1:{port}/health"
+    status_url = f"http://127.0.0.1:{port}/api/v1/status"
     try:
-        response = urllib.request.urlopen(health_url, timeout=3)
+        response = urllib.request.urlopen(status_url, timeout=3)
     except HTTPError as exc:
         if exc.code != 401:
             raise RuntimeError(
-                f"Local MCP health check returned HTTP {exc.code}; expected 401 without a token."
+                f"Local MCP status check returned HTTP {exc.code}; expected 401 without a token."
             ) from None
         exc.close()
     except URLError as exc:
@@ -314,19 +314,19 @@ def _verify_local_auth(port: int, token: str) -> None:
     else:
         response.close()
         raise RuntimeError(
-            "The local MCP server did not require authentication; set GODOT_AI_AUTH_TOKEN "
+            "The local MCP status endpoint did not require authentication; set GODOT_AI_AUTH_TOKEN "
             "before exposing a public tunnel."
         )
 
     request = urllib.request.Request(
-        health_url,
+        status_url,
         headers={"Authorization": f"Bearer {token}"},
     )
     try:
         with urllib.request.urlopen(request, timeout=3) as response:
             if response.status != 200:
                 raise RuntimeError(
-                    "Local MCP health check returned HTTP "
+                    "Local MCP status check returned HTTP "
                     f"{response.status} with the configured token."
                 )
     except HTTPError as exc:

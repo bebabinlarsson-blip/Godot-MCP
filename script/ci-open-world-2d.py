@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import secrets
 import shutil
 import subprocess
 import sys
@@ -33,33 +34,38 @@ def _run(command: list[str], env: dict[str, str], timeout: int, label: str) -> s
     return output
 
 
-def _request_json(url: str, http_capability: str) -> dict:
-    request = urllib.request.Request(
-        url,
-        headers={"Authorization": f"Bearer {http_capability}"},
-    )
+def _request_json(url: str, auth_token: str | None = None) -> dict:
+    headers = {"Authorization": f"Bearer {auth_token}"} if auth_token else {}
+    request = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(request, timeout=1) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
-def _wait_for_http_server(capability_file: Path, timeout: float) -> str | None:
-    """Wait for the backend and authenticate with its private HTTP capability."""
+def _wait_for_http_server(auth_token: str, timeout: float) -> bool:
+    """Wait for the backend and prove its status route enforces Bearer auth."""
+    status_url = "http://127.0.0.1:8000/api/v1/status"
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
+        anonymous_rejected = False
         try:
-            record = json.loads(capability_file.read_text(encoding="utf-8"))
-            http_capability = record.get("http")
-            if not isinstance(http_capability, str) or not http_capability:
-                raise ValueError("capability record has no HTTP capability")
-            status = _request_json("http://127.0.0.1:8000/api/v1/status", http_capability)
-            if status.get("status") == "online":
-                return http_capability
+            _request_json(status_url)
+        except urllib.error.HTTPError as exc:
+            anonymous_rejected = exc.code == 401
+            exc.close()
         except (OSError, urllib.error.URLError, ValueError, json.JSONDecodeError):
-            time.sleep(0.25)
-    return None
+            pass
+        if anonymous_rejected:
+            try:
+                status = _request_json(status_url, auth_token)
+                if status.get("status") == "online":
+                    return True
+            except (OSError, urllib.error.URLError, ValueError, json.JSONDecodeError):
+                pass
+        time.sleep(0.25)
+    return False
 
 
-def _wait_for_core_tools(http_capability: str, timeout: float) -> list[str] | None:
+def _wait_for_core_tools(auth_token: str, timeout: float) -> list[str] | None:
     """Wait until the HTTP gateway advertises every always-on core tool."""
     required = {
         "session_activate",
@@ -70,7 +76,7 @@ def _wait_for_core_tools(http_capability: str, timeout: float) -> list[str] | No
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
-            payload = _request_json("http://127.0.0.1:8000/api/v1/tools", http_capability)
+            payload = _request_json("http://127.0.0.1:8000/api/v1/tools", auth_token)
             names = [tool.get("name") for tool in payload.get("tools", [])]
             if required.issubset(names):
                 return names
@@ -123,21 +129,17 @@ def main() -> int:
         capability_dir = Path(temp) / "capabilities"
         if os.name == "nt":
             env["LOCALAPPDATA"] = str(Path(temp) / "local-app-data")
-            capability_file = (
-                Path(env["LOCALAPPDATA"]) / "godot-ai" / "capabilities" / "http-8000.json"
-            )
         else:
             env["GODOT_AI_CAPABILITY_DIR"] = str(capability_dir)
-            capability_file = capability_dir / "http-8000.json"
         env.update(
             {
                 "GODOT_AI_ALLOW_HEADLESS": "1",
                 "GODOT_AI_DISABLE_TELEMETRY": "true",
                 "GODOT_AI_MODE": "dev",
                 "GODOT_AI_VENV_PYTHON": sys.executable,
+                "GODOT_AI_AUTH_TOKEN": secrets.token_urlsafe(32),
             }
         )
-        env.pop("GODOT_AI_AUTH_TOKEN", None)
         editor_log = Path(temp) / "editor.log"
         game_log = Path(temp) / "game.log"
         editor_stdout_log = Path(temp) / "editor-stdout.log"
@@ -156,15 +158,15 @@ def main() -> int:
             stdout=editor_stdout,
             stderr=subprocess.STDOUT,
         )
-        http_capability = _wait_for_http_server(capability_file, 30)
-        if http_capability is None:
+        auth_token = env["GODOT_AI_AUTH_TOKEN"]
+        if not _wait_for_http_server(auth_token, 30):
             _stop_editor(editor, editor_stdout)
             output = _editor_output(editor_stdout_log, editor_log)
             raise RuntimeError(
                 "Godot Core did not start its authenticated local MCP status endpoint:\n"
                 + output[-12000:]
             )
-        available_tools = _wait_for_core_tools(http_capability, 30)
+        available_tools = _wait_for_core_tools(auth_token, 30)
         if available_tools is None:
             _stop_editor(editor, editor_stdout)
             output = _editor_output(editor_stdout_log, editor_log)
