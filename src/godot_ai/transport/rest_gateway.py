@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 from typing import Any
@@ -54,6 +55,105 @@ def _parse_query_args(request: Request) -> dict[str, Any]:
     return args
 
 
+def _json_safe(value: Any) -> Any:
+    """Convert MCP/Pydantic values into ordinary JSON values."""
+    model_dump = getattr(value, "model_dump", None)
+    if callable(model_dump):
+        return _json_safe(model_dump(mode="json", by_alias=True, exclude_none=True))
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, bytes):
+        return base64.b64encode(value).decode("ascii")
+    return value
+
+
+def _serialize_tool_result(result: Any) -> Any:
+    """Preserve MCP result blocks, including images, across the JSON gateway."""
+    if not hasattr(result, "content"):
+        return _json_safe(result)
+
+    content = []
+    for block in result.content:
+        serialized = _json_safe(block)
+        if isinstance(serialized, dict):
+            content.append(serialized)
+            continue
+
+        block_type = getattr(block, "type", "")
+        if block_type == "text" or hasattr(block, "text"):
+            content.append({"type": "text", "text": str(getattr(block, "text", ""))})
+        elif block_type == "image" or hasattr(block, "data"):
+            image_data = getattr(block, "data", b"")
+            encoded = (
+                image_data
+                if isinstance(image_data, str)
+                else base64.b64encode(image_data).decode("ascii")
+            )
+            mime_type = getattr(block, "mimeType", None) or getattr(block, "mime_type", None)
+            image_format = getattr(block, "format", None)
+            if not mime_type and image_format:
+                mime_type = image_format if "/" in image_format else f"image/{image_format}"
+            content.append(
+                {
+                    "type": "image",
+                    "data": encoded,
+                    **({"mimeType": mime_type} if mime_type else {}),
+                }
+            )
+        else:
+            content.append({"type": str(block_type or "text"), "text": str(block)})
+
+    serialized_result: dict[str, Any] = {
+        "content": content,
+        "isError": bool(
+            getattr(result, "isError", getattr(result, "is_error", False))
+        ),
+    }
+    structured_content = getattr(
+        result, "structuredContent", getattr(result, "structured_content", None)
+    )
+    if structured_content is not None:
+        serialized_result["structuredContent"] = _json_safe(structured_content)
+    return serialized_result
+
+
+def _tool_result_error(result: Any) -> str:
+    if isinstance(result, dict):
+        for block in result.get("content", []):
+            if isinstance(block, dict) and block.get("type") == "text":
+                return str(block.get("text", "Tool call failed"))
+    return "Tool call failed"
+
+
+def _rest_tool_fields(result: Any) -> dict[str, Any]:
+    """Add lossless MCP content while keeping the REST ``result`` shape stable."""
+    serialized = _serialize_tool_result(result)
+    fields: dict[str, Any] = {
+        "success": not (
+            isinstance(serialized, dict) and serialized.get("isError", False)
+        )
+    }
+    if isinstance(serialized, dict) and "content" in serialized:
+        blocks = serialized["content"]
+        fields["result"] = [
+            block["text"]
+            for block in blocks
+            if isinstance(block, dict) and block.get("type") == "text"
+        ]
+        fields["content"] = blocks
+        if "structuredContent" in serialized:
+            fields["structuredContent"] = serialized["structuredContent"]
+        if serialized.get("isError"):
+            fields["isError"] = True
+    else:
+        fields["result"] = serialized
+    if not fields["success"]:
+        fields["error"] = _tool_result_error(serialized)
+    return fields
+
+
 def register_rest_gateway(
     mcp: FastMCP,
     *,
@@ -74,6 +174,42 @@ def register_rest_gateway(
         base_url = public_url or str(request.base_url).rstrip("/")
         accept = request.headers.get("accept", "").lower()
         path = request.url.path
+
+        work_mode_snippet = (
+            "import base64, json, urllib.request\n\n"
+            f'BASE = "{base_url}"\n'
+            'AUTH_TOKEN = ""  # Paste your --auth-token value here if enabled\n\n'
+            "def _display_images(response):\n"
+            '    blocks = response.get("content", [])\n'
+            '    images = [block for block in blocks if block.get("type") == "image"]\n'
+            "    if not images:\n"
+            "        return\n"
+            "    try:\n"
+            "        from IPython.display import Image, display\n"
+            "    except ImportError:\n"
+            "        return  # Image data remains available as base64 in the response\n"
+            "    for block in images:\n"
+            '        display(Image(data=base64.b64decode(block["data"])))\n'
+            '        block["data"] = "[image displayed in this cell]"\n\n'
+            "def godot(tool: str, **kwargs):\n"
+            '    payload = json.dumps({"tool": tool, "arguments": kwargs}).encode()\n'
+            '    headers = {"Content-Type": "application/json"}\n'
+            "    if AUTH_TOKEN:\n"
+            '        headers["Authorization"] = f"Bearer {AUTH_TOKEN}"\n'
+            '    req = urllib.request.Request(\n'
+            '        f"{BASE}/api/v1/call", data=payload, headers=headers\n'
+            "    )\n"
+            "    with urllib.request.urlopen(req) as resp:\n"
+            "        result = json.loads(resp.read().decode())\n"
+            '    if not result.get("success", False):\n'
+            '        raise RuntimeError(result.get("error", "Godot tool call failed"))\n'
+            "    _display_images(result)\n"
+            "    return result\n\n"
+            'print(godot("editor_state"))\n'
+            'print(godot("filesystem_manage", op="read_text", path="res://project.godot"))\n'
+            '# Captures and displays the editor image in Work Mode\n'
+            '# godot("editor_screenshot")\n'
+        )
 
         if (
             "application/json" in accept
@@ -122,15 +258,7 @@ def register_rest_gateway(
             f"- Run Project:      {base_url}/api/v1/call?tool=project_run&op=run\n\n"
             "## 4. ChatGPT Python Snippet\n"
             "```python\n"
-            "import urllib.request, json\n\n"
-            f"BASE = \"{base_url}\"\n\n"
-            "def godot(tool: str, **kwargs):\n"
-            "    payload = json.dumps({\"tool\": tool, \"arguments\": kwargs}).encode()\n"
-            "    req = urllib.request.Request(f\"{BASE}/api/v1/call\", data=payload, headers={\"Content-Type\": \"application/json\"})\n"
-            "    with urllib.request.urlopen(req) as resp:\n"
-            "        return json.loads(resp.read().decode())\n\n"
-            "print(godot(\"editor_state\"))\n"
-            "print(godot(\"filesystem_manage\", op=\"read_text\", path=\"res://project.godot\"))\n"
+            f"{work_mode_snippet}"
             "```\n"
         )
 
@@ -235,19 +363,7 @@ def register_rest_gateway(
             '<div class="card">\n'
             "  <h2>ChatGPT Python / Code Interpreter Snippet</h2>\n"
             "  <p>If running in ChatGPT Python mode (Work Mode), run:</p>\n"
-            '<pre><code class="language-python">'
-            "import urllib.request, json\n\n"
-            f'BASE = "{base_url}"\n\n'
-            "def godot(tool: str, **kwargs):\n"
-            '    payload = json.dumps({"tool": tool, "arguments": kwargs}).encode()\n'
-            '    req = urllib.request.Request(f"{BASE}/api/v1/call", data=payload, '
-            'headers={"Content-Type": "application/json"})\n'
-            "    with urllib.request.urlopen(req) as resp:\n"
-            "        return json.loads(resp.read().decode())\n\n"
-            '# Check editor state\nprint(godot("editor_state"))\n'
-            '# Read file\nprint(godot("filesystem_manage", op="read_text", path="res://project.godot"))\n'
-            '# Get scene hierarchy\nprint(godot("scene_get_hierarchy"))\n'
-            "</code></pre>\n"
+            f'<pre><code class="language-python">{work_mode_snippet}</code></pre>\n'
             "</div>\n"
             "</body>\n"
             "</html>"
@@ -340,21 +456,11 @@ def register_rest_gateway(
                 arguments = params.get("arguments") or {}
                 try:
                     result = await mcp.call_tool(tool_name, arguments=arguments)
-                    text_result = ""
-                    if hasattr(result, "content"):
-                        text_result = "\n".join(getattr(c, "text", str(c)) for c in result.content)
-                    elif isinstance(result, (dict, list)):
-                        text_result = json.dumps(result)
-                    else:
-                        text_result = str(result)
                     return JSONResponse(
                         {
                             "jsonrpc": "2.0",
                             "id": req_id,
-                            "result": {
-                                "content": [{"type": "text", "text": text_result}],
-                                "isError": False,
-                            },
+                            "result": _serialize_tool_result(result),
                         }
                     )
                 except Exception as exc:
@@ -387,10 +493,7 @@ def register_rest_gateway(
             arguments = body.get("arguments") or {}
             try:
                 result = await mcp.call_tool(tool_name, arguments=arguments)
-                data: Any = result
-                if hasattr(result, "content"):
-                    data = [getattr(c, "text", str(c)) for c in result.content]
-                return JSONResponse({"success": True, "tool": tool_name, "result": data})
+                return JSONResponse({"tool": tool_name, **_rest_tool_fields(result)})
             except Exception as exc:
                 return JSONResponse(
                     {"success": False, "tool": tool_name, "error": str(exc)},
@@ -448,10 +551,7 @@ def register_rest_gateway(
 
         try:
             result = await mcp.call_tool(tool_name, arguments=arguments)
-            data: Any = result
-            if hasattr(result, "content"):
-                data = [getattr(c, "text", str(c)) for c in result.content]
-            return JSONResponse({"success": True, "tool": tool_name, "result": data})
+            return JSONResponse({"tool": tool_name, **_rest_tool_fields(result)})
         except Exception as exc:
             return JSONResponse(
                 {"success": False, "tool": tool_name, "error": str(exc)},
@@ -492,15 +592,11 @@ def register_rest_gateway(
 
         try:
             result = await mcp.call_tool(tool_name, arguments=arguments)
-            data: Any = result
-            if hasattr(result, "content"):
-                data = [getattr(c, "text", str(c)) for c in result.content]
             return JSONResponse(
                 {
-                    "success": True,
                     "tool": tool_name,
                     "arguments": arguments,
-                    "result": data,
+                    **_rest_tool_fields(result),
                 }
             )
         except Exception as exc:
@@ -582,10 +678,14 @@ def register_rest_gateway(
                 "filesystem_manage",
                 arguments={"op": "list", "path": path, "recursive": True},
             )
-            data: Any = res
-            if hasattr(res, "content"):
-                data = [getattr(c, "text", str(c)) for c in res.content]
-            return JSONResponse({"success": True, "path": path, "tree": data})
+            tool_fields = _rest_tool_fields(res)
+            return JSONResponse(
+                {
+                    "path": path,
+                    "tree": tool_fields.pop("result"),
+                    **tool_fields,
+                }
+            )
         except Exception as exc:
             return JSONResponse(
                 {"success": False, "path": path, "error": str(exc)},

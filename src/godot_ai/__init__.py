@@ -171,6 +171,31 @@ def _wait_for_port_seconds() -> float:
         return 0.0
 
 
+def _add_tunnel_argument(parser: argparse.ArgumentParser) -> None:
+    """Add the legacy server-mode tunnel option with the shared provider default."""
+    from godot_ai.transport.tunnel import DEFAULT_TUNNEL_PROVIDER
+
+    parser.add_argument(
+        "--tunnel",
+        nargs="?",
+        const=DEFAULT_TUNNEL_PROVIDER,
+        choices=[
+            "cloudflare",
+            "serveo",
+            "ngrok",
+            "ssh",
+            "pinggy",
+            "localhost.run",
+            "manual",
+        ],
+        default=None,
+        help=(
+            "Start automated public HTTPS tunnel for remote cloud access "
+            f"(default: {DEFAULT_TUNNEL_PROVIDER})."
+        ),
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     from godot_ai.runtime_dependencies import verify_runtime_dependencies
 
@@ -183,7 +208,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         return
 
     if effective_argv[:1] == ["tunnel"]:
-        from godot_ai.transport.tunnel import run_tunnel_forever
+        from godot_ai.transport.tunnel import DEFAULT_TUNNEL_PROVIDER, run_tunnel_forever
 
         tunnel_parser = argparse.ArgumentParser(
             prog="godot-ai tunnel",
@@ -198,8 +223,11 @@ def main(argv: Sequence[str] | None = None) -> None:
         tunnel_parser.add_argument(
             "--provider",
             choices=["localhost.run", "serveo", "cloudflare", "ssh", "pinggy"],
-            default="localhost.run",
-            help="Tunnel provider (default: localhost.run for permanent non-expiring connection without 15m limit)",
+            default=DEFAULT_TUNNEL_PROVIDER,
+            help=(
+                f"Tunnel provider (default: {DEFAULT_TUNNEL_PROVIDER} for permanent "
+                "non-expiring connection without 15m limit)"
+            ),
         )
         t_args = tunnel_parser.parse_args(effective_argv[1:])
 
@@ -213,6 +241,8 @@ def main(argv: Sequence[str] | None = None) -> None:
 
         run_tunnel_forever(t_args.port, t_args.provider, on_connect=_on_connect)
         return
+
+    from godot_ai.transport.tunnel import DEFAULT_TUNNEL_PROVIDER
 
     parser = argparse.ArgumentParser(
         description="Godot AI server",
@@ -304,14 +334,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             "a client's hard tool-count cap (Antigravity limits to 100)."
         ),
     )
-    parser.add_argument(
-        "--tunnel",
-        nargs="?",
-        const="cloudflare",
-        choices=["cloudflare", "serveo", "ngrok", "ssh", "pinggy", "localhost.run", "manual"],
-        default=None,
-        help="Start automated public HTTPS tunnel for remote cloud access (default: cloudflare).",
-    )
+    _add_tunnel_argument(parser)
     parser.add_argument(
         "--auth-token",
         default=None,
@@ -359,7 +382,11 @@ def main(argv: Sequence[str] | None = None) -> None:
                 print("Share this link with ChatGPT Web / Work Mode / Code Interpreter", flush=True)
                 print("==================================================================", flush=True)
 
-            run_tunnel_forever(args.port, args.tunnel or "cloudflare", on_connect=_on_connect)
+            run_tunnel_forever(
+                args.port,
+                args.tunnel or DEFAULT_TUNNEL_PROVIDER,
+                on_connect=_on_connect,
+            )
             return
 
     from godot_ai.tools.domains import parse_exclude_list
@@ -525,7 +552,7 @@ def _serve(
 
         tunnel_thread = threading.Thread(
             target=run_tunnel_forever,
-            args=(args.port, args.tunnel or "cloudflare"),
+            args=(args.port, args.tunnel or DEFAULT_TUNNEL_PROVIDER),
             kwargs={"on_connect": _on_connect},
             daemon=True,
         )

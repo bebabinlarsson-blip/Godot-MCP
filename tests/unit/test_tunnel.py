@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import argparse
 import re
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from godot_ai import _add_tunnel_argument
 from godot_ai.transport.tunnel import (
+    DEFAULT_TUNNEL_PROVIDER,
     _CF_URL_REGEX,
     _SSH_URL_REGEX,
     find_tunnel_binary,
@@ -15,6 +18,15 @@ from godot_ai.transport.tunnel import (
     start_cloudflare_quick_tunnel,
     start_ssh_tunnel,
 )
+
+
+def test_legacy_tunnel_flag_uses_shared_provider_default():
+    parser = argparse.ArgumentParser()
+    _add_tunnel_argument(parser)
+
+    assert DEFAULT_TUNNEL_PROVIDER == "localhost.run"
+    assert parser.parse_args(["--tunnel"]).tunnel == DEFAULT_TUNNEL_PROVIDER
+    assert parser.parse_args(["--tunnel", "cloudflare"]).tunnel == "cloudflare"
 
 
 def test_ssh_url_regex_matches():

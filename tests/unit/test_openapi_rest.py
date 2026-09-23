@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import base64
+from types import SimpleNamespace
+
 import pytest
 from starlette.testclient import TestClient
 
@@ -43,6 +46,14 @@ def test_rest_gateway_endpoints(server_instance):
     assert res_root.status_code == 200
     assert "Godot AI Remote Engine Bridge" in res_root.text
     assert "Instructions for ChatGPT" in res_root.text
+    assert 'AUTH_TOKEN = ""' in res_root.text
+    assert 'headers["Authorization"] = f"Bearer {AUTH_TOKEN}"' in res_root.text
+    assert "display(Image(data=base64.b64decode" in res_root.text
+    code_start = res_root.text.index('<pre><code class="language-python">') + len(
+        '<pre><code class="language-python">'
+    )
+    code_end = res_root.text.index("</code></pre>", code_start)
+    compile(res_root.text[code_start:code_end], "<work-mode-example>", "exec")
 
     # Landing page JSON format
     from godot_ai import __version__
@@ -131,6 +142,92 @@ def test_rest_gateway_endpoints(server_instance):
     )
     assert res_tools_rpc.status_code == 200
     assert len(res_tools_rpc.json()["result"]["tools"]) == 100
+
+
+def test_rest_gateway_preserves_mcp_image_results(server_instance, monkeypatch):
+    image_bytes = b"fake-png-image-bytes"
+    mcp_result = SimpleNamespace(
+        content=[
+            SimpleNamespace(type="text", text='{"source":"viewport"}'),
+            SimpleNamespace(type="image", data=image_bytes, mimeType="image/png"),
+        ],
+        isError=False,
+        structuredContent={"source": "viewport"},
+    )
+
+    async def fake_call_tool(name, *, arguments):
+        assert name == "editor_screenshot"
+        assert arguments == {}
+        return mcp_result
+
+    monkeypatch.setattr(server_instance, "call_tool", fake_call_tool)
+    client = TestClient(server_instance.http_app())
+
+    response = client.post(
+        "/api/v1/call",
+        json={"tool": "editor_screenshot", "arguments": {}},
+    )
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["result"] == ['{"source":"viewport"}']
+    assert result["content"][0] == {
+        "type": "text",
+        "text": '{"source":"viewport"}',
+    }
+    assert result["content"][1] == {
+        "type": "image",
+        "data": base64.b64encode(image_bytes).decode("ascii"),
+        "mimeType": "image/png",
+    }
+    assert result["structuredContent"] == {"source": "viewport"}
+
+    rpc_response = client.post(
+        "/",
+        json={
+            "jsonrpc": "2.0",
+            "id": 9,
+            "method": "tools/call",
+            "params": {"name": "editor_screenshot", "arguments": {}},
+        },
+    )
+    assert rpc_response.status_code == 200
+    assert rpc_response.json()["result"]["content"] == result["content"]
+    assert rpc_response.json()["result"]["structuredContent"] == result["structuredContent"]
+
+    mcp_result.content = [
+        SimpleNamespace(type="text", text="Editor is not connected")
+    ]
+    mcp_result.isError = True
+    error_response = client.post(
+        "/api/v1/call",
+        json={"tool": "editor_screenshot", "arguments": {}},
+    )
+    assert error_response.json()["success"] is False
+    assert error_response.json()["error"] == "Editor is not connected"
+
+
+def test_work_mode_example_supports_auth_token(monkeypatch):
+    from fastmcp import FastMCP
+
+    from godot_ai.transport.rest_gateway import register_rest_gateway
+
+    monkeypatch.setenv("GODOT_AI_AUTH_TOKEN", "work-mode-secret")
+    mcp = FastMCP(name="Work Mode auth test")
+    register_rest_gateway(mcp)
+    client = TestClient(mcp.http_app())
+
+    landing = client.get("/")
+    assert 'AUTH_TOKEN = ""' in landing.text
+    assert 'headers["Authorization"] = f"Bearer {AUTH_TOKEN}"' in landing.text
+    assert client.get("/api/v1/status").status_code == 401
+    assert (
+        client.get(
+            "/api/v1/status",
+            headers={"Authorization": "Bearer work-mode-secret"},
+        ).status_code
+        == 200
+    )
 
 
 def test_remote_godot_client_headers():
