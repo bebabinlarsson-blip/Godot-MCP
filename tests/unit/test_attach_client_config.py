@@ -12,16 +12,16 @@ from godot_ai.attach.main import _parser
 
 _TOML_FIXTURE = (
     Path(__file__).resolve().parents[2]
-    / "test_project"
     / "tests"
     / "fixtures"
+    / "attach_client_config"
     / "attach_toml_samples.toml"
 )
 _JSON_FIXTURE = (
     Path(__file__).resolve().parents[2]
-    / "test_project"
     / "tests"
     / "fixtures"
+    / "attach_client_config"
     / "attach_json_sample.json"
 )
 _UVX_POLICY_AND_ENTRYPOINT = [

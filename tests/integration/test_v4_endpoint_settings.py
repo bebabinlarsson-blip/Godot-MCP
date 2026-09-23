@@ -244,7 +244,8 @@ def test_client_port_suite_restores_absent_valid_and_malformed_v4_settings(tmp_p
     project = tmp_path / "client-port-suite"
     shutil.copytree(PLUGIN_ROOT, project / "addons/godot_ai")
     shutil.copyfile(
-        PLUGIN_ROOT.parents[2] / "test_project/tests/test_clients.gd", project / "client_suite.gd",
+        PLUGIN_ROOT.parents[2] / "tests/fixtures/open_world_2d/tests/test_clients.gd",
+        project / "client_suite.gd",
     )
     (project / "project.godot").write_text(
         'config_version=5\n[autoload]\nDriver="*res://driver.gd"\n', encoding="utf-8",

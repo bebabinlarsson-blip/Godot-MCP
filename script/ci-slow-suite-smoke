@@ -21,13 +21,14 @@
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_DIR="${GODOT_AI_PROJECT_DIR:-$REPO_ROOT/test_project}"
 PYTHON_CMD="${1:-${PYTHON_CMD:-python}}"
 export PYTHON_CMD
 source "$SCRIPT_DIR/_ci_env.sh"
 source "$SCRIPT_DIR/_ci_session_guard.sh"
 
 FIXTURE_SRC="$REPO_ROOT/script/fixtures/test_mcp_slow_smoke.gd"
-FIXTURE_DST="$REPO_ROOT/test_project/tests/test_mcp_slow_smoke.gd"
+FIXTURE_DST="$PROJECT_DIR/tests/test_mcp_slow_smoke.gd"
 SUITE_NAME="mcp_slow_smoke"
 EXPECTED_TESTS=25
 
@@ -111,7 +112,7 @@ for i in $(seq 1 60); do
     <<< "$SESSIONS" 2>/dev/null || echo "0")
   if [ "$SESSION_COUNT" -gt 0 ] 2>/dev/null; then
     if ! TARGET_GODOT_SESSION=$(ci_select_godot_session \
-      "$SESSIONS" "$REPO_ROOT/test_project" "${GODOT_AI_SESSION_ID:-}"); then
+      "$SESSIONS" "$PROJECT_DIR" "${GODOT_AI_SESSION_ID:-}"); then
       exit 1
     fi
     GODOT_SESSION_BEFORE="$TARGET_GODOT_SESSION"

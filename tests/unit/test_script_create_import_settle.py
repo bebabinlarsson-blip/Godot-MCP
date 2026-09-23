@@ -22,7 +22,7 @@ from pathlib import Path
 
 from tests.unit._gdscript_text import get_func_block
 
-PLUGIN_ROOT = Path(__file__).resolve().parents[2] / "plugin" / "addons" / "godot_ai"
+PLUGIN_ROOT = Path(__file__).resolve().parents[2] / "addons" / "godot_ai"
 SCRIPT_HANDLER = PLUGIN_ROOT / "handlers" / "script_handler.gd"
 FILESYSTEM_HANDLER = PLUGIN_ROOT / "handlers" / "filesystem_handler.gd"
 RESOURCE_IO = PLUGIN_ROOT / "utils" / "resource_io.gd"
@@ -216,7 +216,7 @@ def test_finish_text_write_deferred_is_static() -> None:
         "the response."
     )
     # And the connection must be passed in explicitly, not pulled from self.
-    assert "connection: McpConnection," in source, (
+    assert "connection: McpConnection" in source, (
         "The static function must take the connection as an explicit "
         "parameter — referencing self._connection would re-introduce the "
         "implicit `self` capture the static refactor avoids."

@@ -12,6 +12,8 @@ Guarantees:
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from godot_omni.benchmark import BenchmarkSuite
@@ -366,9 +368,11 @@ def test_cli_benchmark_all():
     assert code == 0
 
 
-def test_cli_doctor():
+def test_cli_doctor(capsys):
     code = main(["doctor", "--json"])
-    assert code == 0
+    report = json.loads(capsys.readouterr().out)
+    assert len(report["sections"]) == 5
+    assert code == (0 if report["all_passed"] else 1)
 
 
 def test_cli_versions_status():

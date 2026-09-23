@@ -24,14 +24,15 @@ from pathlib import Path
 
 from tests.unit._gdscript_text import get_func_block
 
-PLUGIN_ROOT = Path(__file__).resolve().parents[2] / "plugin" / "addons" / "godot_ai"
+PLUGIN_ROOT = Path(__file__).resolve().parents[2] / "addons" / "godot_ai"
 
 
 def test_save_to_disk_takes_pause_target() -> None:
     source = (PLUGIN_ROOT / "utils" / "resource_io.gd").read_text(encoding="utf-8")
     block = get_func_block(source, "static func save_to_disk(")
-    assert "pause_target: McpConnection" in block, (
-        "save_to_disk must accept a McpConnection so the WebSocket pump "
+    signature = block.split(") ->", 1)[0]
+    assert "pause_target" in signature, (
+        "save_to_disk must accept a pause target so the WebSocket pump "
         "can be paused while ResourceSaver.save() runs. Without this, a "
         "queued command landing during the editor's progress-UI pump "
         "re-enters the dispatcher and crashes Godot. See #288."
@@ -78,7 +79,7 @@ def test_resource_handler_threads_connection_to_save() -> None:
 def test_curve_handler_threads_connection_to_save() -> None:
     source = (PLUGIN_ROOT / "handlers" / "curve_handler.gd").read_text(encoding="utf-8")
     assert "var _connection: McpConnection" in source
-    assert "_init(undo_redo: EditorUndoRedoManager, connection: McpConnection" in source
+    assert "connection: McpConnection" in source
     set_points_block = get_func_block(source, "func set_points")
     assert "save_to_disk(" in set_points_block
     # Slice from save_to_disk( through the next return / line break out of

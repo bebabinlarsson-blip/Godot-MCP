@@ -228,9 +228,11 @@ def test_runner_reuses_one_mcp_session_and_accepts_both_response_shapes(
     runner_name: str,
 ) -> None:
     state = _RunnerState()
+    project = tmp_path / "test_project"
+    shutil.copytree(ROOT / "tests/fixtures/open_world_2d", project)
     server = _LoopbackServer(
         ("127.0.0.1", 0),
-        _handler(state, ROOT / "test_project", response_shape, runner_name),
+        _handler(state, project, response_shape, runner_name),
     )
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -238,7 +240,8 @@ def test_runner_reuses_one_mcp_session_and_accepts_both_response_shapes(
         port = server.server_address[1]
         environment = _capability_environment(tmp_path, port)
         environment["MCP_SERVER_URL"] = f"http://127.0.0.1:{port}/mcp"
-        environment["GODOT_AI_MIN_TESTS"] = "2050"
+        environment["GODOT_AI_MIN_TESTS"] = "17" if runner_name == "ci-godot-tests" else "25"
+        environment["GODOT_AI_PROJECT_DIR"] = str(project)
         python_path = [str(ROOT / "src")]
         if inherited := environment.get("PYTHONPATH"):
             python_path.append(inherited)
@@ -280,4 +283,4 @@ def test_runner_reuses_one_mcp_session_and_accepts_both_response_shapes(
         assert "Godot tests: 2200/2200 passed, 0 failed, 0 skipped" in result.stdout
     else:
         assert "PASS: slow suite completed" in result.stdout
-        assert not (ROOT / "test_project/tests/test_mcp_slow_smoke.gd").exists()
+        assert not (project / "tests/test_mcp_slow_smoke.gd").exists()

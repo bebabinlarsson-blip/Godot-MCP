@@ -7,6 +7,7 @@
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_DIR="${GODOT_AI_PROJECT_DIR:-$REPO_ROOT/test_project}"
 PYTHON_CMD="${1:-${PYTHON_CMD:-python}}"
 export PYTHON_CMD
 source "$SCRIPT_DIR/_ci_env.sh"
@@ -133,7 +134,7 @@ if [ -z "$FINAL_SESSIONS" ]; then
   exit 1
 fi
 if ! PIN_SESSION=$(ci_select_godot_session \
-  "$FINAL_SESSIONS" "$REPO_ROOT/test_project" "${GODOT_AI_SESSION_ID:-}"); then
+  "$FINAL_SESSIONS" "$PROJECT_DIR" "${GODOT_AI_SESSION_ID:-}"); then
   exit 1
 fi
 
@@ -202,7 +203,7 @@ RESULT=$(curl -fsS "$SERVER_URL" -X POST "${HEADERS[@]}" \
 # Anchored to the script's own location so the gate cannot be silently
 # disabled by running from a different cwd (an empty glob would read as
 # "expect 0 suites" and pass anything).
-TESTS_DIR="$REPO_ROOT/test_project/tests"
+TESTS_DIR="${GODOT_AI_TESTS_DIR:-$PROJECT_DIR/tests}"
 EXPECTED_SUITES=$(ls "$TESTS_DIR"/test_*.gd 2>/dev/null | wc -l | tr -d ' ')
 EXPECTED_SUITE_NAMES=$(ls "$TESTS_DIR"/test_*.gd 2>/dev/null | xargs -n1 basename 2>/dev/null | sed -e 's/^test_//' -e 's/\.gd$//')
 if [ "$EXPECTED_SUITES" -eq 0 ]; then

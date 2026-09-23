@@ -25,7 +25,7 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-GDSCRIPT_TESTS = REPO_ROOT / "test_project" / "tests"
+GDSCRIPT_TESTS = REPO_ROOT / "tests" / "fixtures" / "open_world_2d" / "tests"
 
 # ``_undo_redo.undo()`` or ``_undo_redo.redo()`` as a real call — not bare
 # ``_undo_redo.undo`` (a method reference) and not the same identifier appearing
