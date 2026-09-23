@@ -41,6 +41,9 @@ def test_ssh_url_regex_matches():
     assert match_pnet is not None
     assert match_pnet.group(0) == "https://tfyux-109-104-14-146.free.pinggy.net"
 
+    # Should NOT match admin.localhost.run
+    assert _SSH_URL_REGEX.search("https://admin.localhost.run/") is None
+
 
 def test_cloudflare_url_regex_matches():
     cf_line = "|  https://phys-brochures-hart-indicate.trycloudflare.com  |"

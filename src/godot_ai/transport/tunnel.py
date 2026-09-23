@@ -7,14 +7,16 @@ import logging
 import re
 import shutil
 import subprocess
+import threading
 import time
+import urllib.request
 from dataclasses import dataclass
 from typing import Literal
 
 logger = logging.getLogger(__name__)
 
 TunnelProvider = Literal[
-    "cloudflare", "serveo", "ngrok", "ssh", "pinggy", "localhost.run", "manual"
+    "serveo", "cloudflare", "ngrok", "ssh", "pinggy", "localhost.run", "manual"
 ]
 
 _MAX_RECONNECT_DELAY = 30
@@ -32,7 +34,7 @@ class TunnelInfo:
 _CF_URL_REGEX = re.compile(r"https://[a-zA-Z0-9-]+\.trycloudflare\.com")
 _NGROK_URL_REGEX = re.compile(r"https://[a-zA-Z0-9-]+\.ngrok-free\.app")
 _SSH_URL_REGEX = re.compile(
-    r"https?://[a-zA-Z0-9.-]+\.(?:serveousercontent\.com|lhr\.life|localhost\.run|pinggy\.link|a\.pinggy\.link|free\.pinggy\.net|run\.pinggy-free\.link)"
+    r"https?://(?!admin\.)[a-zA-Z0-9.-]+\.(?:serveousercontent\.com|lhr\.life|localhost\.run|pinggy\.link|a\.pinggy\.link|free\.pinggy\.net|run\.pinggy-free\.link)"
 )
 
 
@@ -52,13 +54,37 @@ def _ssh_keepalive_opts(null_dev: str) -> list[str]:
     return [
         "-o", "StrictHostKeyChecking=no",
         "-o", f"UserKnownHostsFile={null_dev}",
-        "-o", "ServerAliveInterval=15",
-        "-o", "ServerAliveCountMax=4",
+        "-o", "ServerAliveInterval=10",
+        "-o", "ServerAliveCountMax=60",
         "-o", "TCPKeepAlive=yes",
         "-o", "ExitOnForwardFailure=yes",
         "-o", "ConnectTimeout=10",
         "-T",
     ]
+
+
+def _start_keepalive_worker(
+    public_url: str, proc: subprocess.Popen, interval: float = 25.0
+) -> None:
+    """Send periodic lightweight HTTP pings through the tunnel to prevent idle timeouts."""
+    def _worker():
+        health_url = f"{public_url}/health"
+        while proc.poll() is None:
+            time.sleep(interval)
+            if proc.poll() is not None:
+                break
+            try:
+                req = urllib.request.Request(
+                    health_url,
+                    headers={"User-Agent": "GodotAI-KeepAlive/1.0"},
+                )
+                with urllib.request.urlopen(req, timeout=8) as _:
+                    pass
+            except Exception:
+                pass
+
+    t = threading.Thread(target=_worker, daemon=True, name="TunnelKeepAlive")
+    t.start()
 
 
 def start_ssh_tunnel(port: int, service: str = "serveo") -> TunnelInfo:
@@ -109,6 +135,8 @@ def start_ssh_tunnel(port: int, service: str = "serveo") -> TunnelInfo:
             return start_ssh_tunnel(port, "pinggy")
         raise RuntimeError(f"Failed to obtain public URL from SSH tunnel ({service}).")
 
+    _start_keepalive_worker(public_url, proc)
+
     return TunnelInfo(
         provider=f"ssh_{service}",
         public_url=public_url,
@@ -158,6 +186,8 @@ def start_cloudflare_quick_tunnel(port: int) -> TunnelInfo:
         logger.warning("Cloudflare tunnel failed. Falling back to SSH tunnel...")
         return start_ssh_tunnel(port, "serveo")
 
+    _start_keepalive_worker(public_url, proc)
+
     return TunnelInfo(
         provider="cloudflare",
         public_url=public_url,
@@ -166,7 +196,7 @@ def start_cloudflare_quick_tunnel(port: int) -> TunnelInfo:
     )
 
 
-def _start_tunnel_for_provider(port: int, provider: str = "cloudflare") -> TunnelInfo:
+def _start_tunnel_for_provider(port: int, provider: str = "serveo") -> TunnelInfo:
     """Dispatch to the right tunnel starter."""
     if provider == "serveo":
         return start_ssh_tunnel(port, "serveo")
@@ -176,14 +206,13 @@ def _start_tunnel_for_provider(port: int, provider: str = "cloudflare") -> Tunne
         return start_ssh_tunnel(port, "localhost.run")
     if provider == "cloudflare":
         return start_cloudflare_quick_tunnel(port)
-    # Default is cloudflare; start_cloudflare_quick_tunnel automatically
-    # falls back to SSH (serveo -> localhost.run -> pinggy) if cloudflared is absent.
-    return start_cloudflare_quick_tunnel(port)
+    # Default is serveo for unblocked ChatGPT access; fallback to localhost.run -> pinggy.
+    return start_ssh_tunnel(port, "serveo")
 
 
 def run_tunnel_forever(
     port: int,
-    provider: str = "cloudflare",
+    provider: str = "serveo",
     on_connect: "callable | None" = None,
 ) -> None:
     """Start a tunnel and auto-reconnect on drops with exponential backoff.
@@ -224,7 +253,7 @@ def run_tunnel_forever(
 
 async def supervise_tunnel(
     port: int,
-    provider: TunnelProvider = "cloudflare",
+    provider: TunnelProvider = "serveo",
 ) -> TunnelInfo:
     """Async supervisor to launch and monitor cloud tunnel."""
     loop = asyncio.get_running_loop()
@@ -235,7 +264,7 @@ async def supervise_tunnel(
 
 async def supervise_tunnel_forever(
     port: int,
-    provider: TunnelProvider = "cloudflare",
+    provider: TunnelProvider = "serveo",
     on_connect: "callable | None" = None,
 ) -> None:
     """Async auto-reconnecting tunnel supervisor for co-launch mode.

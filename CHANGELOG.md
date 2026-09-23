@@ -5,6 +5,20 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.32 (2026-09-23)
+
+Serveo set as primary default tunnel provider with active HTTP keep-alive worker to eliminate Cloudflare Bot Management 403 Forbidden on ChatGPT and prevent idle timeouts.
+
+### Fixed
+
+- **Cloudflare Edge Bot Block (403 Forbidden)**:
+  - Identified and resolved the root cause of `403 Forbidden` ("Your request was blocked") when external AI agents (ChatGPT, Claude) connect to `*.trycloudflare.com`. Cloudflare Quick Tunnels enforce global Bot Management rules at their edge that block AI crawlers, datacenter IPs, and MCP clients before reaching the local server.
+  - Set **Serveo** (`serveousercontent.com`) as the primary default tunnel provider for `godot-ai tunnel` and `start_tunnel`. Serveo does not block ChatGPT, OpenAI, or Claude.
+- **Tunnel Idle Inactivity Fix (15-Minute Timeout)**:
+  - Added background daemon keep-alive worker (`_start_keepalive_worker`) in `godot_ai.transport.tunnel` that issues lightweight HTTP pings (`GET /health`) through the reverse tunnel every 25 seconds. This guarantees continuous active HTTP traffic through Serveo and NAT firewalls, keeping tunnels permanently connected as long as the terminal runs.
+  - Tightened SSH keepalive parameters: `ServerAliveInterval=10`, `ServerAliveCountMax=60`, `TCPKeepAlive=yes`.
+  - Fixed `_SSH_URL_REGEX` to exclude `admin.localhost.run` greeting banner.
+
 ## 5.0.31 (2026-09-23)
 
 Standalone GDScript parse resilience, complete explicit preload coverage across all client strategies, handlers, and testing utilities, and decoupling from Godot's un-indexed global script class cache.

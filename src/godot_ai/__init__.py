@@ -197,9 +197,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         )
         tunnel_parser.add_argument(
             "--provider",
-            choices=["cloudflare", "serveo", "ssh", "pinggy", "localhost.run"],
-            default="cloudflare",
-            help="Tunnel provider (default: cloudflare for permanent HTTPS quick tunnel)",
+            choices=["serveo", "cloudflare", "ssh", "pinggy", "localhost.run"],
+            default="serveo",
+            help="Tunnel provider (default: serveo for unblocked ChatGPT access)",
         )
         t_args = tunnel_parser.parse_args(effective_argv[1:])
 
