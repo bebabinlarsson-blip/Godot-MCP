@@ -124,24 +124,31 @@ class CapabilityAuthMiddleware(_Wrapper):
                 os.environ.get("GODOT_AI_AUTH_TOKEN", "").strip() or self._capability
             )
             values = _headers(scope, b"authorization")
-                key_headers = _headers(scope, b"x-godot-ai-key")
-                valid = False
-                if values:
-                    try:
-                        scheme, space, supplied = values[0].decode("ascii").partition(" ")
-                        if scheme.lower() == "bearer" and hmac.compare_digest(supplied.strip(), auth_token):
-                            valid = True
-                    except Exception:
-                        pass
-                if not valid and key_headers:
-                    try:
-                        if hmac.compare_digest(key_headers[0].decode("ascii").strip(), auth_token):
-                            valid = True
-                    except Exception:
-                        pass
-                if not valid:
-                    await _reject(send, "TRANSPORT_AUTH_REQUIRED")
-                    return
+            key_headers = _headers(scope, b"x-godot-ai-key")
+            valid = False
+            if len(values) == 1 and not key_headers:
+                try:
+                    scheme, space, supplied = values[0].decode("ascii").partition(" ")
+                    valid = (
+                        scheme.lower() == "bearer"
+                        and space == " "
+                        and supplied == supplied.strip()
+                        and hmac.compare_digest(supplied, auth_token)
+                    )
+                except UnicodeDecodeError:
+                    pass
+            elif len(key_headers) == 1 and not values:
+                try:
+                    supplied_key = key_headers[0].decode("ascii")
+                    valid = (
+                        supplied_key == supplied_key.strip()
+                        and hmac.compare_digest(supplied_key, auth_token)
+                    )
+                except UnicodeDecodeError:
+                    pass
+            if not valid:
+                await _reject(send, "TRANSPORT_AUTH_REQUIRED")
+                return
             await self.app(scope, receive, send)
             return
         values = _headers(scope, b"authorization")
