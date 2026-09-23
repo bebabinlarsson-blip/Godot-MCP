@@ -55,9 +55,11 @@ const DEFERRED_TIMEOUT_MS_BY_COMMAND := {
 const ErrorCodes := preload("res://addons/godot_ai/utils/error_codes.gd")
 const FuzzySuggestions := preload("res://addons/godot_ai/utils/fuzzy_suggestions.gd")
 const PluginReload := preload("res://addons/godot_ai/utils/plugin_reload.gd")
+const Connection := preload("res://addons/godot_ai/connection.gd")
+const SurfacedErrorTracker := preload("res://addons/godot_ai/utils/surfaced_error_tracker.gd")
 
 
-func _init(log_buffer: McpLogBuffer, surfaced_error_tracker = null) -> void:
+func _init(log_buffer = null, surfaced_error_tracker = null) -> void:
 	_log_buffer = log_buffer
 	_surfaced_error_tracker = surfaced_error_tracker
 
@@ -322,7 +324,7 @@ func _dispatch(cmd: Dictionary) -> Dictionary:
 	## and write tools fail with EDITOR_NOT_READY against a writable editor.
 	## See connection.gd::send_deferred_response for the deferred-response
 	## counterpart, which stamps the same field.
-	result["readiness"] = McpConnection.get_readiness()
+	result["readiness"] = Connection.get_readiness()
 	_stamp_error_watermark(result)
 
 	var elapsed_ms: float = float(Time.get_ticks_msec() - start_ticks)
@@ -498,7 +500,7 @@ func _collect_deferred_timeouts() -> Array[Dictionary]:
 		## self-heal channel symmetric across every reply shape the
 		## dispatcher emits so the server cache can't drift just because
 		## the editor happened to time out a deferred command.
-		response["readiness"] = McpConnection.get_readiness()
+		response["readiness"] = Connection.get_readiness()
 		_stamp_error_watermark(response)
 		responses.append(response)
 		if mcp_logging and _log_buffer != null:
@@ -507,7 +509,7 @@ func _collect_deferred_timeouts() -> Array[Dictionary]:
 
 
 func _stamp_error_watermark(response: Dictionary) -> void:
-	McpSurfacedErrorTracker.stamp_watermark(response, _surfaced_error_tracker)
+	SurfacedErrorTracker.stamp_watermark(response, _surfaced_error_tracker)
 
 
 static func _capture_compact_backtrace(max_frames: int = 8) -> String:

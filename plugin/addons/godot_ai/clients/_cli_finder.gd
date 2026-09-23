@@ -20,6 +20,9 @@ extends RefCounted
 ## back the same answer; that's wasted work, not corruption.
 
 
+const McpPathTemplate := preload("res://addons/godot_ai/clients/_path_template.gd")
+const McpCliExec := preload("res://addons/godot_ai/clients/_cli_exec.gd")
+
 static var _mutex: Mutex = Mutex.new()
 static var _cache: Dictionary = {}  # exe_name -> resolved path (or "")
 static var _searched: Dictionary = {}

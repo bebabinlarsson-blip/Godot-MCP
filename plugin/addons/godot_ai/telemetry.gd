@@ -26,6 +26,8 @@
 
 extends RefCounted
 
+const McpSettings := preload("res://addons/godot_ai/utils/settings.gd")
+
 ## Allowlist mirrored on the Python side in
 ## `src/godot_ai/transport/websocket.py::_PLUGIN_EVENT_NAMES`. Update
 ## both together.

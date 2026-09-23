@@ -2,6 +2,10 @@
 class_name McpYamlStrategy
 extends RefCounted
 
+const McpClient := preload("res://addons/godot_ai/clients/_base.gd")
+const McpAtomicWrite := preload("res://addons/godot_ai/clients/_atomic_write.gd")
+
+
 ## Minimal YAML upsert for Hermes Agent MCP config.
 ##
 ## Hermes reads MCP servers from ~/.hermes/config.yaml under the

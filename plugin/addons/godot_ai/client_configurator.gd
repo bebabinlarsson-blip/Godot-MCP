@@ -29,6 +29,12 @@ const MutationLock := preload("res://addons/godot_ai/utils/client_mutation_lock.
 const WindowsPortReservation := preload("res://addons/godot_ai/utils/windows_port_reservation.gd")
 const PortResolver := preload("res://addons/godot_ai/utils/port_resolver.gd")
 const UvResolution := preload("res://addons/godot_ai/utils/uv_resolution_policy.gd")
+const McpSettings := preload("res://addons/godot_ai/utils/settings.gd")
+const McpAllowHosts := preload("res://addons/godot_ai/utils/allow_hosts.gd")
+const McpCliExec := preload("res://addons/godot_ai/clients/_cli_exec.gd")
+const McpPathTemplate := preload("res://addons/godot_ai/clients/_path_template.gd")
+const McpServerVersionCheck := preload("res://addons/godot_ai/utils/server_version_check.gd")
+const McpToolCatalog := preload("res://addons/godot_ai/tool_catalog.gd")
 
 const SERVER_NAME := "godot-ai"
 

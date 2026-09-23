@@ -12,6 +12,8 @@ extends RefCounted
 ## only needed when the dock refreshes client statuses or a client_*
 ## command runs, so they load lazily on first registry access.
 
+const McpClient := preload("res://addons/godot_ai/clients/_base.gd")
+
 const _CLIENT_SCRIPT_PATHS := [
 	"res://addons/godot_ai/clients/claude_code.gd",
 	"res://addons/godot_ai/clients/claude_desktop.gd",

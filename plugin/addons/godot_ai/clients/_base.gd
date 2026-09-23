@@ -2,6 +2,13 @@
 class_name McpClient
 extends RefCounted
 
+const McpPathTemplate := preload("res://addons/godot_ai/clients/_path_template.gd")
+const McpCliFinder := preload("res://addons/godot_ai/clients/_cli_finder.gd")
+const RESTART_TO_FINISH_UPDATE := (
+	"Godot AI was updated in this editor session. Restart the editor to finish the update."
+)
+
+
 ## Descriptor for one MCP client (Cursor, Claude Desktop, Codex, ...).
 ##
 ## Subclasses set fields in `_init()` and MUST NOT carry Callables — strategies
@@ -315,7 +322,7 @@ func _resolve_config_path_details() -> Dictionary:
 	var template: Variant = get("path_template")
 	var file_env: Variant = get("config_file_env")
 	if not (candidates is Dictionary) or not (template is Dictionary) or not (file_env is String):
-		return {"path": "", "error": McpClientRegistry.RESTART_TO_FINISH_UPDATE}
+		return {"path": "", "error": RESTART_TO_FINISH_UPDATE}
 	var file_override := config_file_override_details()
 	if not str(file_override.get("path", "")).is_empty() or not str(file_override.get("error", "")).is_empty():
 		_clear_config_path_warning()

@@ -6,6 +6,9 @@ extends RefCounted
 ## on McpTestSuite instances, runs them, and collects structured results.
 
 const ScriptErrorCapture := preload("res://addons/godot_ai/testing/script_error_capture.gd")
+const McpTestSuite := preload("res://addons/godot_ai/testing/test_suite.gd")
+const McpLogBuffer := preload("res://addons/godot_ai/utils/log_buffer.gd")
+const McpConnection := preload("res://addons/godot_ai/connection.gd")
 
 var _results: Array[Dictionary] = []
 var _last_run_ms: int = 0

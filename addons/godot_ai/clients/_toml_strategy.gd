@@ -2,6 +2,10 @@
 class_name McpTomlStrategy
 extends RefCounted
 
+const McpClient := preload("res://addons/godot_ai/clients/_base.gd")
+const McpAtomicWrite := preload("res://addons/godot_ai/clients/_atomic_write.gd")
+
+
 ## TOML upsert for URL entries and client-owned command entries.
 ##
 ## This remains deliberately smaller than a general TOML parser, but the

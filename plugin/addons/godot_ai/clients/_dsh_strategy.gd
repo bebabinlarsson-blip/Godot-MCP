@@ -2,6 +2,11 @@
 class_name McpDshStrategy
 extends RefCounted
 
+const McpClient := preload("res://addons/godot_ai/clients/_base.gd")
+const McpAtomicWrite := preload("res://addons/godot_ai/clients/_atomic_write.gd")
+const McpYamlStrategy := preload("res://addons/godot_ai/clients/_yaml_strategy.gd")
+
+
 ## Configure / status / remove for DeepSeek Harness (dsh) MCP servers.
 ##
 ## DeepSeek Harness has no `mcp` CLI verb (verified against dsh

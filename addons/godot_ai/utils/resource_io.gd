@@ -3,6 +3,7 @@ class_name McpResourceIO
 extends RefCounted
 
 const ErrorCodes := preload("res://addons/godot_ai/utils/error_codes.gd")
+const PathValidator := preload("res://addons/godot_ai/utils/path_validator.gd")
 
 ## Shared helpers for "save a Resource to .tres" and the mutually-exclusive
 ## path-vs-resource_path param validation that every resource-authoring
@@ -83,9 +84,9 @@ static func save_to_disk(
 	overwrite: bool,
 	label: String,
 	extra_fields: Dictionary = {},
-	pause_target: McpConnection = null,
+	pause_target = null,
 ) -> Dictionary:
-	var path_err = McpPathValidator.path_error(resource_path, "resource_path", true)
+	var path_err = PathValidator.path_error(resource_path, "resource_path", true)
 	if path_err != null:
 		return path_err
 
@@ -149,7 +150,7 @@ static func save_to_disk(
 ## (undo/redo callables reloading-mutating-resaving an existing resource,
 ## `apply_to_node`'s inline-then-save branch). Returns the raw
 ## `ResourceSaver.save` error code.
-static func guarded_save(res: Resource, resource_path: String, pause_target: McpConnection) -> int:
+static func guarded_save(res: Resource, resource_path: String, pause_target = null) -> int:
 	var prior_uid := ResourceLoader.get_resource_uid(resource_path) if FileAccess.file_exists(resource_path) else ResourceUID.INVALID_ID
 	if pause_target != null:
 		pause_target.pause_processing = true
@@ -237,7 +238,7 @@ static func write_text_to_disk(path: String, content: String) -> Variant:
 # parameterise everything it needs explicitly — do not reference instance
 # state. Shared by create_script and write_file's fresh-`.gd` path (#714).
 static func finish_text_write_deferred(
-	connection: McpConnection,
+	connection,
 	request_id: String,
 	path: String,
 	data: Dictionary,
@@ -249,11 +250,11 @@ static func finish_text_write_deferred(
 
 
 static func _settle_text_write(
-	connection: McpConnection, request_id: String, path: String, data: Dictionary,
+	connection, request_id: String, path: String, data: Dictionary,
 ) -> void:
 	if not is_instance_valid(connection):
 		return
-	var tree := connection.get_tree()
+	var tree: SceneTree = connection.get_tree()
 	if tree == null:
 		return
 	var deadline_ms := Time.get_ticks_msec() + IMPORT_SETTLE_MAX_MSEC

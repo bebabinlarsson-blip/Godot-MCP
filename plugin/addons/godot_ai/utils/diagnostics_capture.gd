@@ -2,6 +2,9 @@
 class_name McpDiagnosticsCapture
 extends RefCounted
 
+const McpEditorLogBuffer := preload("res://addons/godot_ai/utils/editor_log_buffer.gd")
+
+
 ## Small helper for scoped validation-log capture windows. Callers snapshot a
 ## private log cursor, perform a deliberate validation action, then only report
 ## new diagnostics whose original source location is the target file.

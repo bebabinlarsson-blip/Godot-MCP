@@ -1,6 +1,7 @@
 @tool
 class_name McpGameLogBuffer
-extends McpStructuredLogRing
+extends "res://addons/godot_ai/utils/structured_log_ring.gd"
+
 
 ## Ring buffer for game-process log lines (print, push_warning, push_error)
 ## ferried back from the playing game over the EngineDebugger channel.

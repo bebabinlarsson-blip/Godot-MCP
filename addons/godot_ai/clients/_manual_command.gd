@@ -2,6 +2,14 @@
 class_name McpManualCommand
 extends RefCounted
 
+const McpClient := preload("res://addons/godot_ai/clients/_base.gd")
+const McpJsonStrategy := preload("res://addons/godot_ai/clients/_json_strategy.gd")
+const McpTomlStrategy := preload("res://addons/godot_ai/clients/_toml_strategy.gd")
+const McpYamlStrategy := preload("res://addons/godot_ai/clients/_yaml_strategy.gd")
+const McpDshStrategy := preload("res://addons/godot_ai/clients/_dsh_strategy.gd")
+const McpCliStrategy := preload("res://addons/godot_ai/clients/_cli_strategy.gd")
+
+
 const SHELL_POSIX := "posix"
 const SHELL_POWERSHELL := "powershell"
 ## Keep this intersection deliberately small. PowerShell treats a leading `@`

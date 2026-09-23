@@ -48,6 +48,9 @@ const CliExec := preload("res://addons/godot_ai/clients/_cli_exec.gd")
 const ClientJobOwner := preload("res://addons/godot_ai/utils/client_job_owner.gd")
 const UpdateManager := preload("res://addons/godot_ai/utils/update_manager.gd")
 const WindowsPortReservation := preload("res://addons/godot_ai/utils/windows_port_reservation.gd")
+const McpSettings := preload("res://addons/godot_ai/utils/settings.gd")
+const McpServerVersionCheck := preload("res://addons/godot_ai/utils/server_version_check.gd")
+const McpClientRegistry := preload("res://addons/godot_ai/clients/_registry.gd")
 const McpToolRegistry := preload("res://addons/godot_ai/custom_tools/mcp_tool_registry.gd")
 const McpServiceLocator := preload("res://addons/godot_ai/custom_tools/mcp_service_locator.gd")
 
@@ -2057,7 +2060,7 @@ func _preflight_update() -> Dictionary:
 	if status == "swapped" or status == "repair_required":
 		return {"ok": false, "error": "an earlier update is unresolved (%s)" % status, "download_root": ""}
 	var pid := OS.get_process_id()
-	var lock: Dictionary = UpdateInstaller.acquire_lock(pid, McpPortResolver.process_fingerprint(pid))
+	var lock: Dictionary = UpdateInstaller.acquire_lock(pid, PortResolver.process_fingerprint(pid))
 	if not bool(lock.get("ok", false)):
 		return {"ok": false, "error": str(lock.get("error", "")), "download_root": ""}
 	var download_root := ProjectSettings.globalize_path("user://godot_ai_update/download").trim_suffix("/")

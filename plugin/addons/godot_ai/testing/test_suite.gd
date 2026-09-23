@@ -2,6 +2,9 @@
 class_name McpTestSuite
 extends RefCounted
 
+const McpScenePath := preload("res://addons/godot_ai/utils/scene_path.gd")
+
+
 ## Base class for MCP test suites. Provides assertion methods and
 ## lifecycle hooks. Subclass this, add test_* methods, and drop the
 ## script in res://tests/.

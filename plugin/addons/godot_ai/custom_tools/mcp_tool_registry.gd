@@ -15,6 +15,10 @@ extends RefCounted
 ## = same addon (hot-reload replace); different source_path colliding on
 ## a name = reject + dock warning.
 
+const McpDispatcher := preload("res://addons/godot_ai/dispatcher.gd")
+const McpServiceLocator := preload("res://addons/godot_ai/custom_tools/mcp_service_locator.gd")
+const McpCustomToolSpec := preload("res://addons/godot_ai/custom_tools/mcp_custom_tool_spec.gd")
+
 ## singleton instance
 static var _instance: McpToolRegistry = null
 

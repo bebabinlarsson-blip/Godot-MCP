@@ -19,6 +19,7 @@ const DshStrategy := preload("res://addons/godot_ai/clients/_dsh_strategy.gd")
 const CliStrategy := preload("res://addons/godot_ai/clients/_cli_strategy.gd")
 const RefreshState := preload("res://addons/godot_ai/utils/mcp_client_refresh_state.gd")
 const MutationLock := preload("res://addons/godot_ai/utils/client_mutation_lock.gd")
+const McpErrorCodes := preload("res://addons/godot_ai/utils/error_codes.gd")
 
 const STATUS_COOLDOWN_MSEC := 15 * 1000
 const STATUS_TIMEOUT_MSEC := 30 * 1000
@@ -861,7 +862,7 @@ func _complete_mcp_status_waiters(
 		_mcp_status_waiters.erase(request_id)
 	if completed.is_empty():
 		return
-	var payload := (
+	var payload: Dictionary = (
 		McpErrorCodes.make(McpErrorCodes.INTERNAL_ERROR, error)
 		if not error.is_empty()
 		else ClientConfigurator.client_status_response(results)

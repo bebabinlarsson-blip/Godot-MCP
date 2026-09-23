@@ -31,6 +31,7 @@ const _SERVER_PROOF_DOMAIN := "godot-ai-ws-v2/server-proof"
 const _CLIENT_PROOF_DOMAIN := "godot-ai-ws-v2/client-proof"
 const ClientConfigurator := preload("res://addons/godot_ai/client_configurator.gd")
 const ErrorCodes := preload("res://addons/godot_ai/utils/error_codes.gd")
+const SurfacedErrorTracker := preload("res://addons/godot_ai/utils/surfaced_error_tracker.gd")
 
 ## Emitted whenever the authenticated v4 editor channel becomes usable/unusable.
 ## Subscribers (e.g. the plugin-side telemetry helper) use this to drain
@@ -1273,7 +1274,7 @@ static func _make_backpressure_error(
 
 
 func _stamp_error_watermark(response: Dictionary) -> void:
-	McpSurfacedErrorTracker.stamp_watermark(response, surfaced_error_tracker)
+	SurfacedErrorTracker.stamp_watermark(response, surfaced_error_tracker)
 
 
 ## Build a human-readable session ID of form "<slug>@<16hex>" from the project path.

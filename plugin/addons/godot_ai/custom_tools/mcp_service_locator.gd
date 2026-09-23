@@ -2,6 +2,9 @@
 class_name McpServiceLocator
 extends RefCounted
 
+const McpConnection := preload("res://addons/godot_ai/connection.gd")
+const McpLogBuffer := preload("res://addons/godot_ai/utils/log_buffer.gd")
+
 var _connection: McpConnection = null
 var _log_buffer: McpLogBuffer = null
 

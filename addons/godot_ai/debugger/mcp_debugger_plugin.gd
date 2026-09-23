@@ -4,6 +4,11 @@ extends EditorDebuggerPlugin
 
 const ErrorCodes := preload("res://addons/godot_ai/utils/error_codes.gd")
 const ScriptWork := preload("res://addons/godot_ai/utils/script_work.gd")
+const McpConnection := preload("res://addons/godot_ai/connection.gd")
+const McpSurfacedErrorTracker := preload("res://addons/godot_ai/utils/surfaced_error_tracker.gd")
+const McpEditorLogBuffer := preload("res://addons/godot_ai/utils/editor_log_buffer.gd")
+const McpLogBuffer := preload("res://addons/godot_ai/utils/log_buffer.gd")
+const McpGameLogBuffer := preload("res://addons/godot_ai/utils/game_log_buffer.gd")
 
 ## Editor-side half of the game-process capture bridge.
 ##

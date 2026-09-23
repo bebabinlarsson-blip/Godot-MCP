@@ -22,6 +22,10 @@ const _CONFIGURE_TIMEOUT_MS := 10000
 const _REMOVE_TIMEOUT_MS := 10000
 const _STATUS_TIMEOUT_MS := 6000
 const MutationLock := preload("res://addons/godot_ai/utils/client_mutation_lock.gd")
+const McpClient := preload("res://addons/godot_ai/clients/_base.gd")
+const McpCliExec := preload("res://addons/godot_ai/clients/_cli_exec.gd")
+const McpSettings := preload("res://addons/godot_ai/utils/settings.gd")
+const McpCliFinder := preload("res://addons/godot_ai/clients/_cli_finder.gd")
 
 
 static func configure(

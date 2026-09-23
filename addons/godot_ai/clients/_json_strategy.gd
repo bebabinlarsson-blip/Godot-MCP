@@ -2,6 +2,11 @@
 class_name McpJsonStrategy
 extends RefCounted
 
+const McpClient := preload("res://addons/godot_ai/clients/_base.gd")
+const McpAtomicWrite := preload("res://addons/godot_ai/clients/_atomic_write.gd")
+const McpPathTemplate := preload("res://addons/godot_ai/clients/_path_template.gd")
+
+
 ## Read–merge–write strategy for JSON-backed MCP clients.
 ## All knobs come from the McpClient descriptor as plain data — no Callables.
 ## See `_base.gd` for why descriptors are data-only.
@@ -101,7 +106,11 @@ static func _configure_merged(
 	# reaching this point with `project_tiers.is_empty()` means: no probed
 	# override was found.
 	var message := McpClient.configured_message(client, server_url)
-	var external_cwd := str(McpClientConfigurator._editor_setting_lookup(McpClientConfigurator.SETTING_EXTERNAL_CLIENT_CWD))
+	var external_cwd := ""
+	if Engine.is_editor_hint():
+		var es = EditorInterface.get_editor_settings() if Engine.has_singleton("EditorInterface") else null
+		if es != null and es.has_setting("plugins/godot_ai/external_client_cwd"):
+			external_cwd = str(es.get_setting("plugins/godot_ai/external_client_cwd"))
 	if external_cwd.is_empty() and project_tiers.is_empty():
 		message += " If %s is launched from a cwd this editor cannot see, the effective entry may still be in a project-tier file — set godot_ai/external_client_cwd to that cwd to verify." % client.display_name
 	return {"status": "ok", "message": message}

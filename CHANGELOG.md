@@ -5,6 +5,25 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.31 (2026-09-23)
+
+Standalone GDScript parse resilience, complete explicit preload coverage across all client strategies, handlers, and testing utilities, and decoupling from Godot's un-indexed global script class cache.
+
+### Fixed
+
+- **GDScript Standalone Parse Error Cascade Fix**:
+  - Eliminated "Preload file does not exist" errors in Godot 4 editor by adding explicit `const` preloads across all interconnected scripts, preventing chain-compilation failures when `.godot/global_script_class_cache.cfg` is not yet populated.
+  - `addons/godot_ai/plugin.gd`: Preloaded `McpSettings`, `McpServerVersionCheck`, `McpClientRegistry`, and `PortResolver`.
+  - `addons/godot_ai/clients/_registry.gd` & `_base.gd`: Explicitly preloaded base classes and decoupled circular dependencies between `_base.gd` and `client_configurator.gd` via local status codes.
+  - `addons/godot_ai/clients/*_strategy.gd`: Added missing preloads for `_base.gd`, `_cli_exec.gd`, `_atomic_write.gd`, and `_path_template.gd` in JSON, TOML, YAML, DSH, CLI, and manual command strategies.
+  - `addons/godot_ai/connection.gd` & `dispatcher.gd`: Preloaded `surfaced_error_tracker.gd` and `connection.gd`.
+  - `addons/godot_ai/debugger/mcp_debugger_plugin.gd`: Explicitly preloaded `connection.gd`, `surfaced_error_tracker.gd`, `editor_log_buffer.gd`, `game_log_buffer.gd`.
+  - `addons/godot_ai/utils/*_log_buffer.gd`: Used explicit `extends "res://addons/godot_ai/utils/structured_log_ring.gd"` instead of un-indexed `extends McpStructuredLogRing`.
+  - `addons/godot_ai/utils/resource_io.gd`: Fixed untyped `connection` calls and preloaded `path_validator.gd`.
+  - `addons/godot_ai/custom_tools/` & `testing/`: Added explicit preloads for `test_suite.gd`, `mcp_service_locator.gd`, `mcp_tool_registry.gd`, and test utilities.
+- **Project Hygiene**:
+  - Excluded `addons/` folder from git tracking and history in user project repositories (`angel`) while keeping plugin cleanly installable.
+
 ## 5.0.30 (2026-09-23)
 
 Direct remote MCP protocol support without 403 Forbidden, root JSON-RPC 2.0 initialize gateway, and automatic allow-remote server launch flag for editor plugins.

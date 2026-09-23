@@ -1,6 +1,7 @@
 @tool
 class_name McpEditorLogBuffer
-extends McpStructuredLogRing
+extends "res://addons/godot_ai/utils/structured_log_ring.gd"
+
 
 ## Ring buffer for editor-process script errors and warnings (parse errors,
 ## @tool runtime errors, EditorPlugin errors, push_error/push_warning) captured
