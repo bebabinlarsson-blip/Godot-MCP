@@ -607,7 +607,12 @@ static func auto_configure_candidates(status_results: Dictionary) -> Array[Strin
 		if not (entry is Dictionary):
 			continue
 		var details := entry as Dictionary
-		if int(details.get("status", Client.Status.ERROR)) == Client.Status.CONFIGURED:
+		var status := int(details.get("status", Client.Status.ERROR))
+		if status == Client.Status.CONFIGURED or status == Client.Status.ERROR:
+			continue
+		if status == Client.Status.CONFIGURED_MISMATCH and not bool(details.get("owned", false)):
+			continue
+		if status != Client.Status.NOT_CONFIGURED and status != Client.Status.CONFIGURED_MISMATCH:
 			continue
 		if not bool(details.get("installed", false)):
 			continue
