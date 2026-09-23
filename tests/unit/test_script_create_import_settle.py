@@ -216,7 +216,10 @@ def test_finish_text_write_deferred_is_static() -> None:
         "the response."
     )
     # And the connection must be passed in explicitly, not pulled from self.
-    assert "connection: McpConnection" in source, (
+    signature = get_func_block(
+        source, "static func finish_text_write_deferred("
+    ).split(") ->", 1)[0]
+    assert "connection" in signature and "_connection" not in signature, (
         "The static function must take the connection as an explicit "
         "parameter — referencing self._connection would re-introduce the "
         "implicit `self` capture the static refactor avoids."
