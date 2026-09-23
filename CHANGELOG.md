@@ -5,6 +5,23 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.29 (2026-09-23)
+
+Cloudflare Quick Tunnel set as primary default provider for permanent HTTPS links, automated tunnel auto-reconnect supervisor with exponential backoff and aggressive keep-alive, and Godot Asset Store release packaging cleanup.
+
+### Added
+
+- **Cloudflare Quick Tunnel Default**:
+  - `godot_ai.transport.tunnel`: Set Cloudflare Quick Tunnel as the primary default provider for `godot-ai tunnel` and `godot-ai --tunnel`. Emits persistent, stable `https://*.trycloudflare.com` links that remain live without provider session timeouts. Seamless automatic fallback to SSH tunnels (Serveo, localhost.run, Pinggy) if `cloudflared` is absent.
+- **Auto-Reconnecting Tunnel Supervisor**:
+  - `godot_ai.transport.tunnel`: Added `run_tunnel_forever()` and `supervise_tunnel_forever()` implementing automated reconnect with exponential backoff (2s up to 30s cap) and aggressive SSH keep-alive (`ServerAliveInterval=15`, `ServerAliveCountMax=4`, `TCPKeepAlive=yes`, `ExitOnForwardFailure=yes`).
+  - `godot_ai.__init__`: Integrated auto-reconnect across all tunnel execution paths (subcommand, attach to active editor server, and co-launch mode via background daemon thread).
+
+### Fixed
+
+- **Asset Store Packaging Hygiene**:
+  - `script/package_release.py`: Removed root `docs/`, root `README.md`, and root `LICENSE` from the generated release zip archive. The zip file now unpacks cleanly strictly inside `addons/` (`addons/godot_ai/` and `addons/godot_omni/`), complying with official Godot Asset Store publishing standards.
+
 ## 5.0.28 (2026-09-22)
 
 Zero-config external WAN and outside-network HTTPS tunnel access for ChatGPT, Serveo reverse tunnel integration with Let's Encrypt TLS, automatic multi-provider tunnel failover, 0.0.0.0 remote interface binding, standard llms.txt and ai.txt instructions, and tolerant filesystem operation aliases.
