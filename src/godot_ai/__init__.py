@@ -197,9 +197,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         )
         tunnel_parser.add_argument(
             "--provider",
-            choices=["serveo", "ssh", "pinggy", "localhost.run", "cloudflare"],
-            default="serveo",
-            help="Tunnel provider (default: serveo for zero-config HTTPS)",
+            choices=["cloudflare", "serveo", "ssh", "pinggy", "localhost.run"],
+            default="cloudflare",
+            help="Tunnel provider (default: cloudflare for permanent HTTPS quick tunnel)",
         )
         t_args = tunnel_parser.parse_args(effective_argv[1:])
 
@@ -306,9 +306,11 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     parser.add_argument(
         "--tunnel",
-        choices=["serveo", "cloudflare", "ngrok", "ssh", "pinggy", "localhost.run", "manual"],
+        nargs="?",
+        const="cloudflare",
+        choices=["cloudflare", "serveo", "ngrok", "ssh", "pinggy", "localhost.run", "manual"],
         default=None,
-        help="Start automated public HTTPS tunnel for remote cloud access (e.g. ChatGPT).",
+        help="Start automated public HTTPS tunnel for remote cloud access (default: cloudflare).",
     )
     parser.add_argument(
         "--auth-token",
@@ -357,7 +359,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                 print("Share this link with ChatGPT Web / Work Mode / Code Interpreter", flush=True)
                 print("==================================================================", flush=True)
 
-            run_tunnel_forever(args.port, args.tunnel, on_connect=_on_connect)
+            run_tunnel_forever(args.port, args.tunnel or "cloudflare", on_connect=_on_connect)
             return
 
     from godot_ai.tools.domains import parse_exclude_list
@@ -523,7 +525,7 @@ def _serve(
 
         tunnel_thread = threading.Thread(
             target=run_tunnel_forever,
-            args=(args.port, args.tunnel),
+            args=(args.port, args.tunnel or "cloudflare"),
             kwargs={"on_connect": _on_connect},
             daemon=True,
         )

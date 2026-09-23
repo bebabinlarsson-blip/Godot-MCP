@@ -14,7 +14,7 @@ from typing import Literal
 logger = logging.getLogger(__name__)
 
 TunnelProvider = Literal[
-    "serveo", "cloudflare", "ngrok", "ssh", "pinggy", "localhost.run", "manual"
+    "cloudflare", "serveo", "ngrok", "ssh", "pinggy", "localhost.run", "manual"
 ]
 
 _MAX_RECONNECT_DELAY = 30
@@ -36,7 +36,7 @@ _SSH_URL_REGEX = re.compile(
 )
 
 
-def find_tunnel_binary(provider: TunnelProvider = "serveo") -> str | None:
+def find_tunnel_binary(provider: TunnelProvider = "cloudflare") -> str | None:
     """Find binary executable for the requested tunnel provider."""
     if provider == "cloudflare":
         return shutil.which("cloudflared")
@@ -166,20 +166,24 @@ def start_cloudflare_quick_tunnel(port: int) -> TunnelInfo:
     )
 
 
-def _start_tunnel_for_provider(port: int, provider: str) -> TunnelInfo:
+def _start_tunnel_for_provider(port: int, provider: str = "cloudflare") -> TunnelInfo:
     """Dispatch to the right tunnel starter."""
-    if provider == "cloudflare":
-        return start_cloudflare_quick_tunnel(port)
+    if provider == "serveo":
+        return start_ssh_tunnel(port, "serveo")
     if provider == "pinggy":
         return start_ssh_tunnel(port, "pinggy")
     if provider == "localhost.run":
         return start_ssh_tunnel(port, "localhost.run")
-    return start_ssh_tunnel(port, "serveo")
+    if provider == "cloudflare":
+        return start_cloudflare_quick_tunnel(port)
+    # Default is cloudflare; start_cloudflare_quick_tunnel automatically
+    # falls back to SSH (serveo -> localhost.run -> pinggy) if cloudflared is absent.
+    return start_cloudflare_quick_tunnel(port)
 
 
 def run_tunnel_forever(
     port: int,
-    provider: str = "serveo",
+    provider: str = "cloudflare",
     on_connect: "callable | None" = None,
 ) -> None:
     """Start a tunnel and auto-reconnect on drops with exponential backoff.
@@ -220,7 +224,7 @@ def run_tunnel_forever(
 
 async def supervise_tunnel(
     port: int,
-    provider: TunnelProvider = "serveo",
+    provider: TunnelProvider = "cloudflare",
 ) -> TunnelInfo:
     """Async supervisor to launch and monitor cloud tunnel."""
     loop = asyncio.get_running_loop()
@@ -231,7 +235,7 @@ async def supervise_tunnel(
 
 async def supervise_tunnel_forever(
     port: int,
-    provider: TunnelProvider = "serveo",
+    provider: TunnelProvider = "cloudflare",
     on_connect: "callable | None" = None,
 ) -> None:
     """Async auto-reconnecting tunnel supervisor for co-launch mode.
