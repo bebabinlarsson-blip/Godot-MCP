@@ -17,10 +17,12 @@ from godot_ai.transport.security import BoundedHTTPMiddleware, CapabilityAuthMid
 CAPABILITY = "c" * 32
 
 
-def _scope(*headers: tuple[bytes, bytes], path: str = "/mcp") -> dict:
+def _scope(
+    *headers: tuple[bytes, bytes], path: str = "/mcp", method: str = "POST"
+) -> dict:
     return {
         "type": "http",
-        "method": "POST",
+        "method": method,
         "path": path,
         "headers": list(headers),
     }
@@ -45,7 +47,8 @@ def _error_code(messages: list[dict]) -> str:
 
 
 @pytest.mark.asyncio
-async def test_capability_auth_rejects_missing_wrong_and_duplicate_headers() -> None:
+async def test_capability_auth_rejects_missing_wrong_and_duplicate_headers(monkeypatch) -> None:
+    monkeypatch.delenv("GODOT_AI_AUTH_TOKEN", raising=False)
     called = False
 
     async def endpoint(_scope, _receive, _send) -> None:
@@ -69,7 +72,8 @@ async def test_capability_auth_rejects_missing_wrong_and_duplicate_headers() -> 
 
 
 @pytest.mark.asyncio
-async def test_capability_auth_passes_one_exact_bearer_value() -> None:
+async def test_capability_auth_passes_one_exact_bearer_value(monkeypatch) -> None:
+    monkeypatch.delenv("GODOT_AI_AUTH_TOKEN", raising=False)
     called = False
 
     async def endpoint(_scope, _receive, _send) -> None:
@@ -79,6 +83,69 @@ async def test_capability_auth_passes_one_exact_bearer_value() -> None:
     app = CapabilityAuthMiddleware(endpoint, CAPABILITY)
     await _call(app, _scope((b"authorization", f"bearer {CAPABILITY}".encode())))
     assert called
+
+
+@pytest.mark.asyncio
+async def test_public_auth_token_overrides_private_capability(monkeypatch) -> None:
+    public_token = "p" * 32
+    monkeypatch.setenv("GODOT_AI_AUTH_TOKEN", public_token)
+    reached: list[str] = []
+
+    async def endpoint(_scope, _receive, _send) -> None:
+        reached.append("yes")
+
+    app = CapabilityAuthMiddleware(endpoint, CAPABILITY)
+    rejected = await _call(
+        app, _scope((b"authorization", f"Bearer {CAPABILITY}".encode()))
+    )
+    assert rejected[0]["status"] == 401
+    assert _error_code(rejected) == "TRANSPORT_AUTH_REQUIRED"
+
+    accepted = await _call(
+        app, _scope((b"authorization", f"Bearer {public_token}".encode()))
+    )
+    assert not accepted
+    assert reached == ["yes"]
+
+
+@pytest.mark.asyncio
+async def test_public_auth_rejects_duplicate_or_mixed_credentials(monkeypatch) -> None:
+    public_token = "p" * 32
+    monkeypatch.setenv("GODOT_AI_AUTH_TOKEN", public_token)
+
+    async def endpoint(_scope, _receive, _send) -> None:
+        raise AssertionError("ambiguous credentials reached endpoint")
+
+    app = CapabilityAuthMiddleware(endpoint, CAPABILITY)
+    cases = (
+        _scope(
+            (b"authorization", f"Bearer {public_token}".encode()),
+            (b"authorization", f"Bearer {public_token}".encode()),
+        ),
+        _scope(
+            (b"authorization", f"Bearer {public_token}".encode()),
+            (b"x-godot-ai-key", public_token.encode()),
+        ),
+        _scope((b"x-godot-ai-key", public_token.encode()),
+               (b"x-godot-ai-key", public_token.encode())),
+    )
+    for scope in cases:
+        response = await _call(app, scope)
+        assert response[0]["status"] == 401
+        assert _error_code(response) == "TRANSPORT_AUTH_REQUIRED"
+
+
+@pytest.mark.asyncio
+async def test_cors_preflight_does_not_require_credentials() -> None:
+    reached = False
+
+    async def endpoint(_scope, _receive, _send) -> None:
+        nonlocal reached
+        reached = True
+
+    app = CapabilityAuthMiddleware(endpoint, CAPABILITY)
+    await _call(app, _scope(path="/api/v1/call", method="OPTIONS"))
+    assert reached
 
 
 @pytest.mark.asyncio

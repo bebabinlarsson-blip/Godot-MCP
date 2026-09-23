@@ -95,9 +95,13 @@ class CapabilityAuthMiddleware(_Wrapper):
             await self.app(scope, receive, send)
             return
         path = scope.get("path", "")
+        if scope.get("method") == "OPTIONS":
+            # CORS preflight carries no Authorization header. Let the CORS
+            # middleware answer it; every actual request still authenticates.
+            await self.app(scope, receive, send)
+            return
         if (
-            scope.get("method") == "OPTIONS"
-            or path in (
+            path in (
                 "",
                 "/",
                 "/index.html",
@@ -116,9 +120,10 @@ class CapabilityAuthMiddleware(_Wrapper):
             or path.startswith("/sse")
             or path.startswith("/messages")
         ):
-            auth_token = os.environ.get("GODOT_AI_AUTH_TOKEN", "").strip()
-            if auth_token:
-                values = _headers(scope, b"authorization")
+            auth_token = (
+                os.environ.get("GODOT_AI_AUTH_TOKEN", "").strip() or self._capability
+            )
+            values = _headers(scope, b"authorization")
                 key_headers = _headers(scope, b"x-godot-ai-key")
                 valid = False
                 if values:

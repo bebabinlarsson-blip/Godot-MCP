@@ -10,7 +10,7 @@ from starlette.testclient import TestClient
 
 from godot_ai.remote import RemoteGodotClient, RemoteGodotError
 from godot_ai.transport.openapi import generate_openapi_spec
-from tests.conftest import create_test_server
+from tests.conftest import TEST_HTTP_AUTH_HEADERS, create_test_server
 
 
 @pytest.fixture(scope="module")
@@ -39,7 +39,7 @@ async def test_generate_openapi_spec(server_instance):
 
 def test_rest_gateway_endpoints(server_instance):
     app = server_instance.http_app()
-    client = TestClient(app, base_url="http://127.0.0.1:8000")
+    client = TestClient(app, base_url="http://127.0.0.1:8000", headers=TEST_HTTP_AUTH_HEADERS)
 
     # Landing page HTML endpoint (for web browsing AI / humans)
     res_root = client.get("/")
@@ -115,6 +115,7 @@ def test_rest_gateway_endpoints(server_instance):
 
     # Remote external host and CORS (ChatGPT / remote machine simulation)
     remote_headers = {
+        **TEST_HTTP_AUTH_HEADERS,
         "Host": "tunnel-subdomain.serveousercontent.com",
         "Origin": "https://chatgpt.com",
     }
@@ -161,7 +162,7 @@ def test_rest_gateway_preserves_mcp_image_results(server_instance, monkeypatch):
         return mcp_result
 
     monkeypatch.setattr(server_instance, "call_tool", fake_call_tool)
-    client = TestClient(server_instance.http_app())
+    client = TestClient(server_instance.http_app(), headers=TEST_HTTP_AUTH_HEADERS)
 
     response = client.post(
         "/api/v1/call",
