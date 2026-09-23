@@ -55,6 +55,9 @@ Ops:
         Retrieve comprehensive project metadata: Godot version, project name,
         project path, display settings, rendering settings, active scenes, and
         registered autoloads.
+  * get_map(max_files=180)
+        Compact, read-only map of scenes, scripts, assets, resources, autoloads,
+        input actions and open scenes. Results are capped and mark truncation.
 """
 
 
@@ -122,11 +125,13 @@ def register_project_tools(mcp: FastMCP) -> None:
             "set_main_scene": project_handlers.project_set_main_scene,
             "apply_preset": project_handlers.project_apply_preset,
             "get_info": project_handlers.project_get_info,
+            "get_map": project_handlers.project_get_map,
         },
         read_resource_forms={
             ## stop ends a play session; not a read in the URI sense.
             "stop": None,
             "settings_get": "godot://project/settings",
             "get_info": "godot://project/info",
+            "get_map": None,
         },
     )

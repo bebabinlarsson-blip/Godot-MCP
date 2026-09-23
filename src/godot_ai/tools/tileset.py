@@ -11,6 +11,12 @@ _DESCRIPTION = """\
 TileSet management — atlas inspection tools.
 
 Ops:
+  • tileset_diagnose(tileset_path, check_collision=False, physics_layer=0, max_findings=80)
+        Read-only TileSet doctor: missing textures, atlas sizing, tiles outside
+        textures, tile pixel-size inconsistencies, and optional missing collision.
+        Collision checks are opt-in because decorative tiles need no shapes.
+        Rotated tile variants are not errors by themselves.
+
   • tileset_get_atlas_tiles(tileset_path, source_id)
         Return all occupied atlas tile positions for one source in a TileSet.
         Read-only — does not modify any resource or project file.
@@ -61,6 +67,7 @@ def register_tileset_tools(mcp: FastMCP) -> None:
         tool_name="tileset_manage",
         description=_DESCRIPTION,
         ops={
+            "tileset_diagnose": tileset_handlers.tileset_diagnose,
             "tileset_get_atlas_tiles": tileset_handlers.tileset_get_atlas_tiles,
             "tileset_get_atlas_image": tileset_handlers.tileset_get_atlas_image,
             "tileset_create_from_texture": tileset_handlers.tileset_create_from_texture,
@@ -71,6 +78,7 @@ def register_tileset_tools(mcp: FastMCP) -> None:
             "scaffold_terrain_bitmasks": tileset_handlers.tileset_scaffold_terrain_bitmasks,
         },
         read_resource_forms={
+            "tileset_diagnose": None,
             "tileset_get_atlas_tiles": None,
             "tileset_get_atlas_image": None,
         },

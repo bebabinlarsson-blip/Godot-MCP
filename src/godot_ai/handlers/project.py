@@ -108,6 +108,13 @@ async def project_get_info(
     return await runtime.send_command("project_get_info", {}, timeout=10.0)
 
 
+async def project_get_map(runtime: DirectRuntime, max_files: int = 180) -> dict:
+    """Read a bounded editor index of scenes, scripts, assets and settings."""
+    return await runtime.send_command(
+        "project_get_map", {"max_files": max_files}, timeout=10.0
+    )
+
+
 def project_info_resource_data(runtime: DirectRuntime) -> dict:
     session = runtime.get_active_session()
     if session is None:

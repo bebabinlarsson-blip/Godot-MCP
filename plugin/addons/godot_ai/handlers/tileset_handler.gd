@@ -43,6 +43,70 @@ func get_atlas_tiles(params: Dictionary) -> Dictionary:
 	return {"data": {"tiles": tiles, "count": tiles.size()}}
 
 
+## Inspect atlas geometry and optional collision coverage without changing the resource.
+## Collision is opt-in: many decorative tiles intentionally have no shape.
+func diagnose(params: Dictionary) -> Dictionary:
+	var path: String = str(params.get("tileset_path", ""))
+	if path.is_empty():
+		return ErrorCodes.make(ErrorCodes.MISSING_REQUIRED_PARAM, "tileset_path is required")
+	var path_error = McpPathValidator.loadable_error(path, "tileset_path")
+	if path_error != null:
+		return path_error
+	if not ResourceLoader.exists(path):
+		return ErrorCodes.make(ErrorCodes.RESOURCE_NOT_FOUND, "TileSet not found: %s" % path)
+	var ts := load(path) as TileSet
+	if ts == null:
+		return ErrorCodes.make(ErrorCodes.WRONG_TYPE, "Resource is not a TileSet: %s" % path)
+	var max_findings := clampi(int(params.get("max_findings", 80)), 1, 200)
+	var check_collision := bool(params.get("check_collision", false))
+	var physics_layer := int(params.get("physics_layer", 0))
+	if check_collision and (physics_layer < 0 or physics_layer >= ts.get_physics_layers_count()):
+		return ErrorCodes.make(ErrorCodes.VALUE_OUT_OF_RANGE, "physics_layer does not exist in this TileSet")
+	var findings: Array = []
+	var checked_tiles := 0
+	var truncated := false
+	for source_index in range(mini(ts.get_source_count(), 64)):
+		var source_id := ts.get_source_id(source_index)
+		var source := ts.get_source(source_id) as TileSetAtlasSource
+		if source == null:
+			continue
+		if source.texture == null:
+			findings.append({"code": "MISSING_TEXTURE", "source_id": source_id, "hint": "Assign an atlas texture."})
+			continue
+		var region := source.texture_region_size
+		if region.x <= 0 or region.y <= 0:
+			findings.append({"code": "INVALID_REGION_SIZE", "source_id": source_id, "hint": "Set a positive atlas region size."})
+			continue
+		var texture_size := source.texture.get_size()
+		var stride := region + source.separation
+		if stride.x <= 0 or stride.y <= 0:
+			findings.append({"code": "INVALID_ATLAS_SPACING", "source_id": source_id, "hint": "Check atlas separation and region size."})
+			continue
+		var available := Vector2(texture_size - source.margins * 2)
+		if available.x < region.x or available.y < region.y or fmod(available.x + source.separation.x, stride.x) != 0.0 or fmod(available.y + source.separation.y, stride.y) != 0.0:
+			findings.append({"code": "ATLAS_SIZE_MISMATCH", "source_id": source_id, "texture_size": {"x": texture_size.x, "y": texture_size.y}, "region_size": {"x": region.x, "y": region.y}, "hint": "Check texture dimensions, margins, separation and tile size."})
+		if region != ts.tile_size:
+			findings.append({"code": "REGION_DIFFERS_FROM_TILE_SIZE", "source_id": source_id, "hint": "Confirm this source intentionally uses a different pixel size."})
+		for tile_index in range(source.get_tiles_count()):
+			if checked_tiles >= 1000 or findings.size() >= max_findings:
+				truncated = true
+				break
+			var coords := source.get_tile_id(tile_index)
+			checked_tiles += 1
+			var end := source.get_tile_texture_region(coords).end
+			if end.x > texture_size.x or end.y > texture_size.y:
+				findings.append({"code": "TILE_OUTSIDE_TEXTURE", "source_id": source_id, "col": coords.x, "row": coords.y, "hint": "Adjust atlas coordinates or texture dimensions."})
+			if check_collision:
+				var tile_data := source.get_tile_data(coords, 0)
+				if tile_data != null and tile_data.get_collision_polygons_count(physics_layer) == 0:
+					findings.append({"code": "NO_COLLISION", "source_id": source_id, "col": coords.x, "row": coords.y, "hint": "Add a polygon if this tile should block movement."})
+		if truncated:
+			break
+	if ts.get_source_count() > 64:
+		truncated = true
+	return {"data": {"tileset_path": path, "source_count": ts.get_source_count(), "checked_tiles": checked_tiles, "findings": findings.slice(0, max_findings), "truncated": truncated or findings.size() > max_findings, "read_only": true}}
+
+
 ## Return the atlas texture of a TileSetAtlasSource as a Base64-encoded PNG.
 ##
 ## params:

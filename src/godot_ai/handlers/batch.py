@@ -30,3 +30,11 @@ async def batch_execute(
         {"commands": commands, "undo": undo},
         timeout=30.0,
     )
+
+
+async def preview_scene_changes(runtime: DirectRuntime, commands: list[dict]) -> dict:
+    """Preview structure edits and undo every recorded scene action."""
+    await require_writable_async(runtime)
+    return await runtime.send_command(
+        "preview_scene_changes", {"commands": commands}, timeout=30.0,
+    )

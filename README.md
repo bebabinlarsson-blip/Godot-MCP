@@ -367,6 +367,31 @@ The MCP gateway advertises its available tools at `/api/v1/tools` and exposes
 the OpenAPI document at `/openapi.json`. The editor and tunnel process must
 both remain online for those tools to be reachable.
 
+Open **Remote Setup** in the Godot MCP dock to see the local connection state,
+hostname configuration, and setup steps. Run `godot-ai tunnel doctor` to check
+the Cloudflare binary, named-tunnel token file, local bearer enforcement, and
+the authenticated public status and tool catalog. The doctor never prints
+the bearer token or Cloudflare token. Use `--local-only` when your hostname has
+not been routed yet.
+
+### Inspect before editing
+
+`project_manage(op="get_map")` provides a small, read-only index of the open
+project's scenes, scripts, assets, resources, autoloads, and input actions.
+`tileset_manage(op="tileset_diagnose", params={"tileset_path": "res://..."})`
+reports atlas and texture problems; pass `check_collision=true` to flag tiles
+without polygons on a selected physics layer. Rotated alternatives alone are
+not considered broken.
+
+`batch_execute(commands=[...], preview=true)` previews up to 30 `create_node`
+or `delete_node` edits in an open scene, shows scene nodes before and after,
+and undoes its changes. Call the same batch with `preview=false` to keep it.
+Preview does not capture screenshots or support file-writing commands.
+
+Published v5 releases attach an add-ons-only ZIP after the release workflow
+verifies its structure and loads it into a fresh Godot project. Extract the ZIP
+at the project root, then enable the plugin in Godot's Project Settings.
+
 ---
 
 ## Author and License

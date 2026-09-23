@@ -536,6 +536,7 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy("run_tests", "test", &"run_tests")
 	_dispatcher.register_lazy("get_test_results", "test", &"get_test_results")
 	_dispatcher.register_lazy("batch_execute", "batch", &"batch_execute")
+	_dispatcher.register_lazy("preview_scene_changes", "batch", &"preview_scene_changes")
 	_dispatcher.register_lazy("set_anchor_preset", "ui", &"set_anchor_preset")
 	_dispatcher.register_lazy("set_text", "ui", &"set_text")
 	_dispatcher.register_lazy("build_layout", "ui", &"build_layout")
@@ -650,6 +651,7 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy("tilemap_import_matrix", "tilemap", &"import_matrix")
 	_dispatcher.register_lazy("tilemap_scatter_props", "tilemap", &"scatter_props")
 	_dispatcher.register_lazy("tileset_get_atlas_tiles", "tileset", &"get_atlas_tiles")
+	_dispatcher.register_lazy("tileset_diagnose", "tileset", &"diagnose")
 	_dispatcher.register_lazy("tileset_get_atlas_image", "tileset", &"get_atlas_image")
 	_dispatcher.register_lazy("tileset_create_from_texture", "tileset", &"create_from_texture")
 	_dispatcher.register_lazy("tileset_create_collision_polygon", "tileset", &"create_collision_polygon")
@@ -735,6 +737,7 @@ func _continue_enter_tree_after_update_barrier() -> void:
 	_dispatcher.register_lazy("audio_bus_save_layout", "audio", &"bus_save_layout")
 
 	_dispatcher.register_lazy("project_get_info", "project", &"get_info")
+	_dispatcher.register_lazy("project_get_map", "project", &"get_project_map")
 
 	_dispatcher.register_lazy("display_set_mode", "display", &"set_mode")
 	_dispatcher.register_lazy("display_get_display_info", "display", &"get_display_info")

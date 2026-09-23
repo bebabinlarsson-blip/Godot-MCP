@@ -17,6 +17,7 @@ def register_batch_tools(mcp: FastMCP) -> None:
         ctx: Context,
         commands: Annotated[list[dict], JsonCoerced],
         undo: bool = True,
+        preview: bool = False,
         session_id: str = "",
     ) -> dict:
         """Execute a list of editor sub-commands in order, stopping on first error.
@@ -28,6 +29,10 @@ def register_batch_tools(mcp: FastMCP) -> None:
         (default), any successful sub-commands are rolled back via the scene's
         undo history if a later sub-command fails, producing atomic-on-failure
         semantics.
+
+        With `preview=True`, only create_node/delete_node commands are accepted;
+        returns the scene node list before and after, then undoes all changes.
+        To keep the proposed change, call again with preview=False.
 
         Use this to compose multi-step edits (create node + set property +
         attach script) into a single tool call. Rollback works for sub-commands
@@ -58,6 +63,8 @@ def register_batch_tools(mcp: FastMCP) -> None:
         can be undone as a whole).
         """
         runtime = DirectRuntime.from_context(ctx, session_id=session_id or None)
+        if preview:
+            return await batch_handlers.preview_scene_changes(runtime, commands)
         return await batch_handlers.batch_execute(
             runtime,
             commands=commands,

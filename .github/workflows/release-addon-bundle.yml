@@ -1,0 +1,128 @@
+name: Attach v5 add-on ZIP to release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing published v5+ release tag (for backfills)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: addon-bundle-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Validate published tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v([5-9]|[1-9][0-9]+)\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Only published v5+ semantic-version tags are supported" >&2
+            exit 1
+          fi
+          gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" \
+            --jq '.draft == false and .prerelease == false' | grep -qx true
+          echo "tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${RELEASE_TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate source and build add-ons-only archive
+        env:
+          RELEASE_TAG: ${{ steps.tag.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.tag.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor HEAD origin/main
+          python - <<'PY'
+          import os
+          import tomllib
+          from pathlib import Path
+
+          version = os.environ["RELEASE_VERSION"]
+          with Path("pyproject.toml").open("rb") as file:
+              assert tomllib.load(file)["project"]["version"] == version
+          for name in ("godot_ai", "godot_omni"):
+              assert f'version="{version}"' in Path(f"addons/{name}/plugin.cfg").read_text()
+          PY
+          python script/package_release.py --version "$RELEASE_VERSION"
+          python - <<'PY'
+          import os
+          import zipfile
+          from pathlib import Path
+
+          archive = Path(f'dist/godot-mcp-{os.environ["RELEASE_TAG"]}.zip')
+          with zipfile.ZipFile(archive) as bundle:
+              assert bundle.testzip() is None
+              files = set(bundle.namelist())
+              assert files
+              assert all(name.startswith(("addons/godot_ai/", "addons/godot_omni/")) for name in files)
+              for addon in ("godot_ai", "godot_omni"):
+                  assert all(f"addons/{addon}/{name}" in files for name in ("plugin.cfg", "LICENSE", "icon.png"))
+          PY
+
+      - uses: chickensoft-games/setup-godot@c233594225991af5aec714e52457cc76d6df8fa2 # v2
+        with:
+          version: "4.7.0"
+          use-dotnet: false
+
+      - name: Smoke test installation from the exact release ZIP
+        env:
+          RELEASE_TAG: ${{ steps.tag.outputs.tag }}
+          GODOT_AI_DISABLE_TELEMETRY: "true"
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          import zipfile
+          from pathlib import Path
+          project = Path("dist/install-smoke")
+          project.mkdir(parents=True)
+          with zipfile.ZipFile(f'dist/godot-mcp-{os.environ["RELEASE_TAG"]}.zip') as bundle:
+              bundle.extractall(project)
+          (project / "project.godot").write_text(
+              'config_version=5\n[application]\nconfig/name="Add-on install smoke"\n'
+              '[editor_plugins]\nenabled=PackedStringArray("res://addons/godot_ai/plugin.cfg", '
+              '"res://addons/godot_omni/plugin.cfg")\n', encoding="utf-8")
+          PY
+          timeout 75 godot --headless --path dist/install-smoke --editor --quit-after 90 > dist/install-smoke.log 2>&1 || result=$?
+          cat dist/install-smoke.log
+          if [[ "${result:-0}" -ne 0 && "${result:-0}" -ne 124 ]]; then exit "${result}"; fi
+          if grep -Eq 'SCRIPT ERROR|Parse Error|Failed to load script' dist/install-smoke.log; then exit 1; fi
+
+      - name: Attach archive without replacing existing assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.tag.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="dist/godot-mcp-${RELEASE_TAG}.zip"
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+             --jq '.assets[].name' | grep -Fxq "${archive##*/}"; then
+            echo "Asset already exists; refusing to replace a published archive" >&2
+            exit 1
+          fi
+          gh release upload "$RELEASE_TAG" "$archive" --repo "$GITHUB_REPOSITORY"
