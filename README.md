@@ -10,7 +10,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11%20|%203.12%20|%203.13%20|%203.14-3776AB?style=flat&logo=python&logoColor=white&labelColor=333A41)](https://www.python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat&labelColor=333A41)](LICENSE)
 [![Cost](https://img.shields.io/badge/Cost-100%25%20Free-brightgreen.svg?style=flat&labelColor=333A41)](LICENSE)
-[![Credits](https://img.shields.io/badge/Credits-ghostySRC%20%26%20Benji%20Bebabin-2ea44f.svg?style=flat&labelColor=333A41)](https://github.com/bebabinlarsson-blip/Godot-MCP)
+[![Credits](https://img.shields.io/badge/Credits-ghostySRC%20%26%20Bebabin-2ea44f.svg?style=flat&labelColor=333A41)](https://github.com/bebabinlarsson-blip/Godot-MCP)
 
 <br>
 
@@ -371,8 +371,7 @@ both remain online for those tools to be reachable.
 
 ## Author and License
 
-* Project credits: **[Ghosty (@ghostySRC)](https://github.com/ghostySRC)** and **[Benji (Bebabin, @bebabinlarsson-blip)](https://github.com/bebabinlarsson-blip)**
-* AI use: AI assistance contributed to code and documentation in this release.
+* Project credits: **[Ghosty (@ghostySRC)](https://github.com/ghostySRC)** and **[Bebabin (@bebabinlarsson-blip)](https://github.com/bebabinlarsson-blip)**
 * License: [MIT License](LICENSE) (100% Free and Open Source)
 
 For Godot Asset Library listings, use the direct icon files:

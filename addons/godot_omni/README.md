@@ -22,8 +22,7 @@ Project > Project Settings > Plugins > enable **Godot MCP Omni** (and **Godot MC
 
 [MIT](LICENSE)
 
-## Credits and AI use
+## Credits
 
 Project credits: [Ghosty (@ghostySRC)](https://github.com/ghostySRC) and
-[Benji (Bebabin, @bebabinlarsson-blip)](https://github.com/bebabinlarsson-blip).
-AI assistance was used for code and documentation contributions.
+[Bebabin (@bebabinlarsson-blip)](https://github.com/bebabinlarsson-blip).

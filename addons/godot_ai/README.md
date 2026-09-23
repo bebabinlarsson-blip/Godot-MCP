@@ -39,8 +39,7 @@ Full documentation and source: [github.com/bebabinlarsson-blip/Godot-MCP](https:
 
 [MIT](LICENSE)
 
-## Credits and AI use
+## Credits
 
 Project credits: [Ghosty (@ghostySRC)](https://github.com/ghostySRC) and
-[Benji (Bebabin, @bebabinlarsson-blip)](https://github.com/bebabinlarsson-blip).
-AI assistance was used for code and documentation contributions.
+[Bebabin (@bebabinlarsson-blip)](https://github.com/bebabinlarsson-blip).
