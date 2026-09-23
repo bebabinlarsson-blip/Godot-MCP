@@ -40,16 +40,6 @@ def main() -> None:
                     rel_p = full_p.relative_to(repo_root)
                     zf.write(full_p, str(rel_p).replace("\\", "/"))
 
-        for root_file in ["README.md", "LICENSE"]:
-            p = repo_root / root_file
-            if p.exists():
-                zf.write(p, root_file)
-
-        for doc_file in ["docs/logo.png", "docs/icon.png", "docs/hero.png"]:
-            p = repo_root / doc_file
-            if p.exists():
-                zf.write(p, doc_file)
-
     print(f"Successfully built {zip_path} ({zip_path.stat().st_size / 1024:.1f} KB)")
 
 
