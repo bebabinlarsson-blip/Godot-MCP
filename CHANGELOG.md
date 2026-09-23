@@ -5,6 +5,13 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.35 (2026-09-23)
+
+- Added a bounded project map and a read-only TileSet atlas and collision doctor.
+- Added reversible scene-structure previews to `batch_execute(preview=true)`.
+- Added remote setup guidance in the editor and `godot-ai tunnel doctor` for authenticated named tunnels.
+- Added a release workflow that verifies and attaches an installable add-ons ZIP to published v5 releases.
+
 ## 5.0.34 (2026-09-23)
 
 Fixes the advertised and enforced Godot minimum version, adds named Cloudflare support, protects all automated public tunnels with an auth check, and puts bounded timeouts around tunnel startup. Also corrects public-tunnel persistence claims and updates package metadata and project credits.

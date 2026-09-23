@@ -215,7 +215,11 @@ def main(argv: Sequence[str] | None = None) -> None:
         return
 
     if effective_argv[:1] == ["tunnel"]:
-        from godot_ai.transport.tunnel import DEFAULT_TUNNEL_PROVIDER, diagnose_named_tunnel, run_tunnel_forever
+        from godot_ai.transport.tunnel import (
+            DEFAULT_TUNNEL_PROVIDER,
+            diagnose_named_tunnel,
+            run_tunnel_forever,
+        )
 
         if effective_argv[1:2] == ["doctor"]:
             doctor_parser = argparse.ArgumentParser(prog="godot-ai tunnel doctor")

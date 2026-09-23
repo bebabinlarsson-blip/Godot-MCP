@@ -344,9 +344,10 @@ def diagnose_named_tunnel(port: int = 8000, check_public: bool = True) -> dict:
     Return only booleans and actionable messages; never return credentials.
     """
     checks: dict[str, dict[str, object]] = {}
+    binary_found = bool(find_tunnel_binary("cloudflare-named"))
     checks["cloudflared"] = {
-        "ok": bool(find_tunnel_binary("cloudflare-named")),
-        "message": "Install cloudflared and add it to PATH" if not find_tunnel_binary("cloudflare-named") else "Ready",
+        "ok": binary_found,
+        "message": "Ready" if binary_found else "Install cloudflared and add it to PATH",
     }
     public_url = ""
     try:
@@ -357,33 +358,63 @@ def diagnose_named_tunnel(port: int = 8000, check_public: bool = True) -> dict:
     token = os.environ.get("GODOT_AI_AUTH_TOKEN", "").strip()
     try:
         _verify_local_auth(port, token)
-        checks["local_auth"] = {"ok": True, "message": "Anonymous access denied; configured token accepted"}
+        checks["local_auth"] = {
+            "ok": True,
+            "message": "Anonymous access denied; configured token accepted",
+        }
     except RuntimeError as exc:
         checks["local_auth"] = {"ok": False, "message": str(exc)}
     if check_public and public_url and checks["local_auth"]["ok"]:
         url = f"{public_url}/api/v1/status"
         try:
             with urllib.request.urlopen(url, timeout=5):
-                checks["public_auth"] = {"ok": False, "message": "Public endpoint allows anonymous access"}
+                checks["public_auth"] = {
+                    "ok": False, "message": "Public endpoint allows anonymous access",
+                }
         except HTTPError as exc:
-            checks["public_auth"] = {"ok": exc.code == 401, "message": f"Anonymous response: HTTP {exc.code}"}
+            checks["public_auth"] = {
+                "ok": exc.code == 401,
+                "message": f"Anonymous response: HTTP {exc.code}",
+            }
             exc.close()
         except (URLError, TimeoutError):
-            checks["public_auth"] = {"ok": False, "message": "Public hostname is unreachable; check DNS, tunnel process and route"}
+            checks["public_auth"] = {
+                "ok": False,
+                "message": "Public hostname is unreachable; check DNS, tunnel process and route",
+            }
         if checks["public_auth"]["ok"]:
             try:
                 request = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
                 with urllib.request.urlopen(request, timeout=5) as response:
-                    checks["public_tools"] = {"ok": response.status == 200, "message": f"Status HTTP {response.status}"}
+                    checks["public_tools"] = {
+                        "ok": response.status == 200,
+                        "message": f"Status HTTP {response.status}",
+                    }
                 tools_request = urllib.request.Request(
                     f"{public_url}/api/v1/tools", headers={"Authorization": f"Bearer {token}"}
                 )
                 with urllib.request.urlopen(tools_request, timeout=5) as response:
                     tools_payload = json.load(response)
-                    checks["public_tools"] = {"ok": response.status == 200 and bool(tools_payload), "message": "Authenticated tool catalog available"}
+                    catalog_ready = (
+                        response.status == 200
+                        and isinstance(tools_payload, dict)
+                        and tools_payload.get("count", 0) > 0
+                    )
+                    checks["public_tools"] = {
+                        "ok": catalog_ready,
+                        "message": "Authenticated tool catalog available" if catalog_ready
+                        else "Remote tool catalog is empty",
+                    }
             except (HTTPError, URLError, TimeoutError, ValueError):
-                checks["public_tools"] = {"ok": False, "message": "Authenticated remote status or tool catalog unavailable"}
-    return {"ready": all(c["ok"] for c in checks.values()), "public_url": public_url, "checks": checks}
+                checks["public_tools"] = {
+                    "ok": False,
+                    "message": "Authenticated remote status or tool catalog unavailable",
+                }
+    return {
+        "ready": all(c["ok"] for c in checks.values()),
+        "public_url": public_url,
+        "checks": checks,
+    }
 
 
 def start_cloudflare_named_tunnel(port: int) -> TunnelInfo:
