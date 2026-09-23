@@ -66,7 +66,6 @@ from tests.integration._self_update_fixture import (
 )
 
 
-
 def _require_v4_release_target() -> None:
     version = read_plugin_version(PLUGIN_ROOT / "plugin.cfg")
     if not version.startswith("4."):
