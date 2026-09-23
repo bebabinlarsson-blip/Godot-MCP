@@ -23,6 +23,12 @@ from tests.integration._self_update_fixture import (
 ## from the iteration loop by `pytest -m "not editor"`.
 pytestmark = pytest.mark.editor
 
+def _require_v4_release_target() -> None:
+    version = read_plugin_version(PLUGIN_ROOT / "plugin.cfg")
+    if not version.startswith("4."):
+        pytest.skip(f"private v4 release qualification does not apply to {version}")
+
+
 DRIVER = """extends SceneTree
 
 var certificate := X509Certificate.new()
@@ -189,6 +195,7 @@ def test_real_godot_uses_verified_default_port_https_without_system_changes(tmp_
 @pytest.mark.parametrize("authorized", [True, False])
 def test_unchanged_update_manager_discovers_and_downloads_over_private_https(tmp_path, authorized):
     """Development fixture: the real manager alone, with no signature approval or A/B claim."""
+    _require_v4_release_target()
     godot = godot_bin_or_skip()
     major, minor, patch = support.version_tuple(read_plugin_version(PLUGIN_ROOT / "plugin.cfg"))
     version = f"{major}.{minor}.{patch + 1}"
