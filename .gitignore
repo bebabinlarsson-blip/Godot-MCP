@@ -51,7 +51,7 @@ Thumbs.db
 *.exe
 *.AppImage
 
-# Plugin symlink/junction into test_project/ — built locally by
+# Godot add-on symlink/junction into test_project/ — built locally by
 # script/setup-dev (bash) or script/setup-dev.ps1 (Windows). Not tracked
 # because a committed symlink checks out as a plain text file on Windows
 # without Developer Mode and fights multi-step git ops (rebase,
@@ -81,4 +81,3 @@ mcp-server.log
 *.uid.txt
 test_project/
 dist/
-

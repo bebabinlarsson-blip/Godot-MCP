@@ -24,7 +24,7 @@ FIXTURE="$WORK/fixture"
 mkdir -p "$FIXTURE/addons"
 # Copy (not symlink): Windows CI runners run this under Git Bash where
 # symlinks need special privileges.
-cp -R "$REPO_ROOT/plugin/addons/godot_ai" "$FIXTURE/addons/godot_ai"
+cp -R "$REPO_ROOT/addons/godot_ai" "$FIXTURE/addons/godot_ai"
 
 cat > "$FIXTURE/project.godot" <<'EOF'
 config_version=5

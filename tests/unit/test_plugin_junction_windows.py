@@ -8,7 +8,7 @@ deleted (it may hold uncommitted plugin edits) — it is moved to a timestamped
 ``rmdir`` so the target is never recursed into.
 
 Driven against a throwaway sandbox (copies of the scripts plus a minimal
-``plugin/`` tree) so the real worktree link is never touched. Junctions need no
+``addons/`` tree) so the real worktree link is never touched. Junctions need no
 admin rights or Developer Mode, so these run on any Windows checkout.
 """
 
@@ -33,7 +33,7 @@ CANONICAL = "# canonical plugin source\n"
 def _make_sandbox(tmp_path: Path) -> Path:
     root = tmp_path / "sandbox"
     (root / "script").mkdir(parents=True)
-    plugin = root / "plugin" / "addons" / "godot_ai"
+    plugin = root / "addons" / "godot_ai"
     plugin.mkdir(parents=True)
     (plugin / "plugin.gd").write_text(CANONICAL, encoding="utf-8")
     (root / "test_project" / "addons").mkdir(parents=True)
@@ -47,7 +47,7 @@ def _link(root: Path) -> Path:
 
 
 def _target(root: Path) -> Path:
-    return root / "plugin" / "addons" / "godot_ai"
+    return root / "addons" / "godot_ai"
 
 
 def _mklink(link: Path, target: Path) -> None:

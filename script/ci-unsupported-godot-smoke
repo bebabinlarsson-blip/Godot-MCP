@@ -128,7 +128,7 @@ def main() -> int:
     godot = args.godot.resolve(strict=True)
     root = args.source_root.resolve(strict=True)
     cases = (
-        (root / "plugin/addons/godot_ai", REFUSAL, "v4 runtime"),
+        (root / "addons/godot_ai", REFUSAL, "v4 runtime"),
         (root / "migration_bridge", BRIDGE_REFUSAL, "v3 bridge"),
     )
     for source, refusal, label in cases:

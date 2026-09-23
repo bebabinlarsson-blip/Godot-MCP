@@ -1,10 +1,9 @@
 # AGENTS.md - Godot AI
 
-> **Repo note (Godot MCP fork):** the canonical GDScript plugin lives in the
+> **Repo note (Godot MCP fork):** the canonical GDScript add-ons live in the
 > root `addons/godot_ai/` and `addons/godot_omni/` folders — the release
-> archives are built from them. The duplicate `plugin/addons/` tree mentioned
-> in the upstream sections below was **removed in v5.0.2**; treat any
-> reference to it as stale.
+> archives are built from them. Older references to `plugin/addons/` describe
+> a legacy mirror and are not authoritative for current installs or releases.
 
 This guide is for any AI assistant working in this repository. Keep Claude-specific files such as `.claude/CLAUDE.md` and `.claude/skills/*` as thin pointers to this shared guidance.
 
@@ -55,18 +54,19 @@ A production-grade MCP server for Godot. Python server (FastMCP v3) communicates
 ## Project structure
 
 Read the tree directly — `src/godot_ai/` (Python MCP server) and
-`plugin/addons/godot_ai/` (GDScript editor plugin) are the two roots, and the
-directory names say what they hold. The parts the layout does *not* tell you:
+`addons/godot_ai/` (the distributable GDScript editor plugin) are the two
+product roots. The parts the layout does *not* tell you:
 
-- `plugin/addons/godot_ai/` is the canonical GDScript copy. `test_project/addons/godot_ai`
-  is a locally-built symlink (Windows junction) into it, not tracked in git.
+- `addons/godot_ai/` is the canonical GDScript copy used for installed assets
+  and release archives. `test_project/addons/godot_ai` is a locally-built
+  symlink (Windows junction) into it, not tracked in git.
 - `src/godot_ai/tools/_meta_tool.py` holds `register_manage_tool`, the rollup factory.
 - `src/godot_ai/middleware/` registration order is load-bearing — see "Key conventions".
 - `script/` ships fixers for dev-environment problems; scan it before doing setup by hand.
 
 ## Key conventions
 
-- **GDScript plugin is the canonical copy** in `plugin/`. `test_project/addons/godot_ai` is a locally-built symlink (or Windows junction) into `plugin/addons/godot_ai` — not tracked in git, created by `script/setup-dev` / `script/verify-worktree`.
+- **GDScript plugin is the canonical copy** in `addons/`. `test_project/addons/godot_ai` is a locally-built symlink (or Windows junction) into `addons/godot_ai` — not tracked in git, created by `script/setup-dev` / `script/verify-worktree`.
 - **Error codes**: Defined in `protocol/errors.py` (Python) and `utils/error_codes.gd` (GDScript). Keep in sync. Use Godot's built-in `error_string(err)` to translate numeric error codes in error messages — do not write a custom lookup table.
 - **Tools return `dict`**: Handlers call `runtime.send_command(command, params)` which returns a dict or raises. Tools create a `DirectRuntime` and delegate to handlers.
 - **Plugin runs on main thread**: All GDScript executes in `_process()` with a 4ms frame budget. Never block. Use `call_deferred` for scene tree mutations.
@@ -80,7 +80,7 @@ directory names say what they hold. The parts the layout does *not* tell you:
 - **Session IDs**: format is `<project-slug>@<16hex>` (for example, `godot-ai@7f9c3a10d8e426b1`). The slug is recognizable; the 64-bit cryptographic suffix safely disambiguates same-project editors. Server treats the ID as an opaque key.
 - **Per-call session routing**: every Godot-talking tool accepts an optional `session_id` parameter. Empty (the default) resolves to the global active session. When supplied, that single call targets that session — `require_writable` and every handler inside the call see the pinned session, not the active one. Use this when multiple AI clients share one MCP server. For `<domain>_manage` rollups, `session_id` is a sibling of `op` and `params` (top-level), *not* nested inside `params`. Resources (`godot://...`) still resolve via the active session.
 - **FastMCP middleware order is load-bearing**: `src/godot_ai/server.py` registers `PreserveGodotCommandErrorData → StripClientWrapperKwargs → ParseStringifiedParams → FoldFlatManageParams → HintOpTypoOnManage → TrackMcpSessions`. FastMCP composes the chain via `reversed(self.middleware)`, so first-added is **outermost** (sees response last) and last-added is **innermost** (sees response first). The first five transforms have load-bearing positions; `TrackMcpSessions` is observational and its position is conventional. The rationale is in the docstring above registration and the complete inventory is locked by `tests/unit/test_server_middleware_order.py`.
-- **Telemetry is wrap-once at server build time**: `src/godot_ai/server.py` calls `install_fastmcp_wraps(mcp)` right after constructing the FastMCP instance and before any `register_<domain>_tools(mcp)`. That call replaces `mcp.tool` / `mcp.resource` with auto-instrumenting versions, so every tool and resource (including the `<domain>_manage` rollups, whose `op` arg is captured as `sub_action`) gets one `tool_execution` / `resource_retrieval` record per call automatically. Adding a new tool, resource, or rollup op needs **no telemetry call**. Opt-out is `GODOT_AI_DISABLE_TELEMETRY=true` (also accepts `DISABLE_TELEMETRY=true`). The endpoint is configured via `GODOT_AI_TELEMETRY_ENDPOINT`; if unset, a baked-in production default endpoint is used, so telemetry sends by default. Sends stop via the opt-out env var, or via the `telemetry_opt_out` WebSocket event a connected editor latches on a server the plugin adopted rather than spawned (#913) — that latch is one-way for the process's life. Session-id slugs are sha256-hashed before leaving the process so project directory names don't leak. Plugin-side events (dock startup, self-update outcome) ride the existing `send_event("plugin_event", …)` channel; the names allowlist lives in both `plugin/addons/godot_ai/telemetry.gd` and `src/godot_ai/transport/websocket.py::_PLUGIN_EVENT_NAMES` — keep them in sync, along with the `OPT_OUT_EVENT` / `TELEMETRY_OPT_OUT_EVENT` twins. `tests/unit/test_telemetry_event_name_parity.py` locks both. Full reference: `docs/TELEMETRY.md`.
+- **Telemetry is wrap-once at server build time**: `src/godot_ai/server.py` calls `install_fastmcp_wraps(mcp)` right after constructing the FastMCP instance and before any `register_<domain>_tools(mcp)`. That call replaces `mcp.tool` / `mcp.resource` with auto-instrumenting versions, so every tool and resource (including the `<domain>_manage` rollups, whose `op` arg is captured as `sub_action`) gets one `tool_execution` / `resource_retrieval` record per call automatically. Adding a new tool, resource, or rollup op needs **no telemetry call**. Opt-out is `GODOT_AI_DISABLE_TELEMETRY=true` (also accepts `DISABLE_TELEMETRY=true`). The endpoint is configured via `GODOT_AI_TELEMETRY_ENDPOINT`; if unset, a baked-in production default endpoint is used, so telemetry sends by default. Sends stop via the opt-out env var, or via the `telemetry_opt_out` WebSocket event a connected editor latches on a server the plugin adopted rather than spawned (#913) — that latch is one-way for the process's life. Session-id slugs are sha256-hashed before leaving the process so project directory names don't leak. Plugin-side events (dock startup, self-update outcome) ride the existing `send_event("plugin_event", …)` channel; the names allowlist lives in both `addons/godot_ai/telemetry.gd` and `src/godot_ai/transport/websocket.py::_PLUGIN_EVENT_NAMES` — keep them in sync, along with the `OPT_OUT_EVENT` / `TELEMETRY_OPT_OUT_EVENT` twins. `tests/unit/test_telemetry_event_name_parity.py` locks both. Full reference: `docs/TELEMETRY.md`.
 - **Client auto-configuration**: the plugin configures MCP clients from a registry of
   data-only descriptors — `_registry.gd::_CLIENT_SCRIPT_PATHS` is the authoritative
   list; adding one is a new `clients/<name>.gd` plus one script path there, with no
@@ -107,7 +107,7 @@ class-cache evidence.
 Assistant sessions may run in git worktrees. Claude Code commonly uses `.claude/worktrees/<name>/`. Be aware of which worktree you're in — it affects everything:
 
 - **File paths**: Your working directory is the worktree, not the repo root. Files you create live in that worktree.
-- **Godot editor**: The editor runs against a specific worktree's `test_project/`. The plugin is symlinked from that worktree's `plugin/` directory. Check `session_list` — the `project_path` field tells you which worktree the editor is using.
+- **Godot editor**: The editor runs against a specific worktree's `test_project/`. The plugin is symlinked from that worktree's `addons/` directory. Check `session_list` — the `project_path` field tells you which worktree the editor is using.
 - **Dev server**: The plugin-managed server (auto-spawned on editor start, no `--reload`) uses the root repo's `.venv` and `src/`. Python code changes in a worktree won't take effect there unless the root repo also has them. Two ways to serve the worktree's own Python source: (a) click **Start Dev Server** in the dock — it walks up from `res://` to find a sibling `src/godot_ai/` and auto-sets `PYTHONPATH` to that tree's `src/` before spawning `--reload`; (b) run `script/serve-this-worktree` from a terminal for the same effect outside the editor.
 - **Passing info between sessions**: When writing prompts, handoff notes, or file references intended for another session, **always include the full worktree path** or specify the worktree name. Relative paths like `docs/friction-log.md` are ambiguous — a different session may be in a different worktree or on `main`. Use the absolute path.
 - **Merging**: Worktree branches must be merged to `main` and pulled into other worktrees for changes to propagate. The plugin symlink means GDScript changes propagate within the same worktree immediately, but not across worktrees.
@@ -249,7 +249,7 @@ rows then run, fail slowly, and prove nothing.
 Do not maintain a full tool inventory in this guide. The active inventory has canonical sources:
 
 - `src/godot_ai/tools/domains.py` defines the domain metadata used by Python registration.
-- `plugin/addons/godot_ai/tool_catalog.gd` mirrors the registered tool surface for the Godot dock.
+- `addons/godot_ai/tool_catalog.gd` mirrors the registered tool surface for the Godot dock.
 - `tests/unit/test_tool_domains.py` verifies the GDScript catalog stays in sync with the Python registrations and prints a paste-over-ready diff when it drifts.
 - `docs/TOOLS.md` is the human-facing reference for the full current tool/resource list and op map.
 
@@ -266,7 +266,7 @@ and the checklist for adding a tool: [docs/tool-surface.md](docs/tool-surface.md
 
 ## Game-side code: gate on `Engine.is_editor_hint()`, not `OS.has_feature("editor")`
 
-Code shipped as an autoload (e.g. `plugin/addons/godot_ai/runtime/game_helper.gd`) that's intended to run only in the game subprocess must guard on `Engine.is_editor_hint()`. `OS.has_feature("editor")` is a compile-time `TOOLS_ENABLED` check — it returns true in the game subprocess too, because play-in-editor spawns the game with the same editor binary. `is_editor_hint()` is the runtime-context check.
+Code shipped as an autoload (e.g. `addons/godot_ai/runtime/game_helper.gd`) that's intended to run only in the game subprocess must guard on `Engine.is_editor_hint()`. `OS.has_feature("editor")` is a compile-time `TOOLS_ENABLED` check — it returns true in the game subprocess too, because play-in-editor spawns the game with the same editor binary. `is_editor_hint()` is the runtime-context check.
 
 Corollary for the plugin side: when registering a game-side autoload via `add_autoload_singleton`, also call `ProjectSettings.save()` explicitly. `EditorPlugin.add_autoload_singleton` only mutates in-memory settings — the subprocess reads project.godot from disk, so without an explicit save the autoload is missing in the child process. See `plugin.gd::_ensure_game_helper_autoload`.
 

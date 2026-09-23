@@ -18,11 +18,12 @@ Fixes the advertised and enforced Godot minimum version, adds named Cloudflare s
 - **Tunnel URL claims:** anonymous tunnel URLs are documented as temporary and may change on reconnect.
 - **Repository metadata:** package links, plugin author fields, version badges, and the release archive name now point to this repository and v5.0.34.
 - **Update polling:** v5 packages no longer contact or offer releases from the v4-only upstream signed updater; v5 updates use this repository's release archive.
+- **Godot CI setup:** clean runners now build their smoke project from the tracked 2D fixture, with a main scene and both shipped add-ons. The worktree link and smoke tests use the release `addons/` source.
 
 ### Added
 
 - **Named Cloudflare Tunnel:** `godot-ai tunnel --provider cloudflare-named` uses a token file and a hostname configured in the user's Cloudflare account.
-- **Open-world 2D editor fixture:** a small movement-and-camera project exercises plugin loading and confirms the gateway advertises its four always-on core tools in the Godot CI job.
+- **Open-world 2D editor fixture:** a small movement-and-camera project exercises plugin loading and confirms the gateway advertises its four always-on core tools across the Godot CI platforms.
 - **Credits and AI use disclosure:** release package credits Ghosty and Bebabin and states where AI assistance was used.
 
 ## 5.0.33 (2026-09-23)

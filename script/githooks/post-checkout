@@ -10,7 +10,7 @@
 # `git checkout -- some_file`) shouldn't re-verify the whole worktree.
 #
 # The hook's job: make sure test_project/addons/godot_ai exists and points
-# into this worktree's plugin/. Since the link is no longer tracked in git
+# into this worktree's addons/. Since the link is no longer tracked in git
 # (see #185 / .gitignore), git never creates or updates it on checkout —
 # this hook is how freshly-added worktrees get their link.
 
@@ -35,7 +35,7 @@ fi
 "$repo_top/script/verify-worktree" || {
     echo ""
     echo "[post-checkout] Worktree verification reported problems."
-    echo "[post-checkout] Fix before editing plugin/ code — see output above."
+    echo "[post-checkout] Fix before editing plugin code — see output above."
     echo ""
 }
 

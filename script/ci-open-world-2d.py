@@ -118,7 +118,7 @@ def main() -> int:
         addons_dir = project / "addons"
         addons_dir.mkdir()
         for addon_name in ("godot_ai", "godot_omni"):
-            source = repo_root / "plugin/addons" / addon_name
+            source = repo_root / "addons" / addon_name
             target = addons_dir / addon_name
             try:
                 target.symlink_to(source, target_is_directory=True)

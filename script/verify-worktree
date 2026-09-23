@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Verify a worktree (or main checkout) is safe to edit plugin/ code in, and
-# ensure test_project/addons/godot_ai points to this worktree's plugin/.
+# Verify a worktree (or main checkout) has the shipped Godot add-on source, and
+# ensure test_project/addons/godot_ai points to this worktree's addons/ copy.
 #
 # Invariants enforced:
-#   1. plugin/addons/godot_ai/plugin.gd exists (plugin/ is populated).
+#   1. addons/godot_ai/plugin.gd exists (the shipped add-on is populated).
 #   2. test_project/addons/godot_ai resolves to this worktree's
-#      plugin/addons/godot_ai via symlink or (on Windows) directory junction.
+#      addons/godot_ai via symlink or (on Windows) directory junction.
 #
 # The link is NOT tracked in git (see .gitignore) — this script builds it
 # locally from scratch on fresh clones and `git worktree add`, and repairs
@@ -13,7 +13,7 @@
 #
 # Exit codes:
 #   0  link OK (already valid or just created/repaired)
-#   1  plugin/ missing or sparse — cannot auto-fix, abort
+#   1  addons/ missing or sparse — cannot auto-fix, abort
 #   2  link creation failed (permission / FS error)
 
 set -euo pipefail
@@ -24,19 +24,19 @@ red()    { printf '\033[31m%s\033[0m\n' "$*"; }
 yellow() { printf '\033[33m%s\033[0m\n' "$*"; }
 green()  { printf '\033[32m%s\033[0m\n' "$*"; }
 
-# --- Invariant 1: plugin/ is populated -----------------------------------
-if [ ! -f plugin/addons/godot_ai/plugin.gd ]; then
-    red "[FAIL] plugin/addons/godot_ai/plugin.gd is missing."
-    echo "       This worktree has a broken plugin/ directory. Editing plugin code"
+# --- Invariant 1: shipped add-on source is populated ---------------------
+if [ ! -f addons/godot_ai/plugin.gd ]; then
+    red "[FAIL] addons/godot_ai/plugin.gd is missing."
+    echo "       This worktree has a broken addons/ directory. Editing plugin code"
     echo "       here will stage phantom deletions on commit. Abort and either:"
-    echo "         - git restore plugin/      (re-hydrate from index)"
+    echo "         - git restore addons/      (re-hydrate from index)"
     echo "         - remove this worktree and recreate with: git worktree add ..."
     exit 1
 fi
 
-# --- Invariant 2: link points into this worktree's plugin/ ---------------
+# --- Invariant 2: link points into this worktree's shipped add-on ---------
 link="test_project/addons/godot_ai"
-expected_target_abs="$repo_root/plugin/addons/godot_ai"
+expected_target_abs="$repo_root/addons/godot_ai"
 
 # Are we on Windows? Junctions appear as plain directories to bash, so the
 # "is it a directory?" fallback below is only meaningful there. On macOS/Linux
@@ -72,7 +72,7 @@ elif [ "$is_windows" = "1" ]; then
     # On Windows, directory junctions appear as plain directories to bash, so
     # `-L`/`-d` cannot tell a junction from a stale real copy. Ask PowerShell,
     # which reads the reparse target and compares it to this worktree's
-    # plugin/ (#935). A real directory here is a stale copy holding possibly
+    # addons/ (#935). A real directory here is a stale copy holding possibly
     # uncommitted edits and must never be accepted — nor deleted (see below).
     if _junction_ps -CheckOnly >/dev/null 2>&1; then
         link_ok=1
@@ -80,7 +80,7 @@ elif [ "$is_windows" = "1" ]; then
 fi
 
 if [ "$link_ok" = "1" ]; then
-    green "[ok] $link -> plugin/addons/godot_ai"
+    green "[ok] $link -> addons/godot_ai"
     exit 0
 fi
 
@@ -95,11 +95,11 @@ case "${OS:-}${OSTYPE:-}" in
         # rm -rf'd — because it may hold uncommitted plugin edits. mklink /J
         # needs no admin rights or Developer Mode.
         if _junction_ps; then
-            green "[ok] $link -> plugin/addons/godot_ai (junction verified)"
+            green "[ok] $link -> addons/godot_ai (junction verified)"
             exit 0
         else
             red "[FAIL] Could not establish the junction. Run manually from PowerShell:"
-            echo "       .\\script\\_plugin_junction.ps1 -LinkPath test_project\\addons\\godot_ai -TargetPath plugin\\addons\\godot_ai"
+            echo "       .\\script\\_plugin_junction.ps1 -LinkPath test_project\\addons\\godot_ai -TargetPath addons\\godot_ai"
             exit 2
         fi
         ;;
@@ -116,7 +116,7 @@ case "${OS:-}${OSTYPE:-}" in
         else
             rm -rf "$link" 2>/dev/null || true
         fi
-        if ln -s "../../plugin/addons/godot_ai" "$link"; then
+        if ln -s "../../addons/godot_ai" "$link"; then
             green "[ok] Created $link as a symlink."
             exit 0
         else

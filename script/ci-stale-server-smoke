@@ -62,7 +62,7 @@ def find_godot() -> str:
 
 
 def plugin_version() -> str:
-    cfg = ROOT / "plugin" / "addons" / "godot_ai" / "plugin.cfg"
+    cfg = ROOT / "addons" / "godot_ai" / "plugin.cfg"
     for line in cfg.read_text(encoding="utf-8").splitlines():
         if line.startswith("version="):
             return line.split("=", 1)[1].strip().strip('"')
