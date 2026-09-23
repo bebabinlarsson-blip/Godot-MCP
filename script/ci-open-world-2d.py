@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import asyncio
 import json
 import os
 import secrets
@@ -17,9 +16,6 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-
-from fastmcp import Client
-from fastmcp.client.transports import StreamableHttpTransport
 
 
 def _run(command: list[str], env: dict[str, str], timeout: int, label: str) -> str:
@@ -39,59 +35,23 @@ def _run(command: list[str], env: dict[str, str], timeout: int, label: str) -> s
     return output
 
 
-def _resolve_godot(executable: str) -> str:
-    """Resolve setup-godot's path, including Windows' extensionless launcher."""
-    for candidate in (
-        executable,
-        os.environ.get("GODOT_BIN", ""),
-        os.environ.get("GODOT4_BIN", ""),
-        os.environ.get("GODOT", ""),
-        os.environ.get("GODOT4", ""),
-    ):
-        if not candidate:
-            continue
-        resolved = shutil.which(candidate)
-        if resolved:
-            return resolved
-        if Path(candidate).is_file():
-            return str(Path(candidate))
-    raise FileNotFoundError(
-        "Godot was not found; set GODOT_BIN or let setup-godot provide GODOT/GODOT4"
-    )
-
-
-def _request_json(url: str, auth_token: str | None = None) -> dict:
-    headers = {"Authorization": f"Bearer {auth_token}"} if auth_token else {}
-    request = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(request, timeout=1) as response:
-        return json.loads(response.read().decode("utf-8"))
-
-
-def _wait_for_http_server(auth_token: str, timeout: float) -> bool:
-    """Wait for the backend and prove its status route enforces Bearer auth."""
-    status_url = "http://127.0.0.1:8000/api/v1/status"
+def _wait_for_http_health(timeout: float, token: str) -> bool:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        anonymous_rejected = False
         try:
-            _request_json(status_url)
-        except urllib.error.HTTPError as exc:
-            anonymous_rejected = exc.code == 401
-            exc.close()
-        except (OSError, urllib.error.URLError, ValueError, json.JSONDecodeError):
-            pass
-        if anonymous_rejected:
-            try:
-                status = _request_json(status_url, auth_token)
-                if status.get("status") == "online":
+            request = urllib.request.Request(
+                "http://127.0.0.1:8000/health",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            with urllib.request.urlopen(request, timeout=1) as response:
+                if response.status == 200:
                     return True
-            except (OSError, urllib.error.URLError, ValueError, json.JSONDecodeError):
-                pass
-        time.sleep(0.25)
+        except (OSError, urllib.error.URLError):
+            time.sleep(0.25)
     return False
 
 
-def _wait_for_core_tools(auth_token: str, timeout: float) -> list[str] | None:
+def _wait_for_core_tools(timeout: float, token: str) -> list[str] | None:
     """Wait until the HTTP gateway advertises every always-on core tool."""
     required = {
         "session_activate",
@@ -102,7 +62,12 @@ def _wait_for_core_tools(auth_token: str, timeout: float) -> list[str] | None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
-            payload = _request_json("http://127.0.0.1:8000/api/v1/tools", auth_token)
+            request = urllib.request.Request(
+                "http://127.0.0.1:8000/api/v1/tools",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            with urllib.request.urlopen(request, timeout=1) as response:
+                payload = json.loads(response.read().decode("utf-8"))
             names = [tool.get("name") for tool in payload.get("tools", [])]
             if required.issubset(names):
                 return names
@@ -112,61 +77,140 @@ def _wait_for_core_tools(auth_token: str, timeout: float) -> list[str] | None:
     return None
 
 
-async def _request_editor_quit(auth_token: str) -> None:
-    """Close the editor through MCP so its plugin-owned server shuts down too."""
-    transport = StreamableHttpTransport(
+def _mcp_post(token: str, session_id: str | None, body: dict, timeout: float = 5.0) -> dict:
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream",
+    }
+    if session_id:
+        headers["Mcp-Session-Id"] = session_id
+    request = urllib.request.Request(
         "http://127.0.0.1:8000/mcp",
-        headers={"Authorization": f"Bearer {auth_token}"},
+        data=json.dumps(body).encode("utf-8"),
+        headers=headers,
+        method="POST",
     )
-    async with Client(transport, timeout=15, init_timeout=15) as client:
-        deadline = time.monotonic() + 20
-        while True:
-            sessions = await client.call_tool("session_manage", {"op": "list"})
-            payload = sessions.structured_content or sessions.data or {}
-            if int(payload.get("count", 0)) > 0:
-                break
-            if time.monotonic() >= deadline:
-                raise RuntimeError("Godot editor never registered an MCP session")
-            await asyncio.sleep(0.25)
-        result = await client.call_tool("editor_manage", {"op": "quit"})
-        payload = result.structured_content or result.data or {}
-        if payload.get("status") != "quitting":
-            raise RuntimeError(f"editor_manage(quit) returned an unexpected result: {payload}")
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        raw = response.read().decode("utf-8", errors="replace")
+        response_session = response.headers.get("Mcp-Session-Id")
+    payload = {}
+    for line in raw.splitlines():
+        if line.startswith("data: "):
+            payload = json.loads(line[6:])
+            break
+    if not payload and raw.strip():
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            pass
+    payload["_session_id"] = response_session
+    return payload
 
 
-def _wait_for_ports_to_close(ports: tuple[int, ...], timeout: float) -> bool:
+def _mcp_initialize(token: str) -> str:
+    response = _mcp_post(
+        token,
+        None,
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-03-26",
+                "capabilities": {},
+                "clientInfo": {"name": "ci-open-world-smoke", "version": "1.0"},
+            },
+        },
+    )
+    session_id = response.get("_session_id")
+    if not session_id:
+        raise RuntimeError("MCP initialize did not return a session id")
+    _mcp_post(token, session_id, {"jsonrpc": "2.0", "method": "notifications/initialized"})
+    return session_id
+
+
+def _mcp_tool_call(token: str, session_id: str, name: str, arguments: dict) -> dict:
+    response = _mcp_post(
+        token,
+        session_id,
+        {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {"name": name, "arguments": arguments},
+        },
+    )
+    if response.get("error"):
+        raise RuntimeError(f"MCP {name} call failed: {response['error']}")
+    result = response.get("result", {})
+    if result.get("isError"):
+        raise RuntimeError(f"MCP {name} call returned an error: {result}")
+    structured = result.get("structuredContent")
+    if isinstance(structured, dict):
+        return structured
+    for item in result.get("content", []):
+        if item.get("type") == "text":
+            try:
+                decoded = json.loads(item.get("text", ""))
+                if isinstance(decoded, dict):
+                    return decoded
+            except json.JSONDecodeError:
+                pass
+    return {}
+
+
+def _wait_for_ports_to_close(timeout: float = 10.0) -> bool:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        listening = False
-        for port in ports:
-            try:
-                with socket.create_connection(("127.0.0.1", port), timeout=0.25):
-                    listening = True
-                    break
-            except OSError:
-                continue
+        listening = []
+        for port in (8000, 9500):
+            with socket.socket() as probe:
+                probe.settimeout(0.25)
+                try:
+                    if probe.connect_ex(("127.0.0.1", port)) == 0:
+                        listening.append(port)
+                except OSError:
+                    pass
         if not listening:
             return True
-        time.sleep(0.25)
+        time.sleep(0.2)
     return False
 
 
-def _stop_editor(editor: subprocess.Popen, stdout_log, auth_token: str | None = None) -> None:
-    """Gracefully close Godot and its plugin-owned server, then close its log."""
+def _stop_editor(editor: subprocess.Popen, stdout_log, token: str) -> None:
+    """Ask Godot to shut down cleanly so its child MCP server is reaped."""
+    graceful_error = None
     if editor.poll() is None:
         try:
-            if auth_token:
-                asyncio.run(_request_editor_quit(auth_token))
-            editor.wait(timeout=10)
-        except Exception:
-            if editor.poll() is None:
-                editor.terminate()
-                try:
-                    editor.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    editor.kill()
-                    editor.wait()
+            session_id = _mcp_initialize(token)
+            sessions = _mcp_tool_call(token, session_id, "session_manage", {"op": "list"})
+            active_session = sessions.get("active_session_id")
+            args = {"op": "quit"}
+            if active_session:
+                args["session_id"] = active_session
+            quit_result = _mcp_tool_call(token, session_id, "editor_manage", args)
+            if quit_result.get("status") != "quitting":
+                raise RuntimeError(
+                    "editor_manage(op='quit') did not confirm shutdown: "
+                    f"{quit_result}"
+                )
+            editor.wait(timeout=15)
+        except Exception as exc:
+            graceful_error = exc
+        if editor.poll() is None:
+            editor.terminate()
+            try:
+                editor.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                editor.kill()
+                editor.wait()
     stdout_log.close()
+    if not _wait_for_ports_to_close():
+        detail = f"; graceful-quit error: {graceful_error}" if graceful_error else ""
+        raise RuntimeError(
+            "Godot exited, but its plugin-owned server kept ports 8000/9500 open" + detail
+        )
 
 
 def _editor_output(editor_stdout_log: Path, editor_log: Path) -> str:
@@ -180,7 +224,6 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("godot", nargs="?", default="godot", help="Godot executable")
     args = parser.parse_args()
-    godot = _resolve_godot(args.godot)
 
     repo_root = Path(__file__).resolve().parent.parent
     fixture = repo_root / "tests/fixtures/open_world_2d"
@@ -190,6 +233,8 @@ def main() -> int:
         addons_dir = project / "addons"
         addons_dir.mkdir()
         for addon_name in ("godot_ai", "godot_omni"):
+            # Release archives and installed projects use addons/ as the
+            # canonical source; plugin/addons is an old development mirror.
             source = repo_root / "addons" / addon_name
             target = addons_dir / addon_name
             try:
@@ -198,11 +243,6 @@ def main() -> int:
                 shutil.copytree(source, target, ignore=shutil.ignore_patterns("*.uid"))
 
         env = os.environ.copy()
-        capability_dir = Path(temp) / "capabilities"
-        if os.name == "nt":
-            env["LOCALAPPDATA"] = str(Path(temp) / "local-app-data")
-        else:
-            env["GODOT_AI_CAPABILITY_DIR"] = str(capability_dir)
         env.update(
             {
                 "GODOT_AI_ALLOW_HEADLESS": "1",
@@ -212,13 +252,14 @@ def main() -> int:
                 "GODOT_AI_AUTH_TOKEN": secrets.token_urlsafe(32),
             }
         )
+        auth_token = env["GODOT_AI_AUTH_TOKEN"]
         editor_log = Path(temp) / "editor.log"
         game_log = Path(temp) / "game.log"
         editor_stdout_log = Path(temp) / "editor-stdout.log"
         editor_stdout = editor_stdout_log.open("w", encoding="utf-8")
         editor = subprocess.Popen(
             [
-                godot,
+                args.godot,
                 "--headless",
                 "--editor",
                 "--path",
@@ -230,15 +271,13 @@ def main() -> int:
             stdout=editor_stdout,
             stderr=subprocess.STDOUT,
         )
-        auth_token = env["GODOT_AI_AUTH_TOKEN"]
-        if not _wait_for_http_server(auth_token, 30):
+        if not _wait_for_http_health(30, auth_token):
             _stop_editor(editor, editor_stdout, auth_token)
             output = _editor_output(editor_stdout_log, editor_log)
             raise RuntimeError(
-                "Godot Core did not start its authenticated local MCP status endpoint:\n"
-                + output[-12000:]
+                "Godot Core did not start its local MCP health endpoint:\n" + output[-12000:]
             )
-        available_tools = _wait_for_core_tools(auth_token, 30)
+        available_tools = _wait_for_core_tools(30, auth_token)
         if available_tools is None:
             _stop_editor(editor, editor_stdout, auth_token)
             output = _editor_output(editor_stdout_log, editor_log)
@@ -247,10 +286,6 @@ def main() -> int:
                 + output[-12000:]
             )
         _stop_editor(editor, editor_stdout, auth_token)
-        if not _wait_for_ports_to_close((8000, 9500), 10):
-            raise RuntimeError(
-                "Godot exited, but its plugin-owned server kept ports 8000/9500 open"
-            )
         editor_output = _editor_output(editor_stdout_log, editor_log)
         if "SCRIPT ERROR:" in editor_output or "Parse Error" in editor_output:
             raise RuntimeError(
@@ -268,7 +303,7 @@ def main() -> int:
 
         game_output = _run(
             [
-            godot,
+                args.godot,
                 "--headless",
                 "--path",
                 str(project),
