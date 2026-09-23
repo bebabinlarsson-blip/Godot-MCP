@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
 import secrets
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -15,6 +17,9 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+
+from fastmcp import Client
+from fastmcp.client.transports import StreamableHttpTransport
 
 
 def _run(command: list[str], env: dict[str, str], timeout: int, label: str) -> str:
@@ -107,15 +112,60 @@ def _wait_for_core_tools(auth_token: str, timeout: float) -> list[str] | None:
     return None
 
 
-def _stop_editor(editor: subprocess.Popen, stdout_log) -> None:
-    """Stop the smoke-test editor after assertions and close its log handle."""
+async def _request_editor_quit(auth_token: str) -> None:
+    """Close the editor through MCP so its plugin-owned server shuts down too."""
+    transport = StreamableHttpTransport(
+        "http://127.0.0.1:8000/mcp",
+        headers={"Authorization": f"Bearer {auth_token}"},
+    )
+    async with Client(transport, timeout=15, init_timeout=15) as client:
+        deadline = time.monotonic() + 20
+        while True:
+            sessions = await client.call_tool("session_manage", {"op": "list"})
+            payload = sessions.structured_content or sessions.data or {}
+            if int(payload.get("count", 0)) > 0:
+                break
+            if time.monotonic() >= deadline:
+                raise RuntimeError("Godot editor never registered an MCP session")
+            await asyncio.sleep(0.25)
+        result = await client.call_tool("editor_manage", {"op": "quit"})
+        payload = result.structured_content or result.data or {}
+        if payload.get("status") != "quitting":
+            raise RuntimeError(f"editor_manage(quit) returned an unexpected result: {payload}")
+
+
+def _wait_for_ports_to_close(ports: tuple[int, ...], timeout: float) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        listening = False
+        for port in ports:
+            try:
+                with socket.create_connection(("127.0.0.1", port), timeout=0.25):
+                    listening = True
+                    break
+            except OSError:
+                continue
+        if not listening:
+            return True
+        time.sleep(0.25)
+    return False
+
+
+def _stop_editor(editor: subprocess.Popen, stdout_log, auth_token: str | None = None) -> None:
+    """Gracefully close Godot and its plugin-owned server, then close its log."""
     if editor.poll() is None:
-        editor.terminate()
         try:
+            if auth_token:
+                asyncio.run(_request_editor_quit(auth_token))
             editor.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            editor.kill()
-            editor.wait()
+        except Exception:
+            if editor.poll() is None:
+                editor.terminate()
+                try:
+                    editor.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    editor.kill()
+                    editor.wait()
     stdout_log.close()
 
 
@@ -182,7 +232,7 @@ def main() -> int:
         )
         auth_token = env["GODOT_AI_AUTH_TOKEN"]
         if not _wait_for_http_server(auth_token, 30):
-            _stop_editor(editor, editor_stdout)
+            _stop_editor(editor, editor_stdout, auth_token)
             output = _editor_output(editor_stdout_log, editor_log)
             raise RuntimeError(
                 "Godot Core did not start its authenticated local MCP status endpoint:\n"
@@ -190,13 +240,17 @@ def main() -> int:
             )
         available_tools = _wait_for_core_tools(auth_token, 30)
         if available_tools is None:
-            _stop_editor(editor, editor_stdout)
+            _stop_editor(editor, editor_stdout, auth_token)
             output = _editor_output(editor_stdout_log, editor_log)
             raise RuntimeError(
                 "The MCP gateway did not advertise its required core tools:\n"
                 + output[-12000:]
             )
-        _stop_editor(editor, editor_stdout)
+        _stop_editor(editor, editor_stdout, auth_token)
+        if not _wait_for_ports_to_close((8000, 9500), 10):
+            raise RuntimeError(
+                "Godot exited, but its plugin-owned server kept ports 8000/9500 open"
+            )
         editor_output = _editor_output(editor_stdout_log, editor_log)
         if "SCRIPT ERROR:" in editor_output or "Parse Error" in editor_output:
             raise RuntimeError(

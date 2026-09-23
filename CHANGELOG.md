@@ -18,7 +18,7 @@ Fixes the advertised and enforced Godot minimum version, adds named Cloudflare s
 - **Tunnel URL claims:** anonymous tunnel URLs are documented as temporary and may change on reconnect.
 - **Repository metadata:** package links, plugin author fields, version badges, and the release archive name now point to this repository and v5.0.34.
 - **Update polling:** v5 packages no longer contact or offer releases from the v4-only upstream signed updater; v5 updates use this repository's release archive.
-- **Godot CI setup:** clean runners now build their smoke project from the tracked 2D fixture, with a main scene and both shipped add-ons. Smoke checks resolve Godot's Windows launcher and use the release `addons/` source.
+- **Godot CI setup:** clean runners now build their smoke project from the tracked 2D fixture, with a main scene and both shipped add-ons. Smoke checks resolve Godot's Windows launcher, use the release `addons/` source, and close the editor cleanly so its owned server releases both ports.
 
 ### Added
 
