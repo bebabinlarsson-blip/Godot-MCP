@@ -594,12 +594,11 @@ static func client_automatic_edits(id: String) -> bool:
 
 ## Auto-configure candidates for a fresh plugin enable: installed clients that
 ## are configurable by file edit and not already pointing at the current
-## server. Mirrors the dock's "Configure all" semantics (every client that
-## isn't already pointing at this server) restricted to installed, automatic
-## clients, so no config file is written for software the user doesn't have
-## and manual-only clients (Zed) are not surfaced. Pure function of the status
-## results (`client_id -> {status, installed, error_msg}`) so it is
-## unit-testable without touching EditorInterface.
+## server. Owned mismatches can be repaired; foreign mismatches and unreadable
+## entries are never rewritten automatically. Manual-only clients (Zed) are
+## excluded. Pure function of status results
+## (`client_id -> {status, installed, owned, error_msg}`), so it is unit-testable
+## without touching EditorInterface.
 static func auto_configure_candidates(status_results: Dictionary) -> Array[String]:
 	var ids: Array[String] = []
 	for client_id in status_results:
