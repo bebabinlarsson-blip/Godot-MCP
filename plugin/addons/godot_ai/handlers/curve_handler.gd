@@ -2,6 +2,7 @@
 extends "res://addons/godot_ai/handlers/command_handler.gd"
 
 const ErrorCodes := preload("res://addons/godot_ai/utils/error_codes.gd")
+const McpResourceIO := preload("res://addons/godot_ai/utils/resource_io.gd")
 
 ## Handles Curves (1D, 2D, 3D), Gradients, and GradientTextures.
 
@@ -30,7 +31,7 @@ func create_curve_1d(params: Dictionary) -> Dictionary:
 
 	var save_path: String = params.get("save_path", "")
 	if not save_path.is_empty():
-		var err := ResourceSaver.save(curve, save_path)
+		var err := McpResourceIO.guarded_save(curve, save_path, _connection)
 		if err != OK:
 			return {"error": "Failed to save Curve to %s (code %d)" % [save_path, err]}
 
@@ -63,7 +64,7 @@ func create_curve_2d(params: Dictionary) -> Dictionary:
 
 	var save_path: String = params.get("save_path", "")
 	if not save_path.is_empty():
-		var err := ResourceSaver.save(curve, save_path)
+		var err := McpResourceIO.guarded_save(curve, save_path, _connection)
 		if err != OK:
 			return {"error": "Failed to save Curve2D to %s (code %d)" % [save_path, err]}
 
@@ -94,7 +95,7 @@ func create_curve_3d(params: Dictionary) -> Dictionary:
 
 	var save_path: String = params.get("save_path", "")
 	if not save_path.is_empty():
-		var err := ResourceSaver.save(curve, save_path)
+		var err := McpResourceIO.guarded_save(curve, save_path, _connection)
 		if err != OK:
 			return {"error": "Failed to save Curve3D to %s (code %d)" % [save_path, err]}
 
@@ -122,7 +123,7 @@ func create_gradient(params: Dictionary) -> Dictionary:
 
 	var save_path: String = params.get("save_path", "")
 	if not save_path.is_empty():
-		var err := ResourceSaver.save(gradient, save_path)
+		var err := McpResourceIO.guarded_save(gradient, save_path, _connection)
 		if err != OK:
 			return {"error": "Failed to save Gradient to %s (code %d)" % [save_path, err]}
 
@@ -161,7 +162,7 @@ func create_gradient_texture(params: Dictionary) -> Dictionary:
 
 	var save_path: String = params.get("save_path", "")
 	if not save_path.is_empty():
-		var err := ResourceSaver.save(tex, save_path)
+		var err := McpResourceIO.guarded_save(tex, save_path, _connection)
 		if err != OK:
 			return {"error": "Failed to save GradientTexture to %s (code %d)" % [save_path, err]}
 

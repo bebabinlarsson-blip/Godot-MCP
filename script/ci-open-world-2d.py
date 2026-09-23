@@ -67,11 +67,13 @@ def _request_json(url: str, auth_token: str | None = None) -> dict:
         return json.loads(response.read().decode("utf-8"))
 
 
-def _wait_for_http_server(auth_token: str, timeout: float) -> bool:
+def _wait_for_http_server(auth_token: str, timeout: float, editor=None) -> bool:
     """Wait for the backend and prove its status route enforces Bearer auth."""
     status_url = "http://127.0.0.1:8000/api/v1/status"
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
+        if editor is not None and editor.poll() is not None:
+            return False
         anonymous_rejected = False
         try:
             _request_json(status_url)
@@ -151,22 +153,40 @@ def _wait_for_ports_to_close(ports: tuple[int, ...], timeout: float) -> bool:
     return False
 
 
-def _stop_editor(editor: subprocess.Popen, stdout_log, auth_token: str | None = None) -> None:
-    """Gracefully close Godot and its plugin-owned server, then close its log."""
-    if editor.poll() is None:
+def _terminate_editor_tree(editor: subprocess.Popen) -> None:
+    """Stop Godot and any plugin-owned backend descendant after startup failure."""
+    if os.name == "nt":
         try:
+            subprocess.run(
+                ["taskkill", "/PID", str(editor.pid), "/T", "/F"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+                timeout=15,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            if editor.poll() is None:
+                editor.kill()
+    elif editor.poll() is None:
+        editor.terminate()
+    try:
+        editor.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        editor.kill()
+        editor.wait()
+
+
+def _stop_editor(editor: subprocess.Popen, stdout_log, auth_token: str | None = None) -> None:
+    """Gracefully close Godot, then reap its process tree if shutdown fails."""
+    try:
+        if editor.poll() is None:
             if auth_token:
                 asyncio.run(_request_editor_quit(auth_token))
             editor.wait(timeout=10)
-        except Exception:
-            if editor.poll() is None:
-                editor.terminate()
-                try:
-                    editor.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    editor.kill()
-                    editor.wait()
-    stdout_log.close()
+    except Exception:
+        _terminate_editor_tree(editor)
+    finally:
+        stdout_log.close()
 
 
 def _editor_output(editor_stdout_log: Path, editor_log: Path) -> str:
@@ -208,6 +228,7 @@ def main() -> int:
                 "GODOT_AI_ALLOW_HEADLESS": "1",
                 "GODOT_AI_DISABLE_TELEMETRY": "true",
                 "GODOT_AI_MODE": "dev",
+                "GODOT_AI_STARTUP_TRACE": "true",
                 "GODOT_AI_VENV_PYTHON": sys.executable,
                 "GODOT_AI_AUTH_TOKEN": secrets.token_urlsafe(32),
             }
@@ -231,7 +252,7 @@ def main() -> int:
             stderr=subprocess.STDOUT,
         )
         auth_token = env["GODOT_AI_AUTH_TOKEN"]
-        if not _wait_for_http_server(auth_token, 30):
+        if not _wait_for_http_server(auth_token, 90, editor):
             _stop_editor(editor, editor_stdout, auth_token)
             output = _editor_output(editor_stdout_log, editor_log)
             raise RuntimeError(

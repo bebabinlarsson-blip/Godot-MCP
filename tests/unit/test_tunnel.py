@@ -15,16 +15,15 @@ import pytest
 
 from godot_ai import _add_tunnel_argument, _uses_automatic_tunnel
 from godot_ai.transport.tunnel import (
-    DEFAULT_TUNNEL_PROVIDER,
     _CF_URL_REGEX,
     _SSH_URL_REGEX,
+    DEFAULT_TUNNEL_PROVIDER,
     _ngrok_endpoint_for_port,
-    _wait_for_tunnel_match,
     _verify_local_auth,
+    _wait_for_tunnel_match,
     find_tunnel_binary,
     start_cloudflare_named_tunnel,
     start_cloudflare_quick_tunnel,
-    start_ngrok_tunnel,
     start_ssh_tunnel,
 )
 

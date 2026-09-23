@@ -807,6 +807,7 @@ func _run_status_refresh(
 		results[client_id] = {
 			"status": details.get("status", Client.Status.NOT_CONFIGURED),
 			"installed": bool(probe.get("installed", false)),
+			"owned": bool(details.get("owned", false)),
 			"error_msg": details.get("error_msg", ""),
 		}
 	return {"results": results, "generation": generation}

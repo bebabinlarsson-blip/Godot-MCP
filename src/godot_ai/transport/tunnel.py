@@ -329,7 +329,7 @@ def _verify_local_auth(port: int, token: str) -> None:
                     "Local MCP status check returned HTTP "
                     f"{response.status} with the configured token."
                 )
-    except HTTPError as exc:
+    except HTTPError:
         raise RuntimeError(
             "The local MCP server rejected GODOT_AI_AUTH_TOKEN; use the same token "
             "for Godot and the tunnel process."

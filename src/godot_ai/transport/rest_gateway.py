@@ -238,14 +238,18 @@ def register_rest_gateway(
         markdown_doc = (
             f"# Godot AI Remote Engine Bridge (v{_SERVER_VERSION})\n\n"
             "Full-access remote bridge to local Godot 4 editor and game project. "
-            "Works out-of-the-box in ChatGPT Web, ChatGPT Work Mode, and Python Code Interpreter.\n\n"
+            "Works out-of-the-box in ChatGPT Web, ChatGPT Work Mode, "
+            "and Python Code Interpreter.\n\n"
             f"Base URL: {base_url}\n\n"
             "## 1. Direct Project File Endpoints\n"
             f"- Project Tree: GET {base_url}/api/v1/tree?path=res://\n"
-            f"- Read File:    GET {base_url}/api/v1/files?path=res://path/to/script.gd (add &raw=true for plain text)\n"
-            f"- Write File:   POST {base_url}/api/v1/files?path=res://path/to/script.gd (send text or {{\"content\": \"...\"}})\n\n"
+            f"- Read File:    GET {base_url}/api/v1/files?path=res://path/to/script.gd "
+            "(add &raw=true for plain text)\n"
+            f"- Write File:   POST {base_url}/api/v1/files?path=res://path/to/script.gd "
+            "(send text or {\"content\": \"...\"})\n\n"
             "## 2. Universal Tool Dispatcher (100 Godot Tools)\n"
-            f"- HTTP POST: POST {base_url}/api/v1/call with {{\"tool\": \"<tool_name>\", \"arguments\": {{...}}}}\n"
+            f"- HTTP POST: POST {base_url}/api/v1/call with "
+            '{"tool": "<tool_name>", "arguments": {...}}\n'
             f"- HTTP GET:  GET {base_url}/api/v1/call?tool=<tool_name>&arg1=val1\n"
             f"- Tool List: GET {base_url}/api/v1/tools\n\n"
             "## 3. Essential Tool Examples\n"
@@ -445,11 +449,15 @@ def register_rest_gateway(
                     {
                         "name": t.name,
                         "description": t.description or "",
-                        "inputSchema": getattr(t, "parameters", {"type": "object", "properties": {}}),
+                        "inputSchema": getattr(
+                            t, "parameters", {"type": "object", "properties": {}}
+                        ),
                     }
                     for t in tools
                 ]
-                return JSONResponse({"jsonrpc": "2.0", "id": req_id, "result": {"tools": tool_list}})
+                return JSONResponse(
+                    {"jsonrpc": "2.0", "id": req_id, "result": {"tools": tool_list}}
+                )
 
             if method == "tools/call":
                 tool_name = params.get("name", "")

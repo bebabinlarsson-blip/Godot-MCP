@@ -130,7 +130,10 @@ def test_rest_gateway_endpoints(server_instance):
     # Remote MCP JSON-RPC protocol requests at root
     res_init = client.post(
         "/",
-        json={"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05"}},
+        json={
+            "jsonrpc": "2.0", "id": 1, "method": "initialize",
+            "params": {"protocolVersion": "2024-11-05"},
+        },
         headers=remote_headers,
     )
     assert res_init.status_code == 200

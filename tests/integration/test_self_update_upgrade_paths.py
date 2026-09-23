@@ -65,6 +65,12 @@ from tests.integration._self_update_fixture import (
     write_refused_swap_driver,
 )
 
+
+def _require_v4_release_target() -> None:
+    version = read_plugin_version(PLUGIN_ROOT / "plugin.cfg")
+    if not version.startswith("4."):
+        pytest.skip(f"v3-to-v4 release qualification applies only to a v4 target, got {version}")
+
 ## Needs a real Godot editor (GODOT_BIN); skipped without one and excluded
 ## from the iteration loop by `pytest -m "not editor"`.
 pytestmark = pytest.mark.editor
@@ -475,6 +481,7 @@ def test_signed_update_loads_matching_live_server_in_same_editor(
     signed_update_delivery,
 ) -> None:
     """Click Update on A; the same editor loads B and preserves editing state."""
+    _require_v4_release_target()
     godot_bin = godot_bin_or_skip()
     visible = os.environ.get("GODOT_AI_VISIBLE_SELF_UPDATE") == "1"
     smoke = load_smoke_script()
@@ -739,6 +746,7 @@ def test_final_v3_capsule_automatically_replaces_tree_repins_and_starts(
     from_version: str,
 ) -> None:
     """Click Update in an exact fleet v3 and prove the rest is automatic."""
+    _require_v4_release_target()
     godot_bin = godot_bin_or_skip()
     smoke = load_smoke_script()
     target_version = read_plugin_version(PLUGIN_ROOT / "plugin.cfg")
@@ -961,6 +969,7 @@ def test_final_v3_fallback_waits_for_an_interactive_editor(tmp_path: Path) -> No
     headless import or export that opens the project before the user does
     must leave every byte alone; the restore belongs to the interactive start.
     """
+    _require_v4_release_target()
     godot_bin = godot_bin_or_skip()
     smoke = load_smoke_script()
     target_version = read_plugin_version(PLUGIN_ROOT / "plugin.cfg")
@@ -1071,6 +1080,7 @@ func _process(_delta: float) -> void:
 
 def test_final_v3_capsule_restores_final_v3_when_godot_is_too_old(tmp_path: Path) -> None:
     """Below v4's Godot floor the capsule puts the final v3 add-on back, working."""
+    _require_v4_release_target()
     godot_bin = godot_bin_or_skip()
     smoke = load_smoke_script()
     target_version = read_plugin_version(PLUGIN_ROOT / "plugin.cfg")
@@ -1187,6 +1197,7 @@ def test_refused_swap_restores_the_old_runtime(tmp_path: Path) -> None:
     must rebuild the plugin from the unchanged tree, not leave a dead runtime
     behind a "previous version kept" label.
     """
+    _require_v4_release_target()
     godot_bin = godot_bin_or_skip()
     smoke = load_smoke_script()
     project = tmp_path / "refused-swap"
@@ -1255,6 +1266,7 @@ def test_refused_swap_restores_the_old_runtime(tmp_path: Path) -> None:
 
 def test_tampered_tree_after_swap_is_rolled_back_and_restarted(tmp_path: Path) -> None:
     """A swap whose live tree does not hash as expected restores the backup."""
+    _require_v4_release_target()
     godot_bin = godot_bin_or_skip()
     smoke = load_smoke_script()
     project = tmp_path / "rolled-back-update"
