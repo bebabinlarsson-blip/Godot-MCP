@@ -5,6 +5,18 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.33 (2026-09-23)
+
+Localhost.run set as primary default tunnel provider for permanent non-expiring connections without the 15-minute anonymous timeout or Cloudflare 403 blocks.
+
+### Fixed
+
+- **Permanent Tunnel Without 15-Minute Session Limit**:
+  - Set **`localhost.run`** (`*.lhr.life`) as the primary default tunnel provider across `godot-ai tunnel` and `start_ssh_tunnel`.
+  - Solves the 15-minute anonymous session timeout enforced by Serveo, providing a permanent URL that stays alive as long as the terminal/process runs without requiring key registration or accounts.
+  - Passes external ChatGPT, OpenAI, and Claude requests cleanly without Cloudflare Edge Bot Management 403 Forbidden blocks.
+  - Active background HTTP keepalive worker pings `/health` every 25 seconds to keep ISP NAT tables and SSH sessions hot indefinitely.
+
 ## 5.0.32 (2026-09-23)
 
 Serveo set as primary default tunnel provider with active HTTP keep-alive worker to eliminate Cloudflare Bot Management 403 Forbidden on ChatGPT and prevent idle timeouts.

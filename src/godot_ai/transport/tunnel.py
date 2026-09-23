@@ -87,7 +87,7 @@ def _start_keepalive_worker(
     t.start()
 
 
-def start_ssh_tunnel(port: int, service: str = "serveo") -> TunnelInfo:
+def start_ssh_tunnel(port: int, service: str = "localhost.run") -> TunnelInfo:
     """Start an SSH reverse tunnel using system OpenSSH without extra binaries."""
     ssh_bin = find_tunnel_binary("ssh")
     if not ssh_bin:
@@ -100,10 +100,10 @@ def start_ssh_tunnel(port: int, service: str = "serveo") -> TunnelInfo:
 
     if service == "pinggy":
         cmd = [ssh_bin, "-p", "443", "-R", f"0:127.0.0.1:{port}"] + keepalive + ["a.pinggy.io"]
-    elif service == "localhost.run":
-        cmd = [ssh_bin, "-R", f"80:127.0.0.1:{port}"] + keepalive + ["nokey@localhost.run"]
-    else:
+    elif service == "serveo":
         cmd = [ssh_bin, "-R", f"80:127.0.0.1:{port}"] + keepalive + ["serveo.net"]
+    else:
+        cmd = [ssh_bin, "-R", f"80:127.0.0.1:{port}"] + keepalive + ["nokey@localhost.run"]
 
     proc = subprocess.Popen(
         cmd,
@@ -127,11 +127,11 @@ def start_ssh_tunnel(port: int, service: str = "serveo") -> TunnelInfo:
 
     if not public_url:
         proc.terminate()
-        if service == "serveo":
-            logger.warning("Serveo tunnel timed out. Falling back to localhost.run...")
-            return start_ssh_tunnel(port, "localhost.run")
         if service == "localhost.run":
-            logger.warning("localhost.run timed out. Falling back to pinggy...")
+            logger.warning("localhost.run timed out. Falling back to serveo...")
+            return start_ssh_tunnel(port, "serveo")
+        if service == "serveo":
+            logger.warning("Serveo tunnel timed out. Falling back to pinggy...")
             return start_ssh_tunnel(port, "pinggy")
         raise RuntimeError(f"Failed to obtain public URL from SSH tunnel ({service}).")
 
@@ -196,23 +196,23 @@ def start_cloudflare_quick_tunnel(port: int) -> TunnelInfo:
     )
 
 
-def _start_tunnel_for_provider(port: int, provider: str = "serveo") -> TunnelInfo:
+def _start_tunnel_for_provider(port: int, provider: str = "localhost.run") -> TunnelInfo:
     """Dispatch to the right tunnel starter."""
+    if provider == "localhost.run":
+        return start_ssh_tunnel(port, "localhost.run")
     if provider == "serveo":
         return start_ssh_tunnel(port, "serveo")
     if provider == "pinggy":
         return start_ssh_tunnel(port, "pinggy")
-    if provider == "localhost.run":
-        return start_ssh_tunnel(port, "localhost.run")
     if provider == "cloudflare":
         return start_cloudflare_quick_tunnel(port)
-    # Default is serveo for unblocked ChatGPT access; fallback to localhost.run -> pinggy.
-    return start_ssh_tunnel(port, "serveo")
+    # Default is localhost.run for permanent non-expiring connection without 15m limit
+    return start_ssh_tunnel(port, "localhost.run")
 
 
 def run_tunnel_forever(
     port: int,
-    provider: str = "serveo",
+    provider: str = "localhost.run",
     on_connect: "callable | None" = None,
 ) -> None:
     """Start a tunnel and auto-reconnect on drops with exponential backoff.
@@ -253,7 +253,7 @@ def run_tunnel_forever(
 
 async def supervise_tunnel(
     port: int,
-    provider: TunnelProvider = "serveo",
+    provider: TunnelProvider = "localhost.run",
 ) -> TunnelInfo:
     """Async supervisor to launch and monitor cloud tunnel."""
     loop = asyncio.get_running_loop()
@@ -264,7 +264,7 @@ async def supervise_tunnel(
 
 async def supervise_tunnel_forever(
     port: int,
-    provider: TunnelProvider = "serveo",
+    provider: TunnelProvider = "localhost.run",
     on_connect: "callable | None" = None,
 ) -> None:
     """Async auto-reconnecting tunnel supervisor for co-launch mode.
