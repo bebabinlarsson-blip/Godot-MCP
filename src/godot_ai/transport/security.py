@@ -95,7 +95,20 @@ class CapabilityAuthMiddleware(_Wrapper):
             return
         path = scope.get("path", "")
         if (
-            path in ("", "/", "/index.html", "/chatgpt", "/docs", "/health")
+            scope.get("method") == "OPTIONS"
+            or path in (
+                "",
+                "/",
+                "/index.html",
+                "/chatgpt",
+                "/docs",
+                "/health",
+                "/llms.txt",
+                "/ai.txt",
+                "/instructions",
+                "/robots.txt",
+                "/favicon.ico",
+            )
             or path.startswith("/openapi")
             or path.startswith("/api/v1/")
         ):

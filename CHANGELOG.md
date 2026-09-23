@@ -5,6 +5,27 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.28 (2026-09-22)
+
+Zero-config external WAN and outside-network HTTPS tunnel access for ChatGPT, Serveo reverse tunnel integration with Let's Encrypt TLS, automatic multi-provider tunnel failover, 0.0.0.0 remote interface binding, standard llms.txt and ai.txt instructions, and tolerant filesystem operation aliases.
+
+### Added
+
+- **Serveo HTTPS Reverse Tunnel Integration**:
+  - `godot_ai.transport.tunnel`: Integrated `serveo.net` as primary zero-install SSH reverse tunnel provider. Supplies immediate Let's Encrypt TLS endpoints (`https://*.serveousercontent.com`) accessible from outside the local network without user authentication, client downloads, or browser warning screens.
+- **Resilient Multi-Provider Failover**:
+  - `godot_ai.transport.tunnel`: Added automated fallback mechanism from `serveo` to `localhost.run` to `pinggy` and `cloudflare`, ensuring high availability for remote sessions.
+  - Added `--protocol http2` to Cloudflare quick tunnels to bypass network environments that block QUIC UDP traffic.
+- **Remote Host Interface Binding (0.0.0.0)**:
+  - `godot_ai.__init__`: Server automatically binds to `0.0.0.0` when `--allow-remote` or `--tunnel` is specified, enabling direct inbound access from external network interfaces and port forwards.
+- **Standardized AI Endpoints (llms.txt, ai.txt, instructions)**:
+  - `godot_ai.transport.rest_gateway`: Added `/llms.txt`, `/ai.txt`, and `/instructions` endpoints delivering clean, concise markdown instructions tailored for LLMs and ChatGPT Web browsing.
+  - Root endpoint `/` automatically serves markdown instructions when `Accept: text/markdown` or `text/plain` is sent.
+  - Allowed `/llms.txt`, `/ai.txt`, `/instructions`, `/robots.txt`, and `/favicon.ico` through `CapabilityAuthMiddleware` and `LocalhostOnlyHTTPMiddleware`.
+- **Lenient Filesystem Operation Aliases**:
+  - `godot_ai.tools.filesystem`: Added aliases to `filesystem_manage` for `read_file`, `read`, `write_file`, `write`, `list_dir`, `list_files`, `ls`, `tree`, `delete_file`, and `move_file` to prevent errors from natural AI prompting variations.
+  - Fixed `files_endpoint` and `tree_endpoint` in REST gateway to invoke canonical filesystem operations.
+
 ## 5.0.27 (2026-09-22)
 
 Direct ChatGPT URL access mode with zero configuration, web browsing landing page with comprehensive AI instructions, full GET/POST query execution on /api/v1/call and all 100 tools, direct file read/write at /api/v1/files, project tree hierarchy at /api/v1/tree, capability auth bypass for root paths, and tunnel CLI provider selection.

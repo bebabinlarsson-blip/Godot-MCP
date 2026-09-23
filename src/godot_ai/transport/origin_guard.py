@@ -405,7 +405,19 @@ class LocalhostOnlyHTTPMiddleware:
         if (
             self.allow_remote
             or scope.get("method") == "OPTIONS"
-            or path in ("", "/", "/index.html", "/chatgpt", "/docs", "/health")
+            or path in (
+                "",
+                "/",
+                "/index.html",
+                "/chatgpt",
+                "/docs",
+                "/health",
+                "/llms.txt",
+                "/ai.txt",
+                "/instructions",
+                "/robots.txt",
+                "/favicon.ico",
+            )
             or path.startswith("/openapi")
             or path.startswith("/api/v1/")
         ):

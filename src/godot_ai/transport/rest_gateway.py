@@ -67,9 +67,14 @@ def register_rest_gateway(
     @mcp.custom_route("/index.html", methods=["GET"], include_in_schema=False)
     @mcp.custom_route("/chatgpt", methods=["GET"], include_in_schema=False)
     @mcp.custom_route("/docs", methods=["GET"], include_in_schema=False)
+    @mcp.custom_route("/llms.txt", methods=["GET"], include_in_schema=False)
+    @mcp.custom_route("/ai.txt", methods=["GET"], include_in_schema=False)
+    @mcp.custom_route("/instructions", methods=["GET"], include_in_schema=False)
     async def landing_endpoint(request: Request) -> Response:
         base_url = public_url or str(request.base_url).rstrip("/")
         accept = request.headers.get("accept", "").lower()
+        path = request.url.path
+
         if (
             "application/json" in accept
             and "text/html" not in accept
@@ -93,6 +98,48 @@ def register_rest_gateway(
                     },
                 }
             )
+
+        markdown_doc = (
+            f"# Godot AI Remote Engine Bridge (v{_SERVER_VERSION})\n\n"
+            "Full-access remote bridge to local Godot 4 editor and game project. "
+            "Works out-of-the-box in ChatGPT Web, ChatGPT Work Mode, and Python Code Interpreter.\n\n"
+            f"Base URL: {base_url}\n\n"
+            "## 1. Direct Project File Endpoints\n"
+            f"- Project Tree: GET {base_url}/api/v1/tree?path=res://\n"
+            f"- Read File:    GET {base_url}/api/v1/files?path=res://path/to/script.gd (add &raw=true for plain text)\n"
+            f"- Write File:   POST {base_url}/api/v1/files?path=res://path/to/script.gd (send text or {{\"content\": \"...\"}})\n\n"
+            "## 2. Universal Tool Dispatcher (100 Godot Tools)\n"
+            f"- HTTP POST: POST {base_url}/api/v1/call with {{\"tool\": \"<tool_name>\", \"arguments\": {{...}}}}\n"
+            f"- HTTP GET:  GET {base_url}/api/v1/call?tool=<tool_name>&arg1=val1\n"
+            f"- Tool List: GET {base_url}/api/v1/tools\n\n"
+            "## 3. Essential Tool Examples\n"
+            f"- Editor State:     {base_url}/api/v1/call?tool=editor_state\n"
+            f"- Scene Hierarchy:  {base_url}/api/v1/call?tool=scene_get_hierarchy\n"
+            f"- List Project:     {base_url}/api/v1/call?tool=filesystem_manage&op=list\n"
+            f"- Create Node:      {base_url}/api/v1/call?tool=node_create&name=Player\n"
+            f"- Create Script:    {base_url}/api/v1/call?tool=script_create&path=res://player.gd\n"
+            f"- Open Scene:       {base_url}/api/v1/call?tool=scene_open&path=res://main.tscn\n"
+            f"- Run Project:      {base_url}/api/v1/call?tool=project_run&op=run\n\n"
+            "## 4. ChatGPT Python Snippet\n"
+            "```python\n"
+            "import urllib.request, json\n\n"
+            f"BASE = \"{base_url}\"\n\n"
+            "def godot(tool: str, **kwargs):\n"
+            "    payload = json.dumps({\"tool\": tool, \"arguments\": kwargs}).encode()\n"
+            "    req = urllib.request.Request(f\"{BASE}/api/v1/call\", data=payload, headers={\"Content-Type\": \"application/json\"})\n"
+            "    with urllib.request.urlopen(req) as resp:\n"
+            "        return json.loads(resp.read().decode())\n\n"
+            "print(godot(\"editor_state\"))\n"
+            "print(godot(\"filesystem_manage\", op=\"read_text\", path=\"res://project.godot\"))\n"
+            "```\n"
+        )
+
+        if (
+            path in ("/llms.txt", "/ai.txt", "/instructions")
+            or "text/markdown" in accept
+            or ("text/plain" in accept and "text/html" not in accept)
+        ):
+            return PlainTextResponse(markdown_doc, media_type="text/markdown; charset=utf-8")
 
         html_content = (
             "<!DOCTYPE html>\n"
@@ -198,7 +245,7 @@ def register_rest_gateway(
             "    with urllib.request.urlopen(req) as resp:\n"
             "        return json.loads(resp.read().decode())\n\n"
             '# Check editor state\nprint(godot("editor_state"))\n'
-            '# Read file\nprint(godot("filesystem_manage", op="read_file", path="res://project.godot"))\n'
+            '# Read file\nprint(godot("filesystem_manage", op="read_text", path="res://project.godot"))\n'
             '# Get scene hierarchy\nprint(godot("scene_get_hierarchy"))\n'
             "</code></pre>\n"
             "</div>\n"
@@ -356,7 +403,7 @@ def register_rest_gateway(
             try:
                 res = await mcp.call_tool(
                     "filesystem_manage",
-                    arguments={"op": "read_file", "path": path},
+                    arguments={"op": "read_text", "path": path},
                 )
                 content = ""
                 if hasattr(res, "content"):
@@ -392,7 +439,7 @@ def register_rest_gateway(
             try:
                 res = await mcp.call_tool(
                     "filesystem_manage",
-                    arguments={"op": "write_file", "path": path, "content": content},
+                    arguments={"op": "write_text", "path": path, "content": content},
                 )
                 return JSONResponse(
                     {"success": True, "path": path, "result": str(res)}
@@ -411,7 +458,7 @@ def register_rest_gateway(
         try:
             res = await mcp.call_tool(
                 "filesystem_manage",
-                arguments={"op": "list_dir", "path": path},
+                arguments={"op": "list", "path": path, "recursive": True},
             )
             data: Any = res
             if hasattr(res, "content"):

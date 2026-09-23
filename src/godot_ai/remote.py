@@ -36,10 +36,12 @@ class RemoteGodotClient:
         self.timeout = timeout
 
     def _make_headers(self) -> dict[str, str]:
+        from godot_ai import __version__
+
         headers = {
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "User-Agent": "GodotAI-RemoteClient/5.0.27",
+            "User-Agent": f"GodotAI-RemoteClient/{__version__}",
         }
         if self.auth_token:
             headers["Authorization"] = f"Bearer {self.auth_token}"

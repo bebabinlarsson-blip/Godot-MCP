@@ -73,10 +73,20 @@ def register_filesystem_tools(mcp: FastMCP) -> None:
         description=_DESCRIPTION,
         ops={
             "read_text": filesystem_handlers.filesystem_read_text,
+            "read_file": filesystem_handlers.filesystem_read_text,
+            "read": filesystem_handlers.filesystem_read_text,
             "write_text": filesystem_handlers.filesystem_write_text,
+            "write_file": filesystem_handlers.filesystem_write_text,
+            "write": filesystem_handlers.filesystem_write_text,
             "list": filesystem_handlers.filesystem_list,
+            "list_dir": filesystem_handlers.filesystem_list,
+            "list_files": filesystem_handlers.filesystem_list,
+            "ls": filesystem_handlers.filesystem_list,
+            "tree": filesystem_handlers.filesystem_list,
             "delete": filesystem_handlers.filesystem_delete,
+            "delete_file": filesystem_handlers.filesystem_delete,
             "move": filesystem_handlers.filesystem_move,
+            "move_file": filesystem_handlers.filesystem_move,
             "reimport": filesystem_handlers.filesystem_reimport,
             "scan": filesystem_handlers.filesystem_scan,
             "search": filesystem_handlers.filesystem_search,
@@ -90,7 +100,13 @@ def register_filesystem_tools(mcp: FastMCP) -> None:
             ## File reads/searches/lists are per-call queries with arbitrary path
             ## or query inputs; no fixed-URI resource shape fits.
             "read_text": None,
+            "read_file": None,
+            "read": None,
             "list": None,
+            "list_dir": None,
+            "list_files": None,
+            "ls": None,
+            "tree": None,
             "search": None,
             ## `scan` is an editor action (not require_writable — it must run
             ## while readiness is "importing" to await an in-flight scan), so

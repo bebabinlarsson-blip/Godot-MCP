@@ -7,6 +7,8 @@ from typing import Any
 
 from fastmcp import FastMCP
 
+from godot_ai import __version__ as _DEFAULT_VERSION
+
 COMPACT_PRIMARY_TOOLS: tuple[str, ...] = (
     "scene_manage",
     "node_manage",
@@ -34,7 +36,7 @@ async def generate_openapi_spec(
     *,
     server_url: str = "http://localhost:8000",
     title: str = "Godot AI Engine Control",
-    version: str = "5.0.27",
+    version: str = _DEFAULT_VERSION,
     mode: str = "compact",
     tools: Sequence[Any] | None = None,
 ) -> dict[str, Any]:

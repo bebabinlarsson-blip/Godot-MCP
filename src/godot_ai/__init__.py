@@ -200,20 +200,26 @@ def main(argv: Sequence[str] | None = None) -> None:
         )
         tunnel_parser.add_argument(
             "--provider",
-            choices=["ssh", "pinggy", "localhost.run", "cloudflare"],
-            default="ssh",
-            help="Tunnel provider (default: ssh using system OpenSSH)",
+            choices=["serveo", "ssh", "pinggy", "localhost.run", "cloudflare"],
+            default="serveo",
+            help="Tunnel provider (default: serveo for zero-config HTTPS)",
         )
         t_args = tunnel_parser.parse_args(effective_argv[1:])
         if t_args.provider == "cloudflare":
             info = start_cloudflare_quick_tunnel(t_args.port)
         elif t_args.provider == "pinggy":
             info = start_ssh_tunnel(t_args.port, "pinggy")
-        else:
+        elif t_args.provider == "localhost.run":
             info = start_ssh_tunnel(t_args.port, "localhost.run")
+        else:
+            info = start_ssh_tunnel(t_args.port, "serveo")
 
-        print(f"Public tunnel active ({info.provider}): {info.public_url}")
-        print(f"OpenAPI Action Schema: {info.openapi_url}")
+        print("==================================================================", flush=True)
+        print(f"GODOT AI PUBLIC HTTPS ACCESS READY ({info.provider})", flush=True)
+        print(f"Public Link: {info.public_url}", flush=True)
+        print(f"OpenAPI Schema: {info.openapi_url}", flush=True)
+        print("Share this link with ChatGPT Web / Work Mode / Code Interpreter", flush=True)
+        print("==================================================================", flush=True)
         if info.process:
             try:
                 info.process.wait()
@@ -313,7 +319,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     parser.add_argument(
         "--tunnel",
-        choices=["cloudflare", "ngrok", "ssh", "pinggy", "localhost.run", "manual"],
+        choices=["serveo", "cloudflare", "ngrok", "ssh", "pinggy", "localhost.run", "manual"],
         default=None,
         help="Start automated public HTTPS tunnel for remote cloud access (e.g. ChatGPT).",
     )
@@ -354,18 +360,25 @@ def main(argv: Sequence[str] | None = None) -> None:
 
             print(
                 f"Godot AI server is already active on port {args.port} "
-                "(managed by Godot Editor)."
+                "(managed by Godot Editor).",
+                flush=True,
             )
-            print("Starting public tunnel to forward to active server...")
+            print("Starting public tunnel to forward to active server...", flush=True)
             if args.tunnel == "cloudflare":
                 tunnel_info = start_cloudflare_quick_tunnel(args.port)
             elif args.tunnel == "pinggy":
                 tunnel_info = start_ssh_tunnel(args.port, "pinggy")
-            else:
+            elif args.tunnel == "localhost.run":
                 tunnel_info = start_ssh_tunnel(args.port, "localhost.run")
+            else:
+                tunnel_info = start_ssh_tunnel(args.port, "serveo")
 
-            print(f"Public tunnel active ({tunnel_info.provider}): {tunnel_info.public_url}")
-            print(f"OpenAPI Action Schema: {tunnel_info.openapi_url}")
+            print("==================================================================", flush=True)
+            print(f"GODOT AI PUBLIC HTTPS ACCESS READY ({tunnel_info.provider})", flush=True)
+            print(f"Public Link: {tunnel_info.public_url}", flush=True)
+            print(f"OpenAPI Schema: {tunnel_info.openapi_url}", flush=True)
+            print("Share this link with ChatGPT Web / Work Mode / Code Interpreter", flush=True)
+            print("==================================================================", flush=True)
             if tunnel_info.process:
                 try:
                     tunnel_info.process.wait()
@@ -440,22 +453,25 @@ def _serve(
 ) -> None:
     from godot_ai.transport.origin_guard import bind_host_for_networks
 
-    ## Widen the HTTP bind off loopback only when an allowlist is named. The
-    ## DNS-rebinding guard still gates every request by the CIDR(s); binding
-    ## off loopback without the guard would be the footgun this flag avoids.
-    if allow_host_networks and args.transport in ("sse", "streamable-http"):
+    allow_remote = getattr(args, "allow_remote", False) or bool(getattr(args, "tunnel", None))
+    if (allow_host_networks or allow_remote) and args.transport in ("sse", "streamable-http"):
         import fastmcp
 
-        fastmcp.settings.host = bind_host_for_networks(allow_host_networks)
+        fastmcp.settings.host = (
+            "0.0.0.0" if allow_remote else bind_host_for_networks(allow_host_networks)
+        )
 
     ## #647: fail fast — with a recognizable message and exit code — when a
     ## foreign process holds a port we need, instead of uvicorn's opaque bind
     ## error (HTTP) or a half-ready HTTP process without its editor bridge.
     held_http = held_ws = None
     if args.transport in ("sse", "streamable-http"):
-        http_host = (
-            bind_host_for_networks(allow_host_networks) if allow_host_networks else "127.0.0.1"
-        )
+        if allow_remote:
+            http_host = "0.0.0.0"
+        elif allow_host_networks:
+            http_host = bind_host_for_networks(allow_host_networks)
+        else:
+            http_host = "127.0.0.1"
         held_http = preflight_check_port(
             args.port, label="HTTP", setting="godot_ai/http_port", host=http_host
         )
@@ -527,16 +543,20 @@ def _serve(
         try:
             if args.tunnel == "cloudflare":
                 tunnel_info = start_cloudflare_quick_tunnel(args.port)
-            elif args.tunnel in ("ssh", "localhost.run"):
-                tunnel_info = start_ssh_tunnel(args.port, "localhost.run")
             elif args.tunnel == "pinggy":
                 tunnel_info = start_ssh_tunnel(args.port, "pinggy")
+            elif args.tunnel == "localhost.run":
+                tunnel_info = start_ssh_tunnel(args.port, "localhost.run")
             else:
-                tunnel_info = None
+                tunnel_info = start_ssh_tunnel(args.port, "serveo")
 
             if tunnel_info:
-                print(f"Public tunnel active: {tunnel_info.public_url}")
-                print(f"OpenAPI Action Schema: {tunnel_info.openapi_url}")
+                print("==================================================================", flush=True)
+                print(f"GODOT AI PUBLIC HTTPS ACCESS READY ({tunnel_info.provider})", flush=True)
+                print(f"Public Link: {tunnel_info.public_url}", flush=True)
+                print(f"OpenAPI Schema: {tunnel_info.openapi_url}", flush=True)
+                print("Share this link with ChatGPT Web / Work Mode / Code Interpreter", flush=True)
+                print("==================================================================", flush=True)
         except Exception as exc:
             print(f"Failed to start tunnel: {exc}", file=sys.stderr)
 

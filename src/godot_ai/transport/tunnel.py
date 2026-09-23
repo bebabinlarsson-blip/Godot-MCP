@@ -12,7 +12,9 @@ from typing import Literal
 
 logger = logging.getLogger(__name__)
 
-TunnelProvider = Literal["cloudflare", "ngrok", "ssh", "pinggy", "localhost.run", "manual"]
+TunnelProvider = Literal[
+    "serveo", "cloudflare", "ngrok", "ssh", "pinggy", "localhost.run", "manual"
+]
 
 
 @dataclass
@@ -26,22 +28,22 @@ class TunnelInfo:
 _CF_URL_REGEX = re.compile(r"https://[a-zA-Z0-9-]+\.trycloudflare\.com")
 _NGROK_URL_REGEX = re.compile(r"https://[a-zA-Z0-9-]+\.ngrok-free\.app")
 _SSH_URL_REGEX = re.compile(
-    r"https://[a-zA-Z0-9.-]+\.(?:lhr\.life|localhost\.run|pinggy\.link|a\.pinggy\.link)"
+    r"https?://[a-zA-Z0-9.-]+\.(?:serveousercontent\.com|lhr\.life|localhost\.run|pinggy\.link|a\.pinggy\.link|free\.pinggy\.net|run\.pinggy-free\.link)"
 )
 
 
-def find_tunnel_binary(provider: TunnelProvider = "cloudflare") -> str | None:
+def find_tunnel_binary(provider: TunnelProvider = "serveo") -> str | None:
     """Find binary executable for the requested tunnel provider."""
     if provider == "cloudflare":
         return shutil.which("cloudflared")
     if provider == "ngrok":
         return shutil.which("ngrok")
-    if provider in ("ssh", "pinggy", "localhost.run"):
+    if provider in ("ssh", "serveo", "pinggy", "localhost.run"):
         return shutil.which("ssh")
     return None
 
 
-def start_ssh_tunnel(port: int, service: str = "localhost.run") -> TunnelInfo:
+def start_ssh_tunnel(port: int, service: str = "serveo") -> TunnelInfo:
     """Start an SSH reverse tunnel using system OpenSSH without extra binaries."""
     ssh_bin = find_tunnel_binary("ssh")
     if not ssh_bin:
@@ -61,10 +63,12 @@ def start_ssh_tunnel(port: int, service: str = "localhost.run") -> TunnelInfo:
             "StrictHostKeyChecking=no",
             "-o",
             f"UserKnownHostsFile={null_dev}",
+            "-o",
+            "ServerAliveInterval=30",
             "-T",
             "a.pinggy.io",
         ]
-    else:
+    elif service == "localhost.run":
         cmd = [
             ssh_bin,
             "-R",
@@ -73,8 +77,24 @@ def start_ssh_tunnel(port: int, service: str = "localhost.run") -> TunnelInfo:
             "StrictHostKeyChecking=no",
             "-o",
             f"UserKnownHostsFile={null_dev}",
+            "-o",
+            "ServerAliveInterval=30",
             "-T",
             "nokey@localhost.run",
+        ]
+    else:  # default: serveo.net
+        cmd = [
+            ssh_bin,
+            "-R",
+            f"80:127.0.0.1:{port}",
+            "-o",
+            "StrictHostKeyChecking=no",
+            "-o",
+            f"UserKnownHostsFile={null_dev}",
+            "-o",
+            "ServerAliveInterval=30",
+            "-T",
+            "serveo.net",
         ]
 
     proc = subprocess.Popen(
@@ -97,6 +117,12 @@ def start_ssh_tunnel(port: int, service: str = "localhost.run") -> TunnelInfo:
 
     if not public_url:
         proc.terminate()
+        if service == "serveo":
+            logger.warning("Serveo tunnel timed out. Falling back to localhost.run...")
+            return start_ssh_tunnel(port, "localhost.run")
+        if service == "localhost.run":
+            logger.warning("localhost.run timed out. Falling back to pinggy...")
+            return start_ssh_tunnel(port, "pinggy")
         raise RuntimeError(f"Failed to obtain public URL from SSH tunnel ({service}).")
 
     return TunnelInfo(
@@ -113,13 +139,15 @@ def start_cloudflare_quick_tunnel(port: int) -> TunnelInfo:
     if not bin_path:
         # Fallback to SSH tunnel if cloudflared is absent
         logger.info("cloudflared not found, falling back to SSH reverse tunnel...")
-        return start_ssh_tunnel(port)
+        return start_ssh_tunnel(port, "serveo")
 
     cmd = [
         bin_path,
         "tunnel",
         "--url",
         f"http://127.0.0.1:{port}",
+        "--protocol",
+        "http2",
         "--no-autoupdate",
     ]
     proc = subprocess.Popen(
@@ -143,7 +171,8 @@ def start_cloudflare_quick_tunnel(port: int) -> TunnelInfo:
 
     if not public_url:
         proc.terminate()
-        raise RuntimeError("Failed to obtain Cloudflare Quick Tunnel URL.")
+        logger.warning("Cloudflare tunnel failed. Falling back to SSH tunnel...")
+        return start_ssh_tunnel(port, "serveo")
 
     return TunnelInfo(
         provider="cloudflare",
@@ -155,13 +184,15 @@ def start_cloudflare_quick_tunnel(port: int) -> TunnelInfo:
 
 async def supervise_tunnel(
     port: int,
-    provider: TunnelProvider = "cloudflare",
+    provider: TunnelProvider = "serveo",
 ) -> TunnelInfo:
     """Async supervisor to launch and monitor cloud tunnel."""
     loop = asyncio.get_running_loop()
     if provider == "cloudflare":
         return await loop.run_in_executor(None, start_cloudflare_quick_tunnel, port)
-    if provider in ("ssh", "localhost.run"):
+    if provider in ("ssh", "serveo"):
+        return await loop.run_in_executor(None, start_ssh_tunnel, port, "serveo")
+    if provider == "localhost.run":
         return await loop.run_in_executor(None, start_ssh_tunnel, port, "localhost.run")
     if provider == "pinggy":
         return await loop.run_in_executor(None, start_ssh_tunnel, port, "pinggy")

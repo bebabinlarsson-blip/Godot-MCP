@@ -206,9 +206,9 @@ class GodotAIFastMCP(FastMCP):
     def http_app(self, *args: Any, **kwargs: Any):
         app = super().http_app(*args, **kwargs)
         transport = kwargs.get("transport", "http")
+        app = CORSMiddleware(app)
         if transport in ("http", "streamable-http"):
             app = StaleMcpSessionDiagnosticMiddleware(app)
-        app = CORSMiddleware(app)
         app = BoundedHTTPMiddleware(app)
         app = CapabilityAuthMiddleware(app, self._transport_capabilities.http)
         ## Outermost wrap: refuse non-loopback Host/Origin (DNS-rebinding

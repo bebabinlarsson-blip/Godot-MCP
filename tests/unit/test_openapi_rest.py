@@ -45,17 +45,19 @@ def test_rest_gateway_endpoints(server_instance):
     assert "Instructions for ChatGPT" in res_root.text
 
     # Landing page JSON format
+    from godot_ai import __version__
+
     res_json = client.get("/?format=json")
     assert res_json.status_code == 200
     assert res_json.json()["status"] == "online"
-    assert res_json.json()["version"] == "5.0.27"
+    assert res_json.json()["version"] == __version__
 
     # OpenAPI compact endpoint (default)
     res = client.get("/openapi.json")
     assert res.status_code == 200
     schema = res.json()
     assert schema["openapi"] == "3.1.0"
-    assert schema["info"]["version"] == "5.0.27"
+    assert schema["info"]["version"] == __version__
     assert len(schema["paths"]) <= 25
 
     # OpenAPI full endpoint
@@ -69,7 +71,7 @@ def test_rest_gateway_endpoints(server_instance):
     assert res.status_code == 200
     status_data = res.json()
     assert status_data["status"] == "online"
-    assert status_data["version"] == "5.0.27"
+    assert status_data["version"] == __version__
 
     # List tools endpoint
     res = client.get("/api/v1/tools")
@@ -90,9 +92,19 @@ def test_rest_gateway_endpoints(server_instance):
     res_tree = client.get("/api/v1/tree")
     assert res_tree.status_code in (200, 400)
 
+    # llms.txt and markdown instructions endpoint
+    res_llms = client.get("/llms.txt")
+    assert res_llms.status_code == 200
+    assert "Godot AI Remote Engine Bridge" in res_llms.text
+    assert "/api/v1/call" in res_llms.text
+
+    res_md = client.get("/", headers={"Accept": "text/markdown"})
+    assert res_md.status_code == 200
+    assert "Godot AI Remote Engine Bridge" in res_md.text
+
     # Remote external host and CORS (ChatGPT / remote machine simulation)
     remote_headers = {
-        "Host": "tunnel-subdomain.lhr.life",
+        "Host": "tunnel-subdomain.serveousercontent.com",
         "Origin": "https://chatgpt.com",
     }
     res_remote = client.get("/", headers=remote_headers)
@@ -105,11 +117,13 @@ def test_rest_gateway_endpoints(server_instance):
 
 
 def test_remote_godot_client_headers():
+    from godot_ai import __version__
+
     client = RemoteGodotClient("http://localhost:8000", auth_token="secret-123")
     headers = client._make_headers()
     assert headers["Authorization"] == "Bearer secret-123"
     assert headers["X-Godot-AI-Key"] == "secret-123"
-    assert client._make_headers()["User-Agent"] == "GodotAI-RemoteClient/5.0.27"
+    assert client._make_headers()["User-Agent"] == f"GodotAI-RemoteClient/{__version__}"
     assert headers["Content-Type"] == "application/json"
 
 
