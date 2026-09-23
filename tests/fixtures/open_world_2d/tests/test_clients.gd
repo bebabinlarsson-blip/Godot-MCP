@@ -25,22 +25,22 @@ func test_omni_plugin_configuration_exists() -> void:
 
 
 func test_core_exposes_session_activation() -> void:
-	var source := FileAccess.get_file_as_string("res://addons/godot_ai/plugin.gd")
+	var source := FileAccess.get_file_as_string("res://addons/godot_ai/tool_catalog.gd")
 	assert_true(source.contains("session_activate"))
 
 
 func test_core_exposes_editor_state() -> void:
-	var source := FileAccess.get_file_as_string("res://addons/godot_ai/plugin.gd")
+	var source := FileAccess.get_file_as_string("res://addons/godot_ai/tool_catalog.gd")
 	assert_true(source.contains("editor_state"))
 
 
 func test_core_exposes_scene_hierarchy() -> void:
-	var source := FileAccess.get_file_as_string("res://addons/godot_ai/plugin.gd")
+	var source := FileAccess.get_file_as_string("res://addons/godot_ai/tool_catalog.gd")
 	assert_true(source.contains("scene_get_hierarchy"))
 
 
 func test_core_exposes_node_properties() -> void:
-	var source := FileAccess.get_file_as_string("res://addons/godot_ai/plugin.gd")
+	var source := FileAccess.get_file_as_string("res://addons/godot_ai/tool_catalog.gd")
 	assert_true(source.contains("node_get_properties"))
 
 
