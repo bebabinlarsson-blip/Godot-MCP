@@ -79,16 +79,22 @@ def test_resource_handler_threads_connection_to_save() -> None:
 def test_curve_handler_threads_connection_to_save() -> None:
     source = (PLUGIN_ROOT / "handlers" / "curve_handler.gd").read_text(encoding="utf-8")
     assert "var _connection: McpConnection" in source
-    assert "connection: McpConnection" in source
-    set_points_block = get_func_block(source, "func set_points")
-    assert "save_to_disk(" in set_points_block
-    # Slice from save_to_disk( through the next return / line break out of
-    # the call. _connection must appear in that range.
-    after_save = set_points_block.split("save_to_disk(", 1)[1].split("\n\n", 1)[0]
-    assert "_connection" in after_save, (
-        "curve_handler.set_points must pass _connection to save_to_disk "
-        "for the pause guard to take effect. See #288."
-    )
+    for function_name in (
+        "create_curve_1d",
+        "create_curve_2d",
+        "create_curve_3d",
+        "create_gradient",
+        "create_gradient_texture",
+    ):
+        block = get_func_block(source, f"func {function_name}(")
+        assert "McpResourceIO.guarded_save(" in block, (
+            f"{function_name} must use the guarded resource save helper."
+        )
+        save_call = block.split("McpResourceIO.guarded_save(", 1)[1].split(")", 1)[0]
+        assert "_connection" in save_call, (
+            f"{function_name} must pass _connection so ResourceSaver.save() "
+            "cannot re-enter the WebSocket dispatcher. See #288."
+        )
 
 
 def test_environment_handler_threads_connection_to_save() -> None:
