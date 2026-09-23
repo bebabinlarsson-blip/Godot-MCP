@@ -318,6 +318,10 @@ def test_version_compatibility_matrix():
     assert "4.6.x" in versions
     assert "4.7+" in versions
     assert "4.8 (dev)" in versions
+    by_version = {row["version"]: row["status"] for row in matrix}
+    assert all(by_version[f"4.{minor}.x"] == "Unsupported" for minor in range(1, 7))
+    assert by_version["4.7+"] == "Supported (Stable)"
+    assert by_version["4.8 (dev)"] == "Experimental"
 
 
 # ==============================================================================

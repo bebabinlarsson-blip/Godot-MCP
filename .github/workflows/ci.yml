@@ -264,6 +264,12 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
 
+      - name: Open the 2D exploration project and load both addons
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        timeout-minutes: 5
+        run: python script/ci-open-world-2d.py godot
+
       - name: Install virtual display for Linux restart smoke
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y xvfb

@@ -39,8 +39,8 @@ const DEV_MODE_SETTING := "godot_ai/dev_mode"
 ## `_port_conflict_docs_url`) so a shipped build opens the guide as it shipped,
 ## not tip-of-main, which may have drifted from that build's UI.
 const PORT_CONFLICT_DOCS_PATH := "docs/port-conflicts.md"
-const REPO_BLOB_BASE := "https://github.com/hi-godot/godot-ai/blob"
-const RELEASES_PAGE := "https://github.com/hi-godot/godot-ai/releases/latest"
+const REPO_BLOB_BASE := "https://github.com/bebabinlarsson-blip/Godot-MCP/blob"
+const RELEASES_PAGE := "https://github.com/bebabinlarsson-blip/Godot-MCP/releases/latest"
 ## Opened by the "How to install uv" button. See _on_install_uv for why the
 ## dock links here instead of running an installer itself.
 const UV_INSTALL_DOCS_URL := "https://docs.astral.sh/uv/getting-started/installation/"

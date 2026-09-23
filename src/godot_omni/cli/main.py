@@ -135,7 +135,7 @@ def build_parser() -> argparse.ArgumentParser:
     # 6. versions
     versions_parser = subparsers.add_parser("versions", help="Inspect Godot version compatibility matrix")
     versions_subparsers = versions_parser.add_subparsers(dest="versions_subcommand", help="Versions action")
-    vstatus_p = versions_subparsers.add_parser("status", help="Show compatibility across Godot 4.1 to 4.7+")
+    vstatus_p = versions_subparsers.add_parser("status", help="Show compatibility across Godot 4.7 and newer")
     vstatus_p.add_argument("--json", action="store_true", help="Output JSON")
 
     # 7. self-test

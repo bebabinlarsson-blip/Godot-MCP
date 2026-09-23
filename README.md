@@ -5,12 +5,12 @@
 ### Free and Open-Source Model Context Protocol Automation Plugin for the Godot Engine
 
 [![MCP Protocol](https://img.shields.io/badge/MCP-Model%20Context%20Protocol-8A2BE2?style=flat&labelColor=333A41)](https://modelcontextprotocol.io)
-[![Release](https://img.shields.io/badge/Release-v5.0.5-blue.svg?style=flat&labelColor=333A41)](https://github.com/bebabinlarsson-blip/Godot-MCP/releases)
-[![Godot](https://img.shields.io/badge/Godot-4.1%20to%204.8+-478CBF?style=flat&logo=godotengine&logoColor=white&labelColor=333A41)](https://godotengine.org)
+[![Release](https://img.shields.io/badge/Release-v5.0.34-blue.svg?style=flat&labelColor=333A41)](https://github.com/bebabinlarsson-blip/Godot-MCP/releases)
+[![Godot](https://img.shields.io/badge/Godot-4.7+-478CBF?style=flat&logo=godotengine&logoColor=white&labelColor=333A41)](https://godotengine.org)
 [![Python](https://img.shields.io/badge/Python-3.11%20|%203.12%20|%203.13%20|%203.14-3776AB?style=flat&logo=python&logoColor=white&labelColor=333A41)](https://www.python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat&labelColor=333A41)](LICENSE)
 [![Cost](https://img.shields.io/badge/Cost-100%25%20Free-brightgreen.svg?style=flat&labelColor=333A41)](LICENSE)
-[![Author](https://img.shields.io/badge/Author-bebabin-2ea44f.svg?style=flat&labelColor=333A41)](https://github.com/bebabinlarsson-blip)
+[![Credits](https://img.shields.io/badge/Credits-Ghosty%20%26%20Bebabin-2ea44f.svg?style=flat&labelColor=333A41)](https://github.com/bebabinlarsson-blip/Godot-MCP)
 
 <br>
 
@@ -18,7 +18,7 @@
 
 <br>
 
-**100% Free & Open Source | Fully Local | No External Websites | No npm Packages | No Cloud Logins**
+**100% Free & Open Source | Local by Default | No npm Packages | Optional Public Tunnel**
 
 <br>
 
@@ -37,9 +37,9 @@ Godot MCP is a completely free, local, open-source automation plugin that connec
 Unlike other solutions that rely on external websites, cloud subscriptions, device logins, or custom npm CLI wrappers, Godot MCP is designed to be a straightforward in-engine Godot plugin:
 
 * 100% Free and Open Source: Released under the permissive MIT license. No subscriptions, no paid tiers, and no paywalls.
-* Completely Local and Private: No external website accounts, no cloud relays, and no OAuth device logins. All communication stays strictly on your local machine.
+* Local by default: communication stays on your machine unless you deliberately start a public tunnel. Public tunnels can expose the MCP server outside your network; see the tunnel security notes below.
 * Pure Godot Plugin: Drop the addons into your project and enable them in Godot. No npm packages to install, no global node.js tooling, and no external account setup.
-* Universal Engine Support: Operates via native GDScript inside Godot, supporting both Standard (GDScript) and .NET (Mono) editions of Godot 4.1 through 4.8+ Dev on Windows, macOS, and Linux.
+* Engine Support: Runs as native GDScript in Standard and .NET editions of Godot 4.7 and newer on Windows, macOS, and Linux.
 * 59 Tool Families & 1,820+ Operations: Comprehensive scene building, node transformations, procedural animation, tilemap editing, collision creation, and direct GDScript evaluation.
 * Single Native Dock: Seamlessly integrated tab directly beside your Inspector with live activity monitoring, connection diagnostics, and memory indicators.
 
@@ -79,7 +79,7 @@ You do not need to register on any website or install any npm packages.
 
 ### Step 1: Download and Extract the Plugin
 
-1. Download the free release archive `godot-mcp-v5.0.5.zip` from [GitHub Releases](https://github.com/bebabinlarsson-blip/Godot-MCP/releases).
+1. Download `godot-mcp-v5.0.34.zip` from [GitHub Releases](https://github.com/bebabinlarsson-blip/Godot-MCP/releases).
 2. Extract the archive into your Godot project root so that the `addons/` folder is placed directly in your project:
 
 ```text
@@ -336,9 +336,48 @@ To allow the plugin to run during headless testing or CI:
 $env:GODOT_AI_ALLOW_HEADLESS="1"
 ```
 
+### Public tunnel access
+
+The default `localhost.run` tunnel creates a public hostname for the current
+connection. That hostname can change after a reconnect. Cloudflare Quick
+Tunnels also use temporary hostnames. Neither option reserves a permanent URL.
+
+For a stable hostname, create a named Cloudflare Tunnel in your Cloudflare
+account, route the hostname to `http://127.0.0.1:8000`, and keep both the Godot
+editor and `cloudflared` running on an always-on machine. Store the tunnel token
+in a file (this option requires cloudflared 2025.4.0 or newer) and set:
+
+```sh
+GODOT_AI_CLOUDFLARE_TUNNEL_TOKEN_FILE=/path/to/cloudflare-token
+GODOT_AI_TUNNEL_PUBLIC_URL=https://mcp.example.com
+godot-ai tunnel --provider cloudflare-named
+```
+
+On Windows, set the same environment variables in PowerShell before running
+`godot-ai tunnel`. The stable hostname is configured in Cloudflare DNS; it
+cannot be reserved by this plugin. A hostname stays reachable only while the
+machine, editor server, and tunnel process are online.
+
+Treat any public tunnel as an internet-facing endpoint. Configure the same
+`GODOT_AI_AUTH_TOKEN` in the MCP server and the AI client's Bearer
+authorization. Start Godot with the token set before launching the editor.
+Every automated public tunnel provider refuses to start unless `/health`
+rejects anonymous requests and accepts that token. The `ngrok` provider reads
+the endpoint from ngrok's local Agent API at `127.0.0.1:4040`; keep that API
+bound to loopback. Share the URL only with intended clients.
+
+The MCP gateway advertises its available tools at `/api/v1/tools` and exposes
+the OpenAPI document at `/openapi.json`. The editor and tunnel process must
+both remain online for those tools to be reachable.
+
 ---
 
 ## Author and License
 
-* Author: [bebabin](https://github.com/bebabinlarsson-blip) (`bebabinlarsson@gmail.com`)
+* Project credits: [Ghosty](https://github.com/ghostySRC) and [Bebabin](https://github.com/bebabinlarsson-blip)
+* AI use: AI assistance contributed to code and documentation in this release.
 * License: [MIT License](LICENSE) (100% Free and Open Source)
+
+For Godot Asset Library listings, use the direct icon files:
+[Godot MCP Core](https://raw.githubusercontent.com/bebabinlarsson-blip/Godot-MCP/main/addons/godot_ai/icon.png) ·
+[Godot MCP Omni](https://raw.githubusercontent.com/bebabinlarsson-blip/Godot-MCP/main/addons/godot_omni/icon.png).

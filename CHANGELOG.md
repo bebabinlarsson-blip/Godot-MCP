@@ -5,29 +5,48 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
-## 5.0.33 (2026-09-23)
+## 5.0.34 (2026-09-23)
 
-Localhost.run set as primary default tunnel provider for permanent non-expiring connections without the 15-minute anonymous timeout or Cloudflare 403 blocks.
+Fixes the advertised and enforced Godot minimum version, adds named Cloudflare support, protects all automated public tunnels with an auth check, and puts bounded timeouts around tunnel startup. Also corrects public-tunnel persistence claims and updates package metadata and project credits.
 
 ### Fixed
 
-- **Permanent Tunnel Without 15-Minute Session Limit**:
+- **Godot compatibility:** the plugin now consistently requires Godot 4.7+, matching the backend and the existing 4.5/4.6 refusal checks.
+- **Tunnel startup:** silent or stalled tunnel processes now time out instead of blocking startup forever.
+- **Tunnel provider dispatch:** ngrok now reads the endpoint matching the requested local port from the current Agent API; an unavailable or unknown provider reports an error instead of silently selecting localhost.run. `manual` no longer binds the server to every interface.
+- **Public endpoint protection:** every automated public provider checks that the local server rejects requests without the configured Bearer token and accepts that token before starting.
+- **Tunnel URL claims:** anonymous tunnel URLs are documented as temporary and may change on reconnect.
+- **Repository metadata:** package links, plugin author fields, version badges, and the release archive name now point to this repository and v5.0.34.
+- **Update polling:** v5 packages no longer contact or offer releases from the v4-only upstream signed updater; v5 updates use this repository's release archive.
+
+### Added
+
+- **Named Cloudflare Tunnel:** `godot-ai tunnel --provider cloudflare-named` uses a token file and a hostname configured in the user's Cloudflare account.
+- **Open-world 2D editor fixture:** a small movement-and-camera project exercises plugin loading and confirms the gateway advertises its four always-on core tools in the Godot CI job.
+- **Credits and AI use disclosure:** release package credits Ghosty and Bebabin and states where AI assistance was used.
+
+## 5.0.33 (2026-09-23)
+
+Localhost.run became the primary default tunnel provider. Its anonymous hostname is assigned per connection and is not reserved. The keepalive worker is best-effort and cannot prevent a provider from disconnecting.
+
+### Fixed
+
+- **Tunnel provider selection**:
   - Set **`localhost.run`** (`*.lhr.life`) as the primary default tunnel provider across `godot-ai tunnel` and `start_ssh_tunnel`.
-  - Solves the 15-minute anonymous session timeout enforced by Serveo, providing a permanent URL that stays alive as long as the terminal/process runs without requiring key registration or accounts.
-  - Passes external ChatGPT, OpenAI, and Claude requests cleanly without Cloudflare Edge Bot Management 403 Forbidden blocks.
-  - Active background HTTP keepalive worker pings `/health` every 25 seconds to keep ISP NAT tables and SSH sessions hot indefinitely.
+  - Avoids depending on the documented anonymous Serveo session behavior in common runs. The generated hostname is not permanent and may change after reconnect.
+  - The prior release notes claimed to verify external AI service requests and Cloudflare edge behavior; those claims were not covered by automated tests.
+  - A background HTTP keepalive worker pings `/health` every 25 seconds to reduce idle tunnel disconnects while the process is running.
 
 ## 5.0.32 (2026-09-23)
 
-Serveo set as primary default tunnel provider with active HTTP keep-alive worker to eliminate Cloudflare Bot Management 403 Forbidden on ChatGPT and prevent idle timeouts.
+Serveo set as primary default tunnel provider with an HTTP keep-alive worker.
 
 ### Fixed
 
-- **Cloudflare Edge Bot Block (403 Forbidden)**:
-  - Identified and resolved the root cause of `403 Forbidden` ("Your request was blocked") when external AI agents (ChatGPT, Claude) connect to `*.trycloudflare.com`. Cloudflare Quick Tunnels enforce global Bot Management rules at their edge that block AI crawlers, datacenter IPs, and MCP clients before reaching the local server.
-  - Set **Serveo** (`serveousercontent.com`) as the primary default tunnel provider for `godot-ai tunnel` and `start_tunnel`. Serveo does not block ChatGPT, OpenAI, or Claude.
-- **Tunnel Idle Inactivity Fix (15-Minute Timeout)**:
-  - Added background daemon keep-alive worker (`_start_keepalive_worker`) in `godot_ai.transport.tunnel` that issues lightweight HTTP pings (`GET /health`) through the reverse tunnel every 25 seconds. This guarantees continuous active HTTP traffic through Serveo and NAT firewalls, keeping tunnels permanently connected as long as the terminal runs.
+- **Tunnel provider selection**:
+  - Set Serveo (`serveousercontent.com`) as the primary default for this release. Provider edge policies and external AI client compatibility were not verified by automated tests.
+- **Tunnel keepalive**:
+  - Added a background daemon keep-alive worker (`_start_keepalive_worker`) in `godot_ai.transport.tunnel` that issues lightweight `GET /health` pings through the reverse tunnel every 25 seconds as a best-effort measure to reduce idle disconnects.
   - Tightened SSH keepalive parameters: `ServerAliveInterval=10`, `ServerAliveCountMax=60`, `TCPKeepAlive=yes`.
   - Fixed `_SSH_URL_REGEX` to exclude `admin.localhost.run` greeting banner.
 
@@ -71,7 +90,7 @@ Cloudflare Quick Tunnel set as primary default provider for permanent HTTPS link
 ### Added
 
 - **Cloudflare Quick Tunnel Default**:
-  - `godot_ai.transport.tunnel`: Set Cloudflare Quick Tunnel as the primary default provider for `godot-ai tunnel` and `godot-ai --tunnel`. Emits persistent, stable `https://*.trycloudflare.com` links that remain live without provider session timeouts. Seamless automatic fallback to SSH tunnels (Serveo, localhost.run, Pinggy) if `cloudflared` is absent.
+  - `godot_ai.transport.tunnel`: Added Cloudflare Quick Tunnel support. Quick Tunnel hostnames are temporary and may change after reconnect. Automatic fallback to SSH tunnels (Serveo, localhost.run, Pinggy) is available if `cloudflared` is absent.
 - **Auto-Reconnecting Tunnel Supervisor**:
   - `godot_ai.transport.tunnel`: Added `run_tunnel_forever()` and `supervise_tunnel_forever()` implementing automated reconnect with exponential backoff (2s up to 30s cap) and aggressive SSH keep-alive (`ServerAliveInterval=15`, `ServerAliveCountMax=4`, `TCPKeepAlive=yes`, `ExitOnForwardFailure=yes`).
   - `godot_ai.__init__`: Integrated auto-reconnect across all tunnel execution paths (subcommand, attach to active editor server, and co-launch mode via background daemon thread).

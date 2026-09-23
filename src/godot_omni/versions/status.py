@@ -22,51 +22,51 @@ class VersionCompatibility:
 VERSION_MATRIX: list[VersionCompatibility] = [
     VersionCompatibility(
         version="4.1.x",
-        status="Supported",
+        status="Unsupported",
         core_features=["Node/Scene/Script Ops", "HTTP/WS Transport", "Basic ClassDB"],
         reflection_tier="Basic Object Call",
         ui_automation="Inspector & Node Path",
-        notes="First production 4.x baseline. Fast and stable.",
+        notes="Godot AI v4 requires Godot 4.7 or newer; the plugin stays inactive on this version.",
     ),
     VersionCompatibility(
         version="4.2.x",
-        status="Supported",
+        status="Unsupported",
         core_features=["GDExtension 4.2", "TileMap Multi-layer", "Addon Auto-load"],
         reflection_tier="Method & Signal Discovery",
         ui_automation="Inspector & Scene Dock",
-        notes="Full support for GDExtension workflows and custom types.",
+        notes="Godot AI v4 requires Godot 4.7 or newer; the plugin stays inactive on this version.",
     ),
     VersionCompatibility(
         version="4.3.x",
-        status="Supported",
+        status="Unsupported",
         core_features=["TileMapLayer Node", "Compositor Effects", "UID System", "AudioStreamInteractive"],
         reflection_tier="Full ClassDB Reflection",
         ui_automation="Semantic Control Tree",
-        notes="TileMapLayer separation natively handled; UID tracking active.",
+        notes="Godot AI v4 requires Godot 4.7 or newer; the plugin stays inactive on this version.",
     ),
     VersionCompatibility(
         version="4.4.x",
-        status="Supported",
+        status="Unsupported",
         core_features=["Typed Dictionaries", "Jolt Physics Integration", "Lightmap Bicubic"],
         reflection_tier="Typed Variant Reflection",
         ui_automation="Semantic Control Tree + Shortcuts",
-        notes="Strongly typed variant validation active.",
+        notes="Godot AI v4 requires Godot 4.7 or newer; the plugin stays inactive on this version.",
     ),
     VersionCompatibility(
         version="4.5.x",
-        status="Supported",
+        status="Unsupported",
         core_features=["Modern Rendering Pipelines", "Shader Global Buffers", "Audio Effect Graphs"],
         reflection_tier="Universal Object Reflection (obj://)",
         ui_automation="Full Semantic UI Tree + Shortcuts",
-        notes="Zero-copy buffer support and modern shader parameters.",
+        notes="Godot AI v4 requires Godot 4.7 or newer; the plugin stays inactive on this version.",
     ),
     VersionCompatibility(
         version="4.6.x",
-        status="Supported",
+        status="Unsupported",
         core_features=["Advanced NavigationServer3D", "Async Asset Pipeline", "Threaded Node Loading"],
         reflection_tier="Universal Object Reflection (obj://)",
         ui_automation="Full Semantic UI Tree + Native OS Fallback",
-        notes="Thread-safe operation queuing active.",
+        notes="Godot AI v4 requires Godot 4.7 or newer; the plugin stays inactive on this version.",
     ),
     VersionCompatibility(
         version="4.7+",
@@ -78,7 +78,7 @@ VERSION_MATRIX: list[VersionCompatibility] = [
     ),
     VersionCompatibility(
         version="4.8 (dev)",
-        status="Fully Supported (Active Dev)",
+        status="Experimental",
         core_features=[
             "Texture Streaming",
             "Trail3D",
@@ -90,7 +90,10 @@ VERSION_MATRIX: list[VersionCompatibility] = [
         ],
         reflection_tier="Universal Object Reflection + Gen Tracking + Dynamic ClassDB",
         ui_automation="Full Semantic UI Tree + Multi-Window + Accessibility API",
-        notes="Direct first-class support for Godot 4.8 development builds (dev snapshots), Texture Streaming, Trail3D, and updated ClassDB.",
+        notes=(
+            "Development builds are not in the release-blocking test matrix; "
+            "use Godot 4.7 for verified releases."
+        ),
     ),
 ]
 
@@ -125,6 +128,6 @@ def get_version_status() -> dict[str, Any]:
     ]
     return {
         "detected_local_versions": installed,
-        "recommended_version": "4.7+ / 4.8 (dev)",
+        "recommended_version": "4.7+ (stable)",
         "matrix": matrix_data,
     }

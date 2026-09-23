@@ -107,7 +107,7 @@ func _build_ui() -> void:
 	header_bar.add_child(title)
 
 	var version_badge := Label.new()
-	version_badge.text = "v5.0.33"
+	version_badge.text = "v5.0.34"
 
 	version_badge.modulate = Color(0.45, 0.75, 1.0)
 	version_badge.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -581,4 +581,3 @@ func present_update_state(_state: Dictionary) -> void:
 
 func release_editor_progress_dialog() -> void:
 	pass
-

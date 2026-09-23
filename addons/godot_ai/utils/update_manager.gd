@@ -90,7 +90,13 @@ func check_for_updates() -> void:
 		_qualification.clear()
 		push_error("MCP | invalid private qualification release capability")
 		return
-	if ClientConfigurator.is_dev_checkout():
+	## The signed self-updater still speaks the v4 release envelope. The v5
+	## release archive has its own manual install flow and must never poll or
+	## offer an unrelated upstream repository's release.
+	if (
+		ClientConfigurator.is_dev_checkout()
+		or _version_parts(ClientConfigurator.get_plugin_version()).is_empty()
+	):
 		return
 	if _check_request != null:
 		_check_request.queue_free()

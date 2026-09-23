@@ -15,9 +15,9 @@ const UpdateInstaller := preload("res://addons/godot_ai/utils/update_installer.g
 const LIVE_ADDON_ROOT := "res://addons/godot_ai"
 const PLUGIN_CFG := "res://addons/godot_ai/plugin.cfg"
 const MIN_GODOT_MAJOR := 4
-const MIN_GODOT_MINOR := 1
+const MIN_GODOT_MINOR := 7
 const UNSUPPORTED_GODOT_MESSAGE := \
-	"Godot Omni requires Godot 4.1 or newer in the 4.x line; plugin remains inactive."
+	"Godot AI v4 requires Godot 4.7 or newer in the 4.x line; plugin remains inactive."
 
 ## The lifecycle manager owns the serialized server episode and process
 ## authority. This root only captures its immutable launch plan and routes

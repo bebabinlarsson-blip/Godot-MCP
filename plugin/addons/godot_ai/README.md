@@ -26,7 +26,7 @@ configuration required.
 
 ## Requirements
 
-- **Godot:** 4.1 through 4.8+ (including dev builds)
+- **Godot:** 4.7 or newer
 - **Python:** 3.11, 3.12, 3.13, or 3.14 with `godot-omni` installed
 
 ## Documentation
@@ -36,3 +36,8 @@ Full documentation and source: [github.com/bebabinlarsson-blip/Godot-MCP](https:
 ## License
 
 [MIT](LICENSE)
+
+## Credits and AI use
+
+Project credits: Ghosty and Bebabin. AI assistance was used for code and
+documentation contributions in this release.

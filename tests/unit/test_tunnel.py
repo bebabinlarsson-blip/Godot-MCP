@@ -3,19 +3,28 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
+import threading
+import time
+from io import BytesIO
 from unittest.mock import MagicMock, patch
+from urllib.error import HTTPError
 
 import pytest
 
-from godot_ai import _add_tunnel_argument
+from godot_ai import _add_tunnel_argument, _uses_automatic_tunnel
 from godot_ai.transport.tunnel import (
     DEFAULT_TUNNEL_PROVIDER,
     _CF_URL_REGEX,
     _SSH_URL_REGEX,
+    _ngrok_endpoint_for_port,
+    _wait_for_tunnel_match,
+    _verify_local_auth,
     find_tunnel_binary,
-    run_tunnel_forever,
+    start_cloudflare_named_tunnel,
     start_cloudflare_quick_tunnel,
+    start_ngrok_tunnel,
     start_ssh_tunnel,
 )
 
@@ -27,6 +36,39 @@ def test_legacy_tunnel_flag_uses_shared_provider_default():
     assert DEFAULT_TUNNEL_PROVIDER == "localhost.run"
     assert parser.parse_args(["--tunnel"]).tunnel == DEFAULT_TUNNEL_PROVIDER
     assert parser.parse_args(["--tunnel", "cloudflare"]).tunnel == "cloudflare"
+    assert parser.parse_args(["--tunnel", "cloudflare-named"]).tunnel == "cloudflare-named"
+
+
+def test_tunnel_cli_accepts_named_cloudflare_provider():
+    from godot_ai import main
+
+    with (
+        patch("godot_ai.runtime_dependencies.verify_runtime_dependencies"),
+        patch("godot_ai.transport.tunnel.run_tunnel_forever") as run_tunnel,
+    ):
+        main(["tunnel", "--provider", "cloudflare-named"])
+
+    run_tunnel.assert_called_once()
+    assert run_tunnel.call_args.args[1] == "cloudflare-named"
+
+
+def test_tunnel_cli_accepts_ngrok_provider():
+    from godot_ai import main
+
+    with (
+        patch("godot_ai.runtime_dependencies.verify_runtime_dependencies"),
+        patch("godot_ai.transport.tunnel.run_tunnel_forever") as run_tunnel,
+    ):
+        main(["tunnel", "--provider", "ngrok"])
+
+    run_tunnel.assert_called_once()
+    assert run_tunnel.call_args.args[1] == "ngrok"
+
+
+def test_manual_tunnel_does_not_request_public_bind():
+    assert not _uses_automatic_tunnel(None)
+    assert not _uses_automatic_tunnel("manual")
+    assert _uses_automatic_tunnel("cloudflare")
 
 
 def test_ssh_url_regex_matches():
@@ -78,7 +120,10 @@ def test_start_ssh_tunnel_success():
         "Forwarding HTTP traffic from https://my-tunnel.serveousercontent.com\n",
     ]
 
-    with patch("subprocess.Popen", return_value=fake_proc):
+    with (
+        patch("godot_ai.transport.tunnel._verify_local_auth"),
+        patch("subprocess.Popen", return_value=fake_proc),
+    ):
         info = start_ssh_tunnel(8000, service="serveo")
         assert info.provider == "ssh_serveo"
         assert info.public_url == "https://my-tunnel.serveousercontent.com"
@@ -94,9 +139,175 @@ def test_start_cloudflare_tunnel_success():
 
     with (
         patch("godot_ai.transport.tunnel.find_tunnel_binary", return_value="cloudflared"),
+        patch("godot_ai.transport.tunnel._verify_local_auth"),
         patch("subprocess.Popen", return_value=fake_proc),
     ):
         info = start_cloudflare_quick_tunnel(8000)
         assert info.provider == "cloudflare"
         assert info.public_url == "https://quick-test.trycloudflare.com"
         assert info.openapi_url == "https://quick-test.trycloudflare.com/openapi.json"
+
+
+def test_tunnel_startup_reader_times_out_if_output_read_blocks():
+    read_started = threading.Event()
+    release_read = threading.Event()
+
+    class BlockingStdout:
+        def readline(self):
+            read_started.set()
+            release_read.wait(timeout=1)
+            return ""
+
+    fake_proc = MagicMock()
+    fake_proc.stdout = BlockingStdout()
+    fake_proc.poll.return_value = None
+    started = time.monotonic()
+    try:
+        match, lines = _wait_for_tunnel_match(fake_proc, re.compile(r"https://example\.com"), 0.05)
+    finally:
+        release_read.set()
+
+    assert read_started.wait(timeout=0.5)
+    assert time.monotonic() - started < 0.75
+    assert match is None
+    assert lines == []
+
+
+def test_ngrok_endpoint_lookup_uses_current_api_and_requested_upstream_port():
+    payload = {
+        "endpoints": [
+            {
+                "url": "https://other.ngrok.app",
+                "upstream": {"url": "http://localhost:9000"},
+            },
+            {
+                "url": "https://godot.example.ngrok.app",
+                "upstream": {"url": "http://127.0.0.1:8123"},
+            },
+        ]
+    }
+    with patch(
+        "godot_ai.transport.tunnel.urllib.request.urlopen",
+        return_value=BytesIO(json.dumps(payload).encode()),
+    ) as urlopen:
+        assert _ngrok_endpoint_for_port(8123) == "https://godot.example.ngrok.app"
+
+    assert urlopen.call_args.args[0] == "http://127.0.0.1:4040/api/endpoints"
+
+
+def test_ngrok_endpoint_lookup_rejects_non_https_and_wrong_upstream_port():
+    payload = {
+        "endpoints": [
+            {"url": "http://godot.example.ngrok.app", "upstream": {"url": "127.0.0.1:8123"}},
+            {"url": "https://godot.example.ngrok.app", "upstream": {"url": "127.0.0.1:9000"}},
+        ]
+    }
+    with patch(
+        "godot_ai.transport.tunnel.urllib.request.urlopen",
+        return_value=BytesIO(json.dumps(payload).encode()),
+    ):
+        assert _ngrok_endpoint_for_port(8123) is None
+
+
+def test_ngrok_provider_starts_and_returns_its_matching_public_url(monkeypatch):
+    monkeypatch.setenv("GODOT_AI_AUTH_TOKEN", "mcp-auth-secret")
+    fake_proc = MagicMock()
+    fake_proc.poll.return_value = None
+    with (
+        patch("godot_ai.transport.tunnel._verify_local_auth"),
+        patch("godot_ai.transport.tunnel.find_tunnel_binary", return_value="ngrok"),
+        patch(
+            "godot_ai.transport.tunnel._ngrok_endpoint_for_port",
+            return_value="https://godot.ngrok.app",
+        ),
+        patch("godot_ai.transport.tunnel._start_keepalive_worker"),
+        patch("subprocess.Popen", return_value=fake_proc) as popen,
+    ):
+        from godot_ai.transport.tunnel import _start_tunnel_for_provider
+
+        info = _start_tunnel_for_provider(8123, "ngrok")
+
+    assert popen.call_args.args[0] == ["ngrok", "http", "127.0.0.1:8123"]
+    assert info.provider == "ngrok"
+    assert info.public_url == "https://godot.ngrok.app"
+    assert info.openapi_url == "https://godot.ngrok.app/openapi.json"
+
+
+def test_named_cloudflare_tunnel_uses_token_file_and_stable_https_url(monkeypatch, tmp_path):
+    token_file = tmp_path / "tunnel-token"
+    token_file.write_text("secret-token", encoding="utf-8")
+    monkeypatch.setenv("GODOT_AI_CLOUDFLARE_TUNNEL_TOKEN_FILE", str(token_file))
+    monkeypatch.setenv("GODOT_AI_TUNNEL_PUBLIC_URL", "https://mcp.example.com/")
+    monkeypatch.setenv("GODOT_AI_AUTH_TOKEN", "mcp-auth-secret")
+
+    fake_proc = MagicMock()
+    fake_proc.stdout.readline.side_effect = [
+        "Registered tunnel connection connIndex=0\n",
+    ]
+    with (
+        patch("godot_ai.transport.tunnel.find_tunnel_binary", return_value="cloudflared"),
+        patch("godot_ai.transport.tunnel._verify_local_auth"),
+        patch("subprocess.Popen", return_value=fake_proc) as popen,
+    ):
+        info = start_cloudflare_named_tunnel(8000)
+
+    command = popen.call_args.args[0]
+    assert command[:4] == ["cloudflared", "tunnel", "run", "--token-file"]
+    assert command[4] == str(token_file)
+    assert "secret-token" not in command
+    assert info.provider == "cloudflare-named"
+    assert info.public_url == "https://mcp.example.com"
+    assert info.openapi_url == "https://mcp.example.com/openapi.json"
+
+
+def test_named_tunnel_requires_local_server_authentication(monkeypatch):
+    monkeypatch.delenv("GODOT_AI_AUTH_TOKEN", raising=False)
+
+    with pytest.raises(RuntimeError, match="GODOT_AI_AUTH_TOKEN"):
+        _verify_local_auth(8000, "")
+
+
+def test_named_tunnel_checks_that_local_server_requires_and_accepts_token(monkeypatch):
+    class Response:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+    monkeypatch.setenv("GODOT_AI_AUTH_TOKEN", "expected-token")
+    requests = []
+
+    def fake_urlopen(request, timeout):
+        requests.append((request, timeout))
+        if isinstance(request, str):
+            raise HTTPError(request, 401, "unauthorized", {}, BytesIO())
+        return Response()
+
+    with patch("godot_ai.transport.tunnel.urllib.request.urlopen", side_effect=fake_urlopen):
+        _verify_local_auth(8123, "expected-token")
+
+    assert requests[0][0] == "http://127.0.0.1:8123/health"
+    assert requests[1][0].get_header("Authorization") == "Bearer expected-token"
+
+
+@pytest.mark.parametrize(
+    ("public_url", "message"),
+    [
+        ("http://mcp.example.com", "stable HTTPS hostname"),
+        ("https://mcp.example.com/path", "stable HTTPS hostname"),
+        ("https://user@mcp.example.com", "stable HTTPS hostname"),
+    ],
+)
+def test_named_cloudflare_tunnel_rejects_non_host_urls(
+    monkeypatch, tmp_path, public_url, message
+):
+    token_file = tmp_path / "tunnel-token"
+    token_file.write_text("secret-token", encoding="utf-8")
+    monkeypatch.setenv("GODOT_AI_CLOUDFLARE_TUNNEL_TOKEN_FILE", str(token_file))
+    monkeypatch.setenv("GODOT_AI_TUNNEL_PUBLIC_URL", public_url)
+
+    with pytest.raises(RuntimeError, match=message):
+        start_cloudflare_named_tunnel(8000)

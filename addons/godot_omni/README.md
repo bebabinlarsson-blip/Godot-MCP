@@ -15,9 +15,14 @@ Project > Project Settings > Plugins > enable **Godot MCP Omni** (and **Godot MC
 
 ## Requirements
 
-- Godot 4.1 through 4.8+ (dev)
+- Godot 4.7 or newer
 - Python 3.11–3.14 with `godot-omni` installed (see the repository README)
 
 ## License
 
 [MIT](LICENSE)
+
+## Credits and AI use
+
+Project credits: Ghosty and Bebabin. AI assistance was used for code and
+documentation contributions in this release.

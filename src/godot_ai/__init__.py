@@ -181,6 +181,7 @@ def _add_tunnel_argument(parser: argparse.ArgumentParser) -> None:
         const=DEFAULT_TUNNEL_PROVIDER,
         choices=[
             "cloudflare",
+            "cloudflare-named",
             "serveo",
             "ngrok",
             "ssh",
@@ -191,9 +192,14 @@ def _add_tunnel_argument(parser: argparse.ArgumentParser) -> None:
         default=None,
         help=(
             "Start automated public HTTPS tunnel for remote cloud access "
-            f"(default: {DEFAULT_TUNNEL_PROVIDER})."
+            f"(default: {DEFAULT_TUNNEL_PROVIDER}; anonymous URLs can change after reconnect)."
         ),
     )
+
+
+def _uses_automatic_tunnel(provider: str | None) -> bool:
+    """Whether a provider selection should bind the server for a public tunnel."""
+    return provider not in (None, "manual")
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -222,11 +228,20 @@ def main(argv: Sequence[str] | None = None) -> None:
         )
         tunnel_parser.add_argument(
             "--provider",
-            choices=["localhost.run", "serveo", "cloudflare", "ssh", "pinggy"],
+            choices=[
+                "localhost.run",
+                "serveo",
+                "cloudflare",
+                "cloudflare-named",
+                "ngrok",
+                "ssh",
+                "pinggy",
+            ],
             default=DEFAULT_TUNNEL_PROVIDER,
             help=(
-                f"Tunnel provider (default: {DEFAULT_TUNNEL_PROVIDER} for permanent "
-                "non-expiring connection without 15m limit)"
+                f"Tunnel provider (default: {DEFAULT_TUNNEL_PROVIDER}; anonymous "
+                "URLs may change after reconnect. Use cloudflare-named for a "
+                "Cloudflare hostname configured in your account.)"
             ),
         )
         t_args = tunnel_parser.parse_args(effective_argv[1:])
@@ -236,7 +251,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             print(f"GODOT AI PUBLIC HTTPS ACCESS READY ({info.provider})", flush=True)
             print(f"Public Link: {info.public_url}", flush=True)
             print(f"OpenAPI Schema: {info.openapi_url}", flush=True)
-            print("Share this link with ChatGPT Web / Work Mode / Code Interpreter", flush=True)
+            print("Share this public endpoint with your configured MCP client", flush=True)
             print("==================================================================", flush=True)
 
         run_tunnel_forever(t_args.port, t_args.provider, on_connect=_on_connect)
@@ -353,7 +368,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     if args.tunnel and args.transport == "stdio":
         args.transport = "streamable-http"
 
-    if getattr(args, "tunnel", None) and args.tunnel != "manual":
+    if getattr(args, "tunnel", None):
         probe_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         probe_sock.settimeout(1.0)
         server_already_running = False
@@ -365,6 +380,14 @@ def main(argv: Sequence[str] | None = None) -> None:
             pass
 
         if server_already_running:
+            if args.tunnel == "manual":
+                print(
+                    f"Godot AI server is already active on port {args.port}; "
+                    "configure your manual tunnel to forward to 127.0.0.1.",
+                    flush=True,
+                )
+                return
+
             from godot_ai.transport.tunnel import run_tunnel_forever
 
             print(
@@ -456,7 +479,8 @@ def _serve(
 ) -> None:
     from godot_ai.transport.origin_guard import bind_host_for_networks
 
-    allow_remote = getattr(args, "allow_remote", False) or bool(getattr(args, "tunnel", None))
+    auto_tunnel = _uses_automatic_tunnel(getattr(args, "tunnel", None))
+    allow_remote = getattr(args, "allow_remote", False) or auto_tunnel
     if (allow_host_networks or allow_remote) and args.transport in ("sse", "streamable-http"):
         import fastmcp
 
@@ -519,7 +543,7 @@ def _serve(
         owner_pid=owner_pid,
         allow_host_networks=allow_host_networks,
         ws_socket=held_ws,
-        allow_remote=getattr(args, "allow_remote", False) or bool(getattr(args, "tunnel", None)),
+        allow_remote=getattr(args, "allow_remote", False) or auto_tunnel,
     )
 
     transport_kwargs = {}
@@ -537,7 +561,7 @@ def _serve(
             access_log=http_access_log_enabled()
         )
 
-    if getattr(args, "tunnel", None) and args.tunnel != "manual":
+    if auto_tunnel:
         import threading
 
         from godot_ai.transport.tunnel import run_tunnel_forever

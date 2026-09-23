@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import os
+import queue
 import re
 import shutil
 import subprocess
@@ -11,12 +14,15 @@ import threading
 import time
 import urllib.request
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlsplit
 
 logger = logging.getLogger(__name__)
 
 TunnelProvider = Literal[
-    "serveo", "cloudflare", "ngrok", "ssh", "pinggy", "localhost.run", "manual"
+    "serveo", "cloudflare", "cloudflare-named", "ngrok", "ssh", "pinggy", "localhost.run", "manual"
 ]
 DEFAULT_TUNNEL_PROVIDER: TunnelProvider = "localhost.run"
 
@@ -37,17 +43,76 @@ _NGROK_URL_REGEX = re.compile(r"https://[a-zA-Z0-9-]+\.ngrok-free\.app")
 _SSH_URL_REGEX = re.compile(
     r"https?://(?!admin\.)[a-zA-Z0-9.-]+\.(?:serveousercontent\.com|lhr\.life|localhost\.run|pinggy\.link|a\.pinggy\.link|free\.pinggy\.net|run\.pinggy-free\.link)"
 )
+_CF_NAMED_READY_REGEX = re.compile(r"Registered tunnel connection", re.IGNORECASE)
+TUNNEL_TOKEN_FILE_ENV = "GODOT_AI_CLOUDFLARE_TUNNEL_TOKEN_FILE"
+TUNNEL_PUBLIC_URL_ENV = "GODOT_AI_TUNNEL_PUBLIC_URL"
+TUNNEL_START_TIMEOUT_SECONDS = 30.0
+NGROK_AGENT_API_URL = "http://127.0.0.1:4040/api/endpoints"
 
 
 def find_tunnel_binary(provider: TunnelProvider = DEFAULT_TUNNEL_PROVIDER) -> str | None:
     """Find binary executable for the requested tunnel provider."""
-    if provider == "cloudflare":
+    if provider in ("cloudflare", "cloudflare-named"):
         return shutil.which("cloudflared")
     if provider == "ngrok":
         return shutil.which("ngrok")
     if provider in ("ssh", "serveo", "pinggy", "localhost.run"):
         return shutil.which("ssh")
     return None
+
+
+def _wait_for_tunnel_match(
+    proc: subprocess.Popen[str], pattern: re.Pattern[str], timeout: float
+) -> tuple[str | None, list[str]]:
+    """Read tunnel startup output without hanging forever on a silent process."""
+    if proc.stdout is None:
+        return None, []
+
+    lines: queue.Queue[str | None] = queue.Queue()
+
+    def _read_output() -> None:
+        try:
+            for line in iter(proc.stdout.readline, ""):
+                lines.put(line)
+        except Exception:
+            logger.debug("Tunnel output reader stopped", exc_info=True)
+        finally:
+            lines.put(None)
+
+    threading.Thread(target=_read_output, daemon=True, name="TunnelStartupReader").start()
+    deadline = time.monotonic() + max(0.0, timeout)
+    observed: list[str] = []
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return None, observed
+        try:
+            line = lines.get(timeout=min(0.2, remaining))
+        except queue.Empty:
+            if proc.poll() is not None:
+                return None, observed
+            continue
+        if line is None:
+            return None, observed
+        observed.append(line.rstrip())
+        match = pattern.search(line)
+        if match:
+            return match.group(0), observed
+
+
+def _terminate_tunnel_process(proc: subprocess.Popen[str]) -> None:
+    """Stop a tunnel child after startup failure, without leaving a live child."""
+    if proc.poll() is not None:
+        return
+    proc.terminate()
+    try:
+        proc.wait(timeout=3)
+    except (subprocess.TimeoutExpired, OSError):
+        try:
+            proc.kill()
+            proc.wait(timeout=3)
+        except (subprocess.TimeoutExpired, OSError):
+            logger.warning("Tunnel subprocess did not exit after kill request")
 
 
 def _ssh_keepalive_opts(null_dev: str) -> list[str]:
@@ -75,9 +140,13 @@ def _start_keepalive_worker(
             if proc.poll() is not None:
                 break
             try:
+                headers = {"User-Agent": "GodotAI-KeepAlive/1.0"}
+                auth_token = os.environ.get("GODOT_AI_AUTH_TOKEN", "").strip()
+                if auth_token:
+                    headers["Authorization"] = f"Bearer {auth_token}"
                 req = urllib.request.Request(
                     health_url,
-                    headers={"User-Agent": "GodotAI-KeepAlive/1.0"},
+                    headers=headers,
                 )
                 with urllib.request.urlopen(req, timeout=8) as _:
                     pass
@@ -90,6 +159,7 @@ def _start_keepalive_worker(
 
 def start_ssh_tunnel(port: int, service: str = "localhost.run") -> TunnelInfo:
     """Start an SSH reverse tunnel using system OpenSSH without extra binaries."""
+    _verify_local_auth(port, os.environ.get("GODOT_AI_AUTH_TOKEN", "").strip())
     ssh_bin = find_tunnel_binary("ssh")
     if not ssh_bin:
         raise FileNotFoundError(
@@ -114,20 +184,12 @@ def start_ssh_tunnel(port: int, service: str = "localhost.run") -> TunnelInfo:
         bufsize=1,
     )
 
-    public_url = ""
-    for _ in range(60):
-        line = proc.stdout.readline() if proc.stdout else ""
-        if not line:
-            if proc.poll() is not None:
-                break
-            continue
-        match = _SSH_URL_REGEX.search(line)
-        if match:
-            public_url = match.group(0)
-            break
+    public_url, _ = _wait_for_tunnel_match(
+        proc, _SSH_URL_REGEX, TUNNEL_START_TIMEOUT_SECONDS
+    )
 
-    if not public_url:
-        proc.terminate()
+    if public_url is None:
+        _terminate_tunnel_process(proc)
         if service == "localhost.run":
             logger.warning("localhost.run timed out. Falling back to serveo...")
             return start_ssh_tunnel(port, "serveo")
@@ -148,6 +210,7 @@ def start_ssh_tunnel(port: int, service: str = "localhost.run") -> TunnelInfo:
 
 def start_cloudflare_quick_tunnel(port: int) -> TunnelInfo:
     """Start a free, zero-config Cloudflare Quick Tunnel to local port."""
+    _verify_local_auth(port, os.environ.get("GODOT_AI_AUTH_TOKEN", "").strip())
     bin_path = find_tunnel_binary("cloudflare")
     if not bin_path:
         logger.info("cloudflared not found, falling back to SSH reverse tunnel...")
@@ -170,20 +233,12 @@ def start_cloudflare_quick_tunnel(port: int) -> TunnelInfo:
         bufsize=1,
     )
 
-    public_url = ""
-    for _ in range(60):
-        line = proc.stdout.readline() if proc.stdout else ""
-        if not line:
-            if proc.poll() is not None:
-                break
-            continue
-        match = _CF_URL_REGEX.search(line)
-        if match:
-            public_url = match.group(0)
-            break
+    public_url, _ = _wait_for_tunnel_match(
+        proc, _CF_URL_REGEX, TUNNEL_START_TIMEOUT_SECONDS
+    )
 
-    if not public_url:
-        proc.terminate()
+    if public_url is None:
+        _terminate_tunnel_process(proc)
         logger.warning("Cloudflare tunnel failed. Falling back to SSH tunnel...")
         return start_ssh_tunnel(port, "serveo")
 
@@ -191,6 +246,225 @@ def start_cloudflare_quick_tunnel(port: int) -> TunnelInfo:
 
     return TunnelInfo(
         provider="cloudflare",
+        public_url=public_url,
+        openapi_url=f"{public_url}/openapi.json",
+        process=proc,
+    )
+
+
+def _cloudflare_named_configuration() -> tuple[Path, str]:
+    """Read stable Tunnel configuration without printing its credential."""
+    raw_token_file = (
+        os.environ.get(TUNNEL_TOKEN_FILE_ENV, "").strip()
+        or os.environ.get("TUNNEL_TOKEN_FILE", "").strip()
+    )
+    if not raw_token_file:
+        raise RuntimeError(
+            f"Set {TUNNEL_TOKEN_FILE_ENV} to a Cloudflare tunnel token file."
+        )
+
+    token_file = Path(raw_token_file).expanduser()
+    if not token_file.is_file():
+        raise FileNotFoundError(f"Cloudflare tunnel token file does not exist: {token_file}")
+    try:
+        if not token_file.read_text(encoding="utf-8").strip():
+            raise RuntimeError("Cloudflare tunnel token file is empty.")
+    except OSError as exc:
+        raise RuntimeError("Cloudflare tunnel token file cannot be read.") from exc
+
+    public_url = os.environ.get(TUNNEL_PUBLIC_URL_ENV, "").strip()
+    parsed = urlsplit(public_url)
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or parsed.port
+        or parsed.path not in ("", "/")
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise RuntimeError(
+            f"Set {TUNNEL_PUBLIC_URL_ENV} to the stable HTTPS hostname configured in Cloudflare."
+        )
+    return token_file, public_url.rstrip("/")
+
+
+def _verify_local_auth(port: int, token: str) -> None:
+    """Require the local MCP server to enforce the configured Bearer token."""
+    if not token or "\r" in token or "\n" in token:
+        raise RuntimeError(
+            "Set GODOT_AI_AUTH_TOKEN before exposing a public tunnel."
+        )
+
+    health_url = f"http://127.0.0.1:{port}/health"
+    try:
+        response = urllib.request.urlopen(health_url, timeout=3)
+    except HTTPError as exc:
+        if exc.code != 401:
+            raise RuntimeError(
+                f"Local MCP health check returned HTTP {exc.code}; expected 401 without a token."
+            ) from None
+        exc.close()
+    except URLError as exc:
+        raise RuntimeError(
+            "Could not verify the local MCP server. Start Godot with GODOT_AI_AUTH_TOKEN "
+            "set before starting this tunnel."
+        ) from exc
+    else:
+        response.close()
+        raise RuntimeError(
+            "The local MCP server did not require authentication; set GODOT_AI_AUTH_TOKEN "
+            "before exposing a public tunnel."
+        )
+
+    request = urllib.request.Request(
+        health_url,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=3) as response:
+            if response.status != 200:
+                raise RuntimeError(
+                    "Local MCP health check returned HTTP "
+                    f"{response.status} with the configured token."
+                )
+    except HTTPError as exc:
+        raise RuntimeError(
+            "The local MCP server rejected GODOT_AI_AUTH_TOKEN; use the same token "
+            "for Godot and the tunnel process."
+        ) from None
+    except URLError as exc:
+        raise RuntimeError("Could not verify the configured local MCP token.") from exc
+
+
+def start_cloudflare_named_tunnel(port: int) -> TunnelInfo:
+    """Start a named Cloudflare Tunnel with its stable, user-owned hostname.
+
+    Cloudflare routes this hostname to the local service in the dashboard. The
+    token stays in a file and is passed using cloudflared's ``--token-file``
+    option, so it is never added to the process command line or logs.
+    """
+    token_file, public_url = _cloudflare_named_configuration()
+    bin_path = find_tunnel_binary("cloudflare-named")
+    if not bin_path:
+        raise FileNotFoundError(
+            "cloudflared is required for a named Cloudflare Tunnel; install it and retry."
+        )
+    _verify_local_auth(port, os.environ.get("GODOT_AI_AUTH_TOKEN", "").strip())
+
+    proc = subprocess.Popen(
+        [bin_path, "tunnel", "run", "--token-file", str(token_file)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+    ready, _ = _wait_for_tunnel_match(
+        proc, _CF_NAMED_READY_REGEX, TUNNEL_START_TIMEOUT_SECONDS
+    )
+    if ready is None:
+        _terminate_tunnel_process(proc)
+        raise RuntimeError(
+            "cloudflared did not establish a named tunnel connection within "
+            f"{TUNNEL_START_TIMEOUT_SECONDS:g} seconds. Check the token, hostname route, "
+            "and network access."
+        )
+
+    _start_keepalive_worker(public_url, proc)
+    return TunnelInfo(
+        provider="cloudflare-named",
+        public_url=public_url,
+        openapi_url=f"{public_url}/openapi.json",
+        process=proc,
+    )
+
+
+def _ngrok_endpoint_for_port(port: int) -> str | None:
+    """Return a public HTTPS endpoint forwarding to the requested local port."""
+    try:
+        with urllib.request.urlopen(NGROK_AGENT_API_URL, timeout=1) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (OSError, URLError, TimeoutError, ValueError, json.JSONDecodeError):
+        return None
+
+    endpoints = payload.get("endpoints", []) if isinstance(payload, dict) else []
+    for endpoint in endpoints:
+        if not isinstance(endpoint, dict):
+            continue
+        upstream = endpoint.get("upstream")
+        upstream_url = upstream.get("url") if isinstance(upstream, dict) else None
+        if not isinstance(upstream_url, str):
+            continue
+        parsed_upstream = urlsplit(
+            upstream_url if "://" in upstream_url else f"http://{upstream_url}"
+        )
+        try:
+            upstream_port = parsed_upstream.port
+        except ValueError:
+            continue
+        if parsed_upstream.hostname not in {"localhost", "127.0.0.1", "::1"}:
+            continue
+        if upstream_port != port:
+            continue
+
+        public_url = endpoint.get("url")
+        if not isinstance(public_url, str):
+            continue
+        parsed_public = urlsplit(public_url)
+        try:
+            public_port = parsed_public.port
+        except ValueError:
+            continue
+        if (
+            parsed_public.scheme == "https"
+            and parsed_public.hostname
+            and parsed_public.username is None
+            and parsed_public.password is None
+            and public_port in (None, 443)
+            and parsed_public.path in ("", "/")
+            and not parsed_public.query
+            and not parsed_public.fragment
+        ):
+            return public_url.rstrip("/")
+    return None
+
+
+def start_ngrok_tunnel(port: int) -> TunnelInfo:
+    """Start ngrok and read the matching public endpoint from its local Agent API."""
+    _verify_local_auth(port, os.environ.get("GODOT_AI_AUTH_TOKEN", "").strip())
+    bin_path = find_tunnel_binary("ngrok")
+    if not bin_path:
+        raise FileNotFoundError(
+            "ngrok is required for the ngrok tunnel provider; install it and retry."
+        )
+
+    proc = subprocess.Popen(
+        [bin_path, "http", f"127.0.0.1:{port}"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.STDOUT,
+    )
+    deadline = time.monotonic() + TUNNEL_START_TIMEOUT_SECONDS
+    public_url = None
+    while time.monotonic() < deadline:
+        if proc.poll() is not None:
+            break
+        public_url = _ngrok_endpoint_for_port(port)
+        if public_url:
+            break
+        time.sleep(0.25)
+
+    if public_url is None:
+        _terminate_tunnel_process(proc)
+        raise RuntimeError(
+            "ngrok did not publish an HTTPS endpoint for the requested port within "
+            f"{TUNNEL_START_TIMEOUT_SECONDS:g} seconds. Check ngrok authentication and "
+            "the local Agent API at 127.0.0.1:4040."
+        )
+
+    _start_keepalive_worker(public_url, proc)
+    return TunnelInfo(
+        provider="ngrok",
         public_url=public_url,
         openapi_url=f"{public_url}/openapi.json",
         process=proc,
@@ -207,10 +481,19 @@ def _start_tunnel_for_provider(
         return start_ssh_tunnel(port, "serveo")
     if provider == "pinggy":
         return start_ssh_tunnel(port, "pinggy")
+    if provider == "cloudflare-named":
+        return start_cloudflare_named_tunnel(port)
     if provider == "cloudflare":
         return start_cloudflare_quick_tunnel(port)
-    # Default is localhost.run for permanent non-expiring connection without 15m limit
-    return start_ssh_tunnel(port, "localhost.run")
+    if provider == "ngrok":
+        return start_ngrok_tunnel(port)
+    if provider == "ssh":
+        return start_ssh_tunnel(port, "localhost.run")
+    # Anonymous localhost.run hostnames are assigned per connection and may
+    # change after reconnects, even though the process can stay open for a long time.
+    if provider == "localhost.run":
+        return start_ssh_tunnel(port, "localhost.run")
+    raise ValueError(f"Unsupported tunnel provider: {provider}")
 
 
 def run_tunnel_forever(
