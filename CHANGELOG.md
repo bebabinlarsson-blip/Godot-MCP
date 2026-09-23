@@ -5,6 +5,20 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.30 (2026-09-23)
+
+Direct remote MCP protocol support without 403 Forbidden, root JSON-RPC 2.0 initialize gateway, and automatic allow-remote server launch flag for editor plugins.
+
+### Fixed
+
+- **Remote MCP Protocol 403 Forbidden Fix**:
+  - `godot_ai.transport.origin_guard`: Added `/mcp`, `/sse`, and `/messages` to the public path bypass in `LocalhostOnlyHTTPMiddleware`, allowing external MCP clients (ChatGPT, Claude, Antigravity, Cursor) connecting via public tunnels (Cloudflare, Serveo) to complete MCP protocol handshakes without getting rejected by the localhost DNS-rebinding guard.
+  - `godot_ai.transport.security`: Allowed unauthenticated MCP protocol handshakes through `CapabilityAuthMiddleware` when no explicit `GODOT_AI_AUTH_TOKEN` is configured, preventing 401/403 rejections on initialize requests.
+- **Root POST MCP JSON-RPC Gateway**:
+  - `godot_ai.transport.rest_gateway`: Added JSON-RPC 2.0 handler at `POST /` to support MCP clients that send `initialize`, `tools/list`, `tools/call`, and `ping` directly to the base URL.
+- **Editor Plugin Server Flags**:
+  - `addons/godot_ai/utils/server_lifecycle.gd`: Added `--allow-remote` to `_server_flags` so the editor-managed backend server permits tunnel and remote access by default.
+
 ## 5.0.29 (2026-09-23)
 
 Cloudflare Quick Tunnel set as primary default provider for permanent HTTPS links, automated tunnel auto-reconnect supervisor with exponential backoff and aggressive keep-alive, and Godot Asset Store release packaging cleanup.

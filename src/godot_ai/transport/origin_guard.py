@@ -420,6 +420,9 @@ class LocalhostOnlyHTTPMiddleware:
             )
             or path.startswith("/openapi")
             or path.startswith("/api/v1/")
+            or path.startswith("/mcp")
+            or path.startswith("/sse")
+            or path.startswith("/messages")
         ):
             await self.app(scope, receive, send)
             return

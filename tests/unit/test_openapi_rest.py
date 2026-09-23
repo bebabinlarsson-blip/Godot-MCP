@@ -115,6 +115,23 @@ def test_rest_gateway_endpoints(server_instance):
     assert res_cors_preflight.status_code == 204
     assert res_cors_preflight.headers.get("access-control-allow-origin") == "*"
 
+    # Remote MCP JSON-RPC protocol requests at root
+    res_init = client.post(
+        "/",
+        json={"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05"}},
+        headers=remote_headers,
+    )
+    assert res_init.status_code == 200
+    assert res_init.json()["result"]["serverInfo"]["name"] == "Godot AI"
+
+    res_tools_rpc = client.post(
+        "/",
+        json={"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+        headers=remote_headers,
+    )
+    assert res_tools_rpc.status_code == 200
+    assert len(res_tools_rpc.json()["result"]["tools"]) == 100
+
 
 def test_remote_godot_client_headers():
     from godot_ai import __version__

@@ -277,6 +277,128 @@ def register_rest_gateway(
         )
         return JSONResponse(spec)
 
+    @mcp.custom_route("/", methods=["POST"], include_in_schema=False)
+    async def root_post_endpoint(request: Request) -> Response:
+        if not _check_auth(request, token):
+            return JSONResponse(
+                {"jsonrpc": "2.0", "error": {"code": -32600, "message": "Unauthorized"}},
+                status_code=401,
+            )
+        try:
+            body = await request.json() if await request.body() else {}
+        except Exception:
+            return JSONResponse(
+                {"jsonrpc": "2.0", "error": {"code": -32700, "message": "Parse error"}},
+                status_code=400,
+            )
+
+        if isinstance(body, dict) and "jsonrpc" in body:
+            method = body.get("method", "")
+            req_id = body.get("id")
+            params = body.get("params") or {}
+
+            if method == "initialize":
+                return JSONResponse(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": req_id,
+                        "result": {
+                            "protocolVersion": "2024-11-05",
+                            "capabilities": {
+                                "tools": {"listChanged": False},
+                                "resources": {"subscribe": False, "listChanged": False},
+                                "prompts": {"listChanged": False},
+                            },
+                            "serverInfo": {
+                                "name": "Godot AI",
+                                "version": _SERVER_VERSION,
+                            },
+                        },
+                    }
+                )
+
+            if method in ("notifications/initialized", "initialized"):
+                return Response(status_code=204)
+
+            if method == "ping":
+                return JSONResponse({"jsonrpc": "2.0", "id": req_id, "result": {}})
+
+            if method == "tools/list":
+                tools = await mcp.list_tools()
+                tool_list = [
+                    {
+                        "name": t.name,
+                        "description": t.description or "",
+                        "inputSchema": getattr(t, "parameters", {"type": "object", "properties": {}}),
+                    }
+                    for t in tools
+                ]
+                return JSONResponse({"jsonrpc": "2.0", "id": req_id, "result": {"tools": tool_list}})
+
+            if method == "tools/call":
+                tool_name = params.get("name", "")
+                arguments = params.get("arguments") or {}
+                try:
+                    result = await mcp.call_tool(tool_name, arguments=arguments)
+                    text_result = ""
+                    if hasattr(result, "content"):
+                        text_result = "\n".join(getattr(c, "text", str(c)) for c in result.content)
+                    elif isinstance(result, (dict, list)):
+                        text_result = json.dumps(result)
+                    else:
+                        text_result = str(result)
+                    return JSONResponse(
+                        {
+                            "jsonrpc": "2.0",
+                            "id": req_id,
+                            "result": {
+                                "content": [{"type": "text", "text": text_result}],
+                                "isError": False,
+                            },
+                        }
+                    )
+                except Exception as exc:
+                    return JSONResponse(
+                        {
+                            "jsonrpc": "2.0",
+                            "id": req_id,
+                            "result": {
+                                "content": [{"type": "text", "text": f"Error: {exc}"}],
+                                "isError": True,
+                            },
+                        }
+                    )
+
+            if method in ("resources/list", "prompts/list"):
+                entity = method.split("/")[0]
+                return JSONResponse({"jsonrpc": "2.0", "id": req_id, "result": {entity: []}})
+
+            return JSONResponse(
+                {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "error": {"code": -32601, "message": f"Method '{method}' not found"},
+                },
+                status_code=404,
+            )
+
+        if isinstance(body, dict) and "tool" in body:
+            tool_name = str(body["tool"]).strip()
+            arguments = body.get("arguments") or {}
+            try:
+                result = await mcp.call_tool(tool_name, arguments=arguments)
+                data: Any = result
+                if hasattr(result, "content"):
+                    data = [getattr(c, "text", str(c)) for c in result.content]
+                return JSONResponse({"success": True, "tool": tool_name, "result": data})
+            except Exception as exc:
+                return JSONResponse(
+                    {"success": False, "tool": tool_name, "error": str(exc)},
+                    status_code=400,
+                )
+
+        return JSONResponse({"error": "Unsupported request shape"}, status_code=400)
+
     @mcp.custom_route("/api/v1/status", methods=["GET"], include_in_schema=False)
     async def status_endpoint(request: Request) -> JSONResponse:
         if not _check_auth(request, token):

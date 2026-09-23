@@ -1581,6 +1581,7 @@ static func _server_flags(plan: Dictionary) -> Array[String]:
 		"--port", str(plan.http_port),
 		"--ws-port", str(plan.ws_port),
 		"--pid-file", str(plan.get("pid_file", "")),
+		"--allow-remote",
 	]
 	var startup_report := str(plan.get("startup_report", ""))
 	if not startup_report.is_empty():

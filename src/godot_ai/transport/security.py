@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hmac
 import json
+import os
 from http import HTTPStatus
 from typing import Any
 
@@ -111,7 +112,31 @@ class CapabilityAuthMiddleware(_Wrapper):
             )
             or path.startswith("/openapi")
             or path.startswith("/api/v1/")
+            or path.startswith("/mcp")
+            or path.startswith("/sse")
+            or path.startswith("/messages")
         ):
+            auth_token = os.environ.get("GODOT_AI_AUTH_TOKEN", "").strip()
+            if auth_token:
+                values = _headers(scope, b"authorization")
+                key_headers = _headers(scope, b"x-godot-ai-key")
+                valid = False
+                if values:
+                    try:
+                        scheme, space, supplied = values[0].decode("ascii").partition(" ")
+                        if scheme.lower() == "bearer" and hmac.compare_digest(supplied.strip(), auth_token):
+                            valid = True
+                    except Exception:
+                        pass
+                if not valid and key_headers:
+                    try:
+                        if hmac.compare_digest(key_headers[0].decode("ascii").strip(), auth_token):
+                            valid = True
+                    except Exception:
+                        pass
+                if not valid:
+                    await _reject(send, "TRANSPORT_AUTH_REQUIRED")
+                    return
             await self.app(scope, receive, send)
             return
         values = _headers(scope, b"authorization")
