@@ -11,6 +11,7 @@ from godot_ai.transport.tunnel import (
     _CF_URL_REGEX,
     _SSH_URL_REGEX,
     find_tunnel_binary,
+    run_tunnel_forever,
     start_cloudflare_quick_tunnel,
     start_ssh_tunnel,
 )

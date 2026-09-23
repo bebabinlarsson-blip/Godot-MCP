@@ -183,10 +183,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         return
 
     if effective_argv[:1] == ["tunnel"]:
-        from godot_ai.transport.tunnel import (
-            start_cloudflare_quick_tunnel,
-            start_ssh_tunnel,
-        )
+        from godot_ai.transport.tunnel import run_tunnel_forever
 
         tunnel_parser = argparse.ArgumentParser(
             prog="godot-ai tunnel",
@@ -205,26 +202,16 @@ def main(argv: Sequence[str] | None = None) -> None:
             help="Tunnel provider (default: serveo for zero-config HTTPS)",
         )
         t_args = tunnel_parser.parse_args(effective_argv[1:])
-        if t_args.provider == "cloudflare":
-            info = start_cloudflare_quick_tunnel(t_args.port)
-        elif t_args.provider == "pinggy":
-            info = start_ssh_tunnel(t_args.port, "pinggy")
-        elif t_args.provider == "localhost.run":
-            info = start_ssh_tunnel(t_args.port, "localhost.run")
-        else:
-            info = start_ssh_tunnel(t_args.port, "serveo")
 
-        print("==================================================================", flush=True)
-        print(f"GODOT AI PUBLIC HTTPS ACCESS READY ({info.provider})", flush=True)
-        print(f"Public Link: {info.public_url}", flush=True)
-        print(f"OpenAPI Schema: {info.openapi_url}", flush=True)
-        print("Share this link with ChatGPT Web / Work Mode / Code Interpreter", flush=True)
-        print("==================================================================", flush=True)
-        if info.process:
-            try:
-                info.process.wait()
-            except KeyboardInterrupt:
-                info.process.terminate()
+        def _on_connect(info):
+            print("==================================================================", flush=True)
+            print(f"GODOT AI PUBLIC HTTPS ACCESS READY ({info.provider})", flush=True)
+            print(f"Public Link: {info.public_url}", flush=True)
+            print(f"OpenAPI Schema: {info.openapi_url}", flush=True)
+            print("Share this link with ChatGPT Web / Work Mode / Code Interpreter", flush=True)
+            print("==================================================================", flush=True)
+
+        run_tunnel_forever(t_args.port, t_args.provider, on_connect=_on_connect)
         return
 
     parser = argparse.ArgumentParser(
@@ -353,10 +340,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             pass
 
         if server_already_running:
-            from godot_ai.transport.tunnel import (
-                start_cloudflare_quick_tunnel,
-                start_ssh_tunnel,
-            )
+            from godot_ai.transport.tunnel import run_tunnel_forever
 
             print(
                 f"Godot AI server is already active on port {args.port} "
@@ -364,26 +348,16 @@ def main(argv: Sequence[str] | None = None) -> None:
                 flush=True,
             )
             print("Starting public tunnel to forward to active server...", flush=True)
-            if args.tunnel == "cloudflare":
-                tunnel_info = start_cloudflare_quick_tunnel(args.port)
-            elif args.tunnel == "pinggy":
-                tunnel_info = start_ssh_tunnel(args.port, "pinggy")
-            elif args.tunnel == "localhost.run":
-                tunnel_info = start_ssh_tunnel(args.port, "localhost.run")
-            else:
-                tunnel_info = start_ssh_tunnel(args.port, "serveo")
 
-            print("==================================================================", flush=True)
-            print(f"GODOT AI PUBLIC HTTPS ACCESS READY ({tunnel_info.provider})", flush=True)
-            print(f"Public Link: {tunnel_info.public_url}", flush=True)
-            print(f"OpenAPI Schema: {tunnel_info.openapi_url}", flush=True)
-            print("Share this link with ChatGPT Web / Work Mode / Code Interpreter", flush=True)
-            print("==================================================================", flush=True)
-            if tunnel_info.process:
-                try:
-                    tunnel_info.process.wait()
-                except KeyboardInterrupt:
-                    tunnel_info.process.terminate()
+            def _on_connect(info):
+                print("==================================================================", flush=True)
+                print(f"GODOT AI PUBLIC HTTPS ACCESS READY ({info.provider})", flush=True)
+                print(f"Public Link: {info.public_url}", flush=True)
+                print(f"OpenAPI Schema: {info.openapi_url}", flush=True)
+                print("Share this link with ChatGPT Web / Work Mode / Code Interpreter", flush=True)
+                print("==================================================================", flush=True)
+
+            run_tunnel_forever(args.port, args.tunnel, on_connect=_on_connect)
             return
 
     from godot_ai.tools.domains import parse_exclude_list
@@ -535,29 +509,24 @@ def _serve(
         )
 
     if getattr(args, "tunnel", None) and args.tunnel != "manual":
-        from godot_ai.transport.tunnel import (
-            start_cloudflare_quick_tunnel,
-            start_ssh_tunnel,
+        import threading
+
+        from godot_ai.transport.tunnel import run_tunnel_forever
+
+        def _on_connect(info):
+            print("==================================================================", flush=True)
+            print(f"GODOT AI PUBLIC HTTPS ACCESS READY ({info.provider})", flush=True)
+            print(f"Public Link: {info.public_url}", flush=True)
+            print(f"OpenAPI Schema: {info.openapi_url}", flush=True)
+            print("Share this link with ChatGPT Web / Work Mode / Code Interpreter", flush=True)
+            print("==================================================================", flush=True)
+
+        tunnel_thread = threading.Thread(
+            target=run_tunnel_forever,
+            args=(args.port, args.tunnel),
+            kwargs={"on_connect": _on_connect},
+            daemon=True,
         )
-
-        try:
-            if args.tunnel == "cloudflare":
-                tunnel_info = start_cloudflare_quick_tunnel(args.port)
-            elif args.tunnel == "pinggy":
-                tunnel_info = start_ssh_tunnel(args.port, "pinggy")
-            elif args.tunnel == "localhost.run":
-                tunnel_info = start_ssh_tunnel(args.port, "localhost.run")
-            else:
-                tunnel_info = start_ssh_tunnel(args.port, "serveo")
-
-            if tunnel_info:
-                print("==================================================================", flush=True)
-                print(f"GODOT AI PUBLIC HTTPS ACCESS READY ({tunnel_info.provider})", flush=True)
-                print(f"Public Link: {tunnel_info.public_url}", flush=True)
-                print(f"OpenAPI Schema: {tunnel_info.openapi_url}", flush=True)
-                print("Share this link with ChatGPT Web / Work Mode / Code Interpreter", flush=True)
-                print("==================================================================", flush=True)
-        except Exception as exc:
-            print(f"Failed to start tunnel: {exc}", file=sys.stderr)
+        tunnel_thread.start()
 
     server.run(transport=args.transport, **transport_kwargs)
