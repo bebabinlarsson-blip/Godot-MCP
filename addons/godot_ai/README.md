@@ -18,16 +18,18 @@ full 1,820-operation engine surface.
    project so they sit under `res://addons/`.
 2. Enable the plugins: **Project > Project Settings > Plugins > Godot MCP Core**
    and **Godot MCP Omni**.
-3. Install the Python server: `pip install -e .` or `uv sync`, then configure
-   your MCP client with `godot-omni clients configure <client>`.
+3. Install Python 3.11–3.14 and [uv](https://docs.astral.sh/uv/getting-started/installation/)
+   (`uvx`) on the machine running Godot. Configure a supported local client
+   from the Godot MCP dock, or follow the pinned client examples in the
+   [repository README](https://github.com/bebabinlarsson-blip/Godot-MCP#quick-start-3-simple-steps).
 
-The plugin auto-starts the MCP server and connects over WebSocket. No manual
-configuration required.
+The enabled plugin starts or adopts a compatible local Python server and connects
+over WebSocket. Cloud clients require an authenticated public tunnel.
 
 ## Requirements
 
 - **Godot:** 4.7 or newer
-- **Python:** 3.11, 3.12, 3.13, or 3.14 with `godot-omni` installed
+- **Python:** 3.11, 3.12, 3.13, or 3.14 with `uvx` available
 
 ## Documentation
 
@@ -39,5 +41,6 @@ Full documentation and source: [github.com/bebabinlarsson-blip/Godot-MCP](https:
 
 ## Credits and AI use
 
-Project credits: Ghosty and Bebabin. AI assistance was used for code and
-documentation contributions in this release.
+Project credits: [Ghosty (@ghostySRC)](https://github.com/ghostySRC) and
+[Benji (Bebabin, @bebabinlarsson-blip)](https://github.com/bebabinlarsson-blip).
+AI assistance was used for code and documentation contributions.

@@ -10,7 +10,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11%20|%203.12%20|%203.13%20|%203.14-3776AB?style=flat&logo=python&logoColor=white&labelColor=333A41)](https://www.python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat&labelColor=333A41)](LICENSE)
 [![Cost](https://img.shields.io/badge/Cost-100%25%20Free-brightgreen.svg?style=flat&labelColor=333A41)](LICENSE)
-[![Credits](https://img.shields.io/badge/Credits-Ghosty%20%26%20Bebabin-2ea44f.svg?style=flat&labelColor=333A41)](https://github.com/bebabinlarsson-blip/Godot-MCP)
+[![Credits](https://img.shields.io/badge/Credits-ghostySRC%20%26%20Benji%20Bebabin-2ea44f.svg?style=flat&labelColor=333A41)](https://github.com/bebabinlarsson-blip/Godot-MCP)
 
 <br>
 
@@ -32,13 +32,13 @@
 
 ## Overview
 
-Godot MCP is a completely free, local, open-source automation plugin that connects AI coding assistants to the Godot Editor through the standard Model Context Protocol (MCP).
+Godot MCP is a free, open-source editor add-on and Python server that connect AI coding assistants to the Godot Editor through the Model Context Protocol (MCP). This README describes [v5.0.34](https://github.com/bebabinlarsson-blip/Godot-MCP/releases/tag/v5.0.34).
 
 Unlike other solutions that rely on external websites, cloud subscriptions, device logins, or custom npm CLI wrappers, Godot MCP is designed to be a straightforward in-engine Godot plugin:
 
 * 100% Free and Open Source: Released under the permissive MIT license. No subscriptions, no paid tiers, and no paywalls.
 * Local by default: communication stays on your machine unless you deliberately start a public tunnel. Public tunnels can expose the MCP server outside your network; see the tunnel security notes below.
-* Pure Godot Plugin: Drop the addons into your project and enable them in Godot. No npm packages to install, no global node.js tooling, and no external account setup.
+* Godot add-ons plus Python server: Copy the add-ons into your project, enable them in Godot, and install Python 3.11–3.14 and `uv` so the editor can start the server. No npm or Node.js installation is required.
 * Engine Support: Runs as native GDScript in Standard and .NET editions of Godot 4.7 and newer on Windows, macOS, and Linux.
 * 59 Tool Families & 1,820+ Operations: Comprehensive scene building, node transformations, procedural animation, tilemap editing, collision creation, and direct GDScript evaluation.
 * Single Native Dock: Seamlessly integrated tab directly beside your Inspector with live activity monitoring, connection diagnostics, and memory indicators.
@@ -79,8 +79,8 @@ You do not need to register on any website or install any npm packages.
 
 ### Step 1: Download and Extract the Plugin
 
-1. Download `godot-mcp-v5.0.34.zip` from [GitHub Releases](https://github.com/bebabinlarsson-blip/Godot-MCP/releases).
-2. Extract the archive into your Godot project root so that the `addons/` folder is placed directly in your project:
+1. Download **Source code (zip)** from the [v5.0.34 release](https://github.com/bebabinlarsson-blip/Godot-MCP/releases/tag/v5.0.34). This release currently has GitHub source archives, not a separately attached add-on ZIP.
+2. Extract it and copy the `addons/` directory from inside the extracted repository into your Godot project root. Copy both `godot_ai` and `godot_omni`:
 
 ```text
 your-godot-project/
@@ -109,7 +109,7 @@ your-godot-project/
 
 ### Step 3: Configure Your AI Client
 
-Add Godot MCP to your AI editor of choice. The server runs directly via standard `uvx` without needing manual installation:
+Install [Python 3.11–3.14](https://www.python.org/downloads/) and [uv (`uvx`)](https://docs.astral.sh/uv/getting-started/installation/) on the computer running Godot. The add-on can configure supported local clients from its dock; if you configure a client manually, use an installed `uvx` and the pinned v5.0.34 source below. The first `uvx` launch downloads the Python dependencies:
 
 #### Cursor
 Add to `.cursor/mcp.json`:
@@ -120,7 +120,7 @@ Add to `.cursor/mcp.json`:
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git",
+        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git@v5.0.34",
         "godot-ai"
       ]
     }
@@ -137,7 +137,7 @@ Add to `claude_desktop_config.json` (Windows: `%APPDATA%\Claude\claude_desktop_c
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git",
+        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git@v5.0.34",
         "godot-ai"
       ]
     }
@@ -154,7 +154,7 @@ In Antigravity or Gemini CLI configuration:
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git",
+        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git@v5.0.34",
         "godot-ai"
       ]
     }
@@ -171,7 +171,7 @@ Add to Cline MCP settings:
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git",
+        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git@v5.0.34",
         "godot-ai"
       ]
     }
@@ -188,7 +188,7 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git",
+        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git@v5.0.34",
         "godot-ai"
       ]
     }
@@ -196,7 +196,7 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 }
 ```
 
-That is all. Start prompting your AI to build scenes, write scripts, paint tiles, or animate objects in Godot.
+Keep Godot open while using the tools. These JSON examples are for clients running on the same computer as the editor. Cloud clients such as ChatGPT Work Mode require a separately configured authenticated HTTPS tunnel; see [Public tunnel access](#public-tunnel-access). A local `uvx` command on a cloud machine cannot reach your Godot editor by itself. The 1,820+ operations are grouped into a smaller MCP tool surface; clients load or search tool schemas according to their own capabilities. An OpenAPI URL alone does not register those tools in a client.
 
 ---
 
@@ -289,7 +289,7 @@ flowchart TD
     end
 
     subgraph Godot_Editor [Godot Engine Editor]
-        WSBridge[Local WebSocket :8000]
+        WSBridge[Local WebSocket :9500]
         Dispatcher[McpDispatcher]
         OmniHandler[Omni & Reflection Handler]
         DomainHandlers[59 Domain Handlers]
@@ -310,7 +310,7 @@ flowchart TD
 
 ## Verification and Diagnostics
 
-You can verify the local setup directly from the command line:
+From a checkout of this repository with `uv` installed, you can inspect the installation and tool registry:
 
 ```bash
 # Run the complete test suite
@@ -325,10 +325,7 @@ uv run godot-omni tools stats
 ## Troubleshooting
 
 ### Port 8000 In Use
-Click **Free Port & Replace Server** in the Godot MCP dock tab, or run in PowerShell:
-```powershell
-Get-NetTCPConnection -LocalPort 8000 | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
-```
+Check which process owns the HTTP port before restarting it. In the Godot MCP dock, use **Free Port & Replace Server** only for a server you own. The editor WebSocket uses port 9500 by default; port 8000 is the local HTTP endpoint.
 
 ### Headless Execution
 To allow the plugin to run during headless testing or CI:
@@ -374,7 +371,7 @@ both remain online for those tools to be reachable.
 
 ## Author and License
 
-* Project credits: [Ghosty](https://github.com/ghostySRC) and [Bebabin](https://github.com/bebabinlarsson-blip)
+* Project credits: **[Ghosty (@ghostySRC)](https://github.com/ghostySRC)** and **[Benji (Bebabin, @bebabinlarsson-blip)](https://github.com/bebabinlarsson-blip)**
 * AI use: AI assistance contributed to code and documentation in this release.
 * License: [MIT License](LICENSE) (100% Free and Open Source)
 
