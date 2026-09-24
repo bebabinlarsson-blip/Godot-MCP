@@ -82,6 +82,24 @@ jobs:
                   assert all(f"addons/{addon}/{name}" in files for name in ("plugin.cfg", "LICENSE", "icon.png"))
           PY
 
+      - name: Prepare version-pinned Windows tunnel launcher
+        env:
+          RELEASE_VERSION: ${{ steps.tag.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          version = os.environ["RELEASE_VERSION"]
+          source = Path("Start-Godot-MCP-Tunnel.bat")
+          content = source.read_text(encoding="utf-8")
+          assert f"@v{version}" in content, "launcher must be pinned to this release"
+          launcher = Path("dist") / f"Start-Godot-MCP-Tunnel-v{version}.bat"
+          launcher.write_text(content, encoding="utf-8", newline="")
+          PY
+
       - uses: chickensoft-games/setup-godot@c233594225991af5aec714e52457cc76d6df8fa2 # v2
         with:
           version: "4.7.0"
@@ -112,7 +130,7 @@ jobs:
           if [[ "${result:-0}" -ne 0 && "${result:-0}" -ne 124 ]]; then exit "${result}"; fi
           if grep -Eq 'SCRIPT ERROR|Parse Error|Failed to load script' dist/install-smoke.log; then exit 1; fi
 
-      - name: Attach archive without replacing existing assets
+      - name: Attach archive and Windows launcher without replacing existing assets
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.tag.outputs.tag }}
@@ -120,9 +138,10 @@ jobs:
         run: |
           set -euo pipefail
           archive="dist/godot-mcp-${RELEASE_TAG}.zip"
-          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets \
-             --jq '.assets[].name' | grep -Fxq "${archive##*/}"; then
-            echo "Asset already exists; refusing to replace a published archive" >&2
+          launcher="dist/Start-Godot-MCP-Tunnel-${RELEASE_TAG}.bat"
+          assets="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          if grep -Fxq "${archive##*/}" <<< "$assets" || grep -Fxq "${launcher##*/}" <<< "$assets"; then
+            echo "A release asset already exists; refusing to replace published files" >&2
             exit 1
           fi
-          gh release upload "$RELEASE_TAG" "$archive" --repo "$GITHUB_REPOSITORY"
+          gh release upload "$RELEASE_TAG" "$archive" "$launcher" --repo "$GITHUB_REPOSITORY"
