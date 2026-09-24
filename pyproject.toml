@@ -77,7 +77,7 @@ dev = [
     # CI runs the suite across every runner core; the suite is safe under
     # xdist because integration fixtures allocate free ports per test.
     "pytest-xdist>=3.5",
-    "hypothesis>=6.0",
+    "hypothesis>=6.168.0",
     "ruff>=0.8",
     # Used by script/ci-game-capture-smoke to decode PNG frames from the
     # running game and assert the expected colored quadrants are present.
