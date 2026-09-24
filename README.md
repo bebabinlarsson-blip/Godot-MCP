@@ -40,14 +40,14 @@ Unlike other solutions that rely on external websites, cloud subscriptions, devi
 * Local by default: communication stays on your machine unless you deliberately start a public tunnel. Public tunnels can expose the MCP server outside your network; see the tunnel security notes below.
 * Godot add-ons plus Python server: Copy the add-ons into your project, enable them in Godot, and install Python 3.11–3.14 and `uv` so the editor can start the server. No npm or Node.js installation is required.
 * Engine Support: Runs as native GDScript in Standard and .NET editions of Godot 4.7 and newer on Windows, macOS, and Linux.
-* 59 Tool Families & 1,820+ Operations: Comprehensive scene building, node transformations, procedural animation, tilemap editing, collision creation, and direct GDScript evaluation.
+* 81 Tool Families & 1,820+ Operations: Comprehensive scene building, node transformations, procedural animation, tilemap editing, collision creation, and direct GDScript evaluation.
 * Single Native Dock: Seamlessly integrated tab directly beside your Inspector with live activity monitoring, connection diagnostics, and memory indicators.
 
 ---
 
 ## Tool Families and Capabilities Matrix
 
-Godot MCP provides full engine automation across 59 domain families:
+Godot MCP provides full engine automation across 81 domain families:
 
 | Family | Key Operations | Description |
 | :--- | :--- | :--- |
@@ -72,6 +72,23 @@ Godot MCP provides full engine automation across 59 domain families:
 | **ui** | `ui_manage`, `ui_semantic_tree`, `ui_click`, `ui_type` | Inspect the semantic control hierarchy of the editor UI, click buttons/tabs, and simulate input keystrokes. |
 
 ---
+
+## Godot access: settings and visual feedback
+
+The AI can read and change Godot Editor Settings through
+`editor_settings_manage` (`list_settings`, `get_setting`, and `set_setting`).
+Project Settings are available through `project_manage` (`settings_get` and
+`settings_set`). Settings that can execute code during startup are deliberately
+restricted; use the validated main-scene and autoload tools for those changes.
+
+`editor_screenshot` returns an actual MCP image block for the editor viewport
+or running game when `include_image=true`. Image-capable clients can inspect it
+directly. For text-only models, the optional Vision Routing feature can return
+a text description instead; see [Vision Routing](docs/vision-routing.md).
+
+Use `batch_execute` when an edit needs several scene operations. It sends the
+commands in one MCP call and reduces repeated network round trips; it does not
+reduce the physical network latency of a single call.
 
 ## Quick Start: 3 Simple Steps
 
@@ -354,6 +371,25 @@ On Windows, set the same environment variables in PowerShell before running
 `godot-ai tunnel`. The stable hostname is configured in Cloudflare DNS; it
 cannot be reserved by this plugin. A hostname stays reachable only while the
 machine, editor server, and tunnel process are online.
+
+#### Free stable URL without a custom domain: Tailscale Funnel
+
+Tailscale Funnel can provide a stable `https://<device>.<tailnet>.ts.net` URL
+without buying a domain. Install Tailscale and sign in on the always-on
+computer that runs Godot. In the Tailscale admin console, enable HTTPS
+certificates and Funnel for the tailnet. Then start the MCP tunnel:
+
+```sh
+godot-ai tunnel --provider tailscale-funnel --port 8000
+```
+
+The command prints the public URL and automatically reconnects if its tunnel
+process exits. Use the same `GODOT_AI_AUTH_TOKEN` protection described below.
+The URL stays tied to that Tailscale device and tailnet while they remain
+configured; it cannot keep the MCP reachable if the computer, Godot editor,
+internet connection, or Tailscale service is offline. Funnel is currently a
+beta feature and has provider limits, so this is a stable address rather than
+an uptime guarantee. Tailscale's Personal plan is free for personal use.
 
 Treat any public tunnel as an internet-facing endpoint. Configure the same
 `GODOT_AI_AUTH_TOKEN` in the MCP server and the AI client's Bearer

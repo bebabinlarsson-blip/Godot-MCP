@@ -22,7 +22,15 @@ from urllib.parse import urlsplit
 logger = logging.getLogger(__name__)
 
 TunnelProvider = Literal[
-    "serveo", "cloudflare", "cloudflare-named", "ngrok", "ssh", "pinggy", "localhost.run", "manual"
+    "serveo",
+    "cloudflare",
+    "cloudflare-named",
+    "tailscale-funnel",
+    "ngrok",
+    "ssh",
+    "pinggy",
+    "localhost.run",
+    "manual",
 ]
 DEFAULT_TUNNEL_PROVIDER: TunnelProvider = "localhost.run"
 
@@ -44,6 +52,9 @@ _SSH_URL_REGEX = re.compile(
     r"https?://(?!admin\.)[a-zA-Z0-9.-]+\.(?:serveousercontent\.com|lhr\.life|localhost\.run|pinggy\.link|a\.pinggy\.link|free\.pinggy\.net|run\.pinggy-free\.link)"
 )
 _CF_NAMED_READY_REGEX = re.compile(r"Registered tunnel connection", re.IGNORECASE)
+_TAILSCALE_URL_REGEX = re.compile(
+    r"https://[a-zA-Z0-9.-]+\.ts\.net(?=[\s/|]|$)", re.IGNORECASE
+)
 TUNNEL_TOKEN_FILE_ENV = "GODOT_AI_CLOUDFLARE_TUNNEL_TOKEN_FILE"
 TUNNEL_PUBLIC_URL_ENV = "GODOT_AI_TUNNEL_PUBLIC_URL"
 TUNNEL_START_TIMEOUT_SECONDS = 30.0
@@ -54,6 +65,8 @@ def find_tunnel_binary(provider: TunnelProvider = DEFAULT_TUNNEL_PROVIDER) -> st
     """Find binary executable for the requested tunnel provider."""
     if provider in ("cloudflare", "cloudflare-named"):
         return shutil.which("cloudflared")
+    if provider == "tailscale-funnel":
+        return shutil.which("tailscale")
     if provider == "ngrok":
         return shutil.which("ngrok")
     if provider in ("ssh", "serveo", "pinggy", "localhost.run"):
@@ -459,6 +472,56 @@ def start_cloudflare_named_tunnel(port: int) -> TunnelInfo:
     )
 
 
+def start_tailscale_funnel_tunnel(port: int) -> TunnelInfo:
+    """Expose the local, authenticated MCP server through a stable Tailscale URL.
+
+    Tailscale Funnel uses the device's ``*.ts.net`` HTTPS name and does not
+    require a separately purchased domain. The Tailscale client and Funnel
+    policy must already be configured on the host. The foreground process is
+    intentionally retained so the tunnel supervisor can detect drops and
+    reconnect without losing the stable device hostname.
+    """
+    _verify_local_auth(port, os.environ.get("GODOT_AI_AUTH_TOKEN", "").strip())
+    bin_path = find_tunnel_binary("tailscale-funnel")
+    if not bin_path:
+        raise FileNotFoundError(
+            "Tailscale CLI is required for Tailscale Funnel; install Tailscale, sign in, "
+            "and enable Funnel for this device."
+        )
+
+    proc = subprocess.Popen(
+        [
+            bin_path,
+            "funnel",
+            "--yes",
+            "--https=443",
+            f"http://127.0.0.1:{port}",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+    public_url, _ = _wait_for_tunnel_match(
+        proc, _TAILSCALE_URL_REGEX, TUNNEL_START_TIMEOUT_SECONDS
+    )
+    if public_url is None:
+        _terminate_tunnel_process(proc)
+        raise RuntimeError(
+            "Tailscale Funnel did not publish a *.ts.net HTTPS URL within "
+            f"{TUNNEL_START_TIMEOUT_SECONDS:g} seconds. Sign in to Tailscale, enable Funnel "
+            "for the tailnet, and check that port 443 is not already used by Serve."
+        )
+
+    _start_keepalive_worker(public_url, proc)
+    return TunnelInfo(
+        provider="tailscale-funnel",
+        public_url=public_url.rstrip("/"),
+        openapi_url=f"{public_url.rstrip('/')}/openapi.json",
+        process=proc,
+    )
+
+
 def _ngrok_endpoint_for_port(port: int) -> str | None:
     """Return a public HTTPS endpoint forwarding to the requested local port."""
     try:
@@ -562,15 +625,13 @@ def _start_tunnel_for_provider(
         return start_ssh_tunnel(port, "pinggy")
     if provider == "cloudflare-named":
         return start_cloudflare_named_tunnel(port)
+    if provider == "tailscale-funnel":
+        return start_tailscale_funnel_tunnel(port)
     if provider == "cloudflare":
         return start_cloudflare_quick_tunnel(port)
     if provider == "ngrok":
         return start_ngrok_tunnel(port)
     if provider == "ssh":
-        return start_ssh_tunnel(port, "localhost.run")
-    # Anonymous localhost.run hostnames are assigned per connection and may
-    # change after reconnects, even though the process can stay open for a long time.
-    if provider == "localhost.run":
         return start_ssh_tunnel(port, "localhost.run")
     raise ValueError(f"Unsupported tunnel provider: {provider}")
 
