@@ -5,12 +5,17 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
-## Unreleased
+## 5.0.36 (2026-09-24)
 
 ### Added
 
-- Added Tailscale Funnel support for a stable free `*.ts.net` endpoint without a separately purchased domain.
-- Documented existing editor and project settings, screenshot image blocks, and batched tool calls.
+- Added a Windows launcher for starting the authenticated Tailscale Funnel tunnel.
+- Added free stable `*.ts.net` Tailscale Funnel support without a separately purchased domain.
+
+### Changed
+
+- Updated v5 releases to include both the installable Godot add-ons ZIP and Windows tunnel launcher.
+- Documented Editor and Project Settings access, screenshot image blocks, batched calls, and the Windows tunnel setup.
 
 ### Fixed
 
