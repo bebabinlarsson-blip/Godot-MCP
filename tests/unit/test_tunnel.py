@@ -17,14 +17,17 @@ from godot_ai import _add_tunnel_argument, _uses_automatic_tunnel
 from godot_ai.transport.tunnel import (
     _CF_URL_REGEX,
     _SSH_URL_REGEX,
+    _TAILSCALE_URL_REGEX,
     DEFAULT_TUNNEL_PROVIDER,
     _ngrok_endpoint_for_port,
+    _start_tunnel_for_provider,
     _verify_local_auth,
     _wait_for_tunnel_match,
     find_tunnel_binary,
     start_cloudflare_named_tunnel,
     start_cloudflare_quick_tunnel,
     start_ssh_tunnel,
+    start_tailscale_funnel_tunnel,
 )
 
 
@@ -36,6 +39,7 @@ def test_legacy_tunnel_flag_uses_shared_provider_default():
     assert parser.parse_args(["--tunnel"]).tunnel == DEFAULT_TUNNEL_PROVIDER
     assert parser.parse_args(["--tunnel", "cloudflare"]).tunnel == "cloudflare"
     assert parser.parse_args(["--tunnel", "cloudflare-named"]).tunnel == "cloudflare-named"
+    assert parser.parse_args(["--tunnel", "tailscale-funnel"]).tunnel == "tailscale-funnel"
 
 
 def test_tunnel_cli_accepts_named_cloudflare_provider():
@@ -64,10 +68,34 @@ def test_tunnel_cli_accepts_ngrok_provider():
     assert run_tunnel.call_args.args[1] == "ngrok"
 
 
+def test_tunnel_cli_accepts_tailscale_funnel_provider():
+    from godot_ai import main
+
+    with (
+        patch("godot_ai.runtime_dependencies.verify_runtime_dependencies"),
+        patch("godot_ai.transport.tunnel.run_tunnel_forever") as run_tunnel,
+    ):
+        main(["tunnel", "--provider", "tailscale-funnel"])
+
+    run_tunnel.assert_called_once()
+    assert run_tunnel.call_args.args[1] == "tailscale-funnel"
+
+
 def test_manual_tunnel_does_not_request_public_bind():
     assert not _uses_automatic_tunnel(None)
     assert not _uses_automatic_tunnel("manual")
     assert _uses_automatic_tunnel("cloudflare")
+    assert _uses_automatic_tunnel("tailscale-funnel")
+
+
+def test_tailscale_provider_dispatches_to_funnel_starter():
+    expected = object()
+    with patch(
+        "godot_ai.transport.tunnel.start_tailscale_funnel_tunnel",
+        return_value=expected,
+    ) as start:
+        assert _start_tunnel_for_provider(8123, "tailscale-funnel") is expected
+    start.assert_called_once_with(8123)
 
 
 def test_ssh_url_regex_matches():
@@ -103,6 +131,15 @@ def test_cloudflare_url_regex_matches():
     match = _CF_URL_REGEX.search(cf_line)
     assert match is not None
     assert match.group(0) == "https://phys-brochures-hart-indicate.trycloudflare.com"
+
+
+def test_tailscale_url_regex_matches_only_ts_net_hosts():
+    match = _TAILSCALE_URL_REGEX.search(
+        "Available on the internet: https://godot-host.personal-tailnet.ts.net\n"
+    )
+    assert match is not None
+    assert match.group(0) == "https://godot-host.personal-tailnet.ts.net"
+    assert _TAILSCALE_URL_REGEX.search("https://godot-host.ts.net.attacker.example") is None
 
 
 def test_find_tunnel_binary():
@@ -257,6 +294,34 @@ def test_named_cloudflare_tunnel_uses_token_file_and_stable_https_url(monkeypatc
     assert info.provider == "cloudflare-named"
     assert info.public_url == "https://mcp.example.com"
     assert info.openapi_url == "https://mcp.example.com/openapi.json"
+
+
+def test_tailscale_funnel_forwards_authenticated_local_server(monkeypatch):
+    monkeypatch.setenv("GODOT_AI_AUTH_TOKEN", "mcp-auth-secret")
+    fake_proc = MagicMock()
+    fake_proc.stdout.readline.side_effect = [
+        "Available on the internet: https://godot-host.personal-tailnet.ts.net\n",
+    ]
+    with (
+        patch("godot_ai.transport.tunnel.find_tunnel_binary", return_value="tailscale"),
+        patch("godot_ai.transport.tunnel._verify_local_auth") as verify_auth,
+        patch("godot_ai.transport.tunnel._start_keepalive_worker") as keepalive,
+        patch("subprocess.Popen", return_value=fake_proc) as popen,
+    ):
+        info = start_tailscale_funnel_tunnel(8123)
+
+    assert popen.call_args.args[0] == [
+        "tailscale",
+        "funnel",
+        "--yes",
+        "--https=443",
+        "http://127.0.0.1:8123",
+    ]
+    verify_auth.assert_called_once_with(8123, "mcp-auth-secret")
+    keepalive.assert_called_once_with("https://godot-host.personal-tailnet.ts.net", fake_proc)
+    assert info.provider == "tailscale-funnel"
+    assert info.public_url == "https://godot-host.personal-tailnet.ts.net"
+    assert info.openapi_url == "https://godot-host.personal-tailnet.ts.net/openapi.json"
 
 
 def test_named_tunnel_requires_local_server_authentication(monkeypatch):

@@ -183,6 +183,7 @@ def _add_tunnel_argument(parser: argparse.ArgumentParser) -> None:
         choices=[
             "cloudflare",
             "cloudflare-named",
+            "tailscale-funnel",
             "serveo",
             "ngrok",
             "ssh",
@@ -249,6 +250,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "serveo",
                 "cloudflare",
                 "cloudflare-named",
+                "tailscale-funnel",
                 "ngrok",
                 "ssh",
                 "pinggy",
@@ -257,7 +259,8 @@ def main(argv: Sequence[str] | None = None) -> None:
             help=(
                 f"Tunnel provider (default: {DEFAULT_TUNNEL_PROVIDER}; anonymous "
                 "URLs may change after reconnect. Use cloudflare-named for a "
-                "Cloudflare hostname configured in your account.)"
+                "Cloudflare hostname configured in your account, or "
+                "tailscale-funnel for a stable free *.ts.net address.)"
             ),
         )
         t_args = tunnel_parser.parse_args(effective_argv[1:])

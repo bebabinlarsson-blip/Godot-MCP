@@ -5,6 +5,17 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## Unreleased
+
+### Added
+
+- Added Tailscale Funnel support for a stable free `*.ts.net` endpoint without a separately purchased domain.
+- Documented existing editor and project settings, screenshot image blocks, and batched tool calls.
+
+### Fixed
+
+- Removed an unreachable duplicate localhost.run tunnel dispatch branch.
+
 ## 5.0.35 (2026-09-23)
 
 - Added a bounded project map and a read-only TileSet atlas and collision doctor.
