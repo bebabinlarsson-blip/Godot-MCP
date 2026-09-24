@@ -81,7 +81,7 @@ dev = [
     "ruff>=0.8",
     # Used by script/ci-game-capture-smoke to decode PNG frames from the
     # running game and assert the expected colored quadrants are present.
-    "pillow>=10.0",
+    "pillow>=12.3.0",
     # Reviewed harness only: identity-bound release resource measurements.
     "psutil==7.2.2",
     # The closed-editor installer (script/v4-release) verifies release
