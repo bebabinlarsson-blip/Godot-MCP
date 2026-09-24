@@ -23,7 +23,7 @@ not the MCP tool names.
 
 | Tool | Description |
 |------|-------------|
-| `batch_execute` | Run multiple plugin commands atomically (rollback on first error) |
+| `batch_execute` | Run multiple plugin commands atomically (rollback on first error); `preview=true` shows node-structure changes and restores the scene |
 | `node_create` / `node_set_property` / `node_find` | Common node writes + search |
 | `scene_open` / `scene_save` | Open and save scenes |
 | `script_create` / `script_attach` / `script_patch` | Create, attach, anchor-edit GDScript files |
@@ -197,7 +197,7 @@ Calls take the form:
 | `scene_manage` | `create`, `save_as`, `get_roots` |
 | `node_manage` | `get_children`, `get_groups`, `delete`, `duplicate`, `rename`, `move`, `reparent`, `add_to_group`, `remove_from_group` |
 | `script_manage` | `read`, `detach`, `find_symbols` |
-| `project_manage` | `stop`, `settings_get`, `settings_set`, `set_main_scene` |
+| `project_manage` | `stop`, `settings_get`, `settings_set`, `set_main_scene`, `get_map` |
 | `editor_manage` | `state`, `selection_get`, `selection_set`, `monitors_get`, `quit`, `logs_clear`, `game_eval` |
 | `session_manage` | `list` |
 | `test_manage` | `results_get` |
@@ -217,7 +217,7 @@ Calls take the form:
 | `api_manage` | `get_class` |
 | `client_manage` | `status`, `configure`, `remove` |
 | `tilemap_manage` | `tilemap_set_cell`, `tilemap_set_cells_rect`, `tilemap_clear`, `tilemap_get_cells` |
-| `tileset_manage` | `tileset_get_atlas_tiles`, `tileset_get_atlas_image` |
+| `tileset_manage` | `tileset_get_atlas_tiles`, `tileset_get_atlas_image`, `tileset_diagnose` |
 | `gridmap_manage` | `gridmap_set_item`, `gridmap_fill`, `gridmap_clear`, `gridmap_get_used_cells`, `gridmap_list_library_items` |
 | `csg_manage` | `csg_create`, `csg_set_operation` |
 | `custom_manage` | `list`, `invoke` |

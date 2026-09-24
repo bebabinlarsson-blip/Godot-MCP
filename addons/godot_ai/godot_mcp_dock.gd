@@ -112,7 +112,7 @@ func _build_ui() -> void:
 	header_bar.add_child(title)
 
 	var version_badge := Label.new()
-	version_badge.text = "v5.0.34"
+	version_badge.text = "v5.0.35"
 
 	version_badge.modulate = Color(0.45, 0.75, 1.0)
 	version_badge.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -191,6 +191,11 @@ func _build_ui() -> void:
 	actions_row.add_child(_restart_btn)
 
 	status_vbox.add_child(actions_row)
+	var remote_btn := Button.new()
+	remote_btn.text = "Remote Setup"
+	remote_btn.tooltip_text = "Check named-tunnel settings and get setup instructions"
+	remote_btn.pressed.connect(_show_remote_setup)
+	status_vbox.add_child(remote_btn)
 	status_card.add_child(status_vbox)
 	main_vbox.add_child(status_card)
 
@@ -443,6 +448,32 @@ func _on_test_connection_pressed() -> void:
 		_eval_output.text = "[color=#ffaa33]Bridge Connecting:[/color] Engine alive | Refreshing server status..."
 	status_snapshot_requested.emit()
 	live_server_probe_requested.emit(_http_port)
+
+
+func _show_remote_setup() -> void:
+	var dialog := AcceptDialog.new()
+	dialog.title = "Remote MCP setup"
+	var hostname := OS.get_environment("GODOT_AI_TUNNEL_PUBLIC_URL")
+	var token_file := OS.get_environment("GODOT_AI_CLOUDFLARE_TUNNEL_TOKEN_FILE")
+	var auth_present := not OS.get_environment("GODOT_AI_AUTH_TOKEN").is_empty()
+	var lines := [
+		"Local server: %s | editor bridge: %s" % [str(_server_state), "connected" if _is_connected else "disconnected"],
+		"Stable HTTPS hostname: %s" % (hostname if not hostname.is_empty() else "not configured"),
+		"Cloudflare token file: %s" % ("configured" if not token_file.is_empty() else "not configured"),
+		"Bearer token: %s" % ("configured" if auth_present else "not configured"),
+		"",
+		"1. Route your Cloudflare hostname to http://127.0.0.1:%d." % _http_port,
+		"2. Set GODOT_AI_AUTH_TOKEN before starting Godot.",
+		"3. Set GODOT_AI_CLOUDFLARE_TUNNEL_TOKEN_FILE and GODOT_AI_TUNNEL_PUBLIC_URL.",
+		"4. Run: godot-ai tunnel doctor --port %d" % _http_port,
+		"5. Run: godot-ai tunnel --provider cloudflare-named --port %d" % _http_port,
+		"Keep the editor and tunnel process running for remote access.",
+	]
+	dialog.dialog_text = "\n".join(lines)
+	dialog.confirmed.connect(dialog.queue_free)
+	dialog.canceled.connect(dialog.queue_free)
+	add_child(dialog)
+	dialog.popup_centered(Vector2i(620, 400))
 
 
 func _on_eval_pressed() -> void:

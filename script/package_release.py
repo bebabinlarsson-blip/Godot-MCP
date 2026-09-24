@@ -1,6 +1,6 @@
 """Package a reproducible Godot MCP add-on archive for GitHub and the Asset Library.
 
-Usage: python script/package_release.py [--version 5.0.34]
+Usage: python script/package_release.py [--version 5.0.35]
 """
 
 from __future__ import annotations

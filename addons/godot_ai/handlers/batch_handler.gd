@@ -44,6 +44,7 @@ const FORBIDDEN_SUBCOMMANDS := {
 ## for the batch's full duration. 500 is far above any legitimate scene
 ## edit while keeping worst-case stalls in check.
 const MAX_BATCH_COMMANDS := 500
+const PREVIEW_COMMANDS := {"create_node": true, "delete_node": true}
 
 var _dispatcher: McpDispatcher
 var _undo_redo: EditorUndoRedoManager
@@ -171,6 +172,53 @@ func batch_execute(params: Dictionary) -> Dictionary:
 	if stopped_at != null:
 		response_data["error"] = results[-1]["error"]
 	return {"data": response_data}
+
+
+## Trial scene-structure edits and always undo them before responding. The
+## allowlist excludes handlers with file writes or script-backed property setters.
+func preview_scene_changes(params: Dictionary) -> Dictionary:
+	var commands = params.get("commands", null)
+	if not commands is Array or commands.is_empty() or commands.size() > 30:
+		return ErrorCodes.make(ErrorCodes.VALUE_OUT_OF_RANGE, "Preview requires 1 to 30 scene commands")
+	var root := EditorInterface.get_edited_scene_root()
+	if root == null:
+		return ErrorCodes.make(ErrorCodes.VALUE_OUT_OF_RANGE, "Open an editable scene first")
+	for i in range(commands.size()):
+		if not commands[i] is Dictionary or not PREVIEW_COMMANDS.has(commands[i].get("command", "")) or not commands[i].get("params", {}) is Dictionary:
+			return ErrorCodes.make(ErrorCodes.VALUE_OUT_OF_RANGE, "commands[%d] must be create_node or delete_node with dictionary params" % i)
+		if commands[i]["command"] == "create_node" and not str(commands[i]["params"].get("scene_path", "")).is_empty():
+			return ErrorCodes.make(ErrorCodes.VALUE_OUT_OF_RANGE, "Preview does not instantiate scripted scenes")
+	var before := _scene_nodes(root)
+	var committed: Array = []
+	var results: Array = []
+	var failed := false
+	for item in commands:
+		var tracked := _tracked_histories()
+		var versions: Array = []
+		for ur in tracked:
+			versions.append(ur.get_version())
+		var result: Dictionary = _dispatcher.dispatch_direct(item["command"], item.get("params", {}))
+		_record_committed(tracked, versions, committed)
+		results.append(result)
+		if result.get("status", "ok") == "error" or committed.size() != results.size():
+			failed = true
+			break
+	var after := _scene_nodes(root)
+	var rolled_back := _rollback(committed) if not committed.is_empty() else true
+	if not rolled_back or _scene_nodes(root) != before:
+		return ErrorCodes.make(ErrorCodes.INTERNAL_ERROR, "Preview could not restore the original scene; inspect editor undo history")
+	return {"data": {"before": before, "after": after, "results": results, "preview_only": true, "rolled_back": true, "stopped_at": results.size() - 1 if failed else null, "keep_with": "batch_execute", "commands": commands}}
+
+
+func _scene_nodes(root: Node) -> Array:
+	var nodes: Array = []
+	var pending: Array = [root]
+	while not pending.is_empty() and nodes.size() < 500:
+		var node: Node = pending.pop_front()
+		nodes.append({"path": str(root.get_path_to(node)) if node != root else ".", "name": str(node.name), "type": node.get_class()})
+		for child in node.get_children():
+			pending.append(child)
+	return nodes
 
 
 ## The histories a batch sub-command can commit into.

@@ -5,7 +5,7 @@
 ### Free and Open-Source Model Context Protocol Automation Plugin for the Godot Engine
 
 [![MCP Protocol](https://img.shields.io/badge/MCP-Model%20Context%20Protocol-8A2BE2?style=flat&labelColor=333A41)](https://modelcontextprotocol.io)
-[![Release](https://img.shields.io/badge/Release-v5.0.34-blue.svg?style=flat&labelColor=333A41)](https://github.com/bebabinlarsson-blip/Godot-MCP/releases)
+[![Release](https://img.shields.io/badge/Release-v5.0.35-blue.svg?style=flat&labelColor=333A41)](https://github.com/bebabinlarsson-blip/Godot-MCP/releases)
 [![Godot](https://img.shields.io/badge/Godot-4.7+-478CBF?style=flat&logo=godotengine&logoColor=white&labelColor=333A41)](https://godotengine.org)
 [![Python](https://img.shields.io/badge/Python-3.11%20|%203.12%20|%203.13%20|%203.14-3776AB?style=flat&logo=python&logoColor=white&labelColor=333A41)](https://www.python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat&labelColor=333A41)](LICENSE)
@@ -32,7 +32,7 @@
 
 ## Overview
 
-Godot MCP is a free, open-source editor add-on and Python server that connect AI coding assistants to the Godot Editor through the Model Context Protocol (MCP). This README describes [v5.0.34](https://github.com/bebabinlarsson-blip/Godot-MCP/releases/tag/v5.0.34).
+Godot MCP is a free, open-source editor add-on and Python server that connect AI coding assistants to the Godot Editor through the Model Context Protocol (MCP). This README describes [v5.0.35](https://github.com/bebabinlarsson-blip/Godot-MCP/releases/tag/v5.0.35).
 
 Unlike other solutions that rely on external websites, cloud subscriptions, device logins, or custom npm CLI wrappers, Godot MCP is designed to be a straightforward in-engine Godot plugin:
 
@@ -79,8 +79,8 @@ You do not need to register on any website or install any npm packages.
 
 ### Step 1: Download and Extract the Plugin
 
-1. Download **Source code (zip)** from the [v5.0.34 release](https://github.com/bebabinlarsson-blip/Godot-MCP/releases/tag/v5.0.34). This release currently has GitHub source archives, not a separately attached add-on ZIP.
-2. Extract it and copy the `addons/` directory from inside the extracted repository into your Godot project root. Copy both `godot_ai` and `godot_omni`:
+1. Download **godot-mcp-v5.0.35.zip** from the [v5.0.35 release](https://github.com/bebabinlarsson-blip/Godot-MCP/releases/tag/v5.0.35).
+2. Extract it into your Godot project root. The ZIP contains both `godot_ai` and `godot_omni` inside `addons/`:
 
 ```text
 your-godot-project/
@@ -109,7 +109,7 @@ your-godot-project/
 
 ### Step 3: Configure Your AI Client
 
-Install [Python 3.11–3.14](https://www.python.org/downloads/) and [uv (`uvx`)](https://docs.astral.sh/uv/getting-started/installation/) on the computer running Godot. The add-on can configure supported local clients from its dock; if you configure a client manually, use an installed `uvx` and the pinned v5.0.34 source below. The first `uvx` launch downloads the Python dependencies:
+Install [Python 3.11–3.14](https://www.python.org/downloads/) and [uv (`uvx`)](https://docs.astral.sh/uv/getting-started/installation/) on the computer running Godot. The add-on can configure supported local clients from its dock; if you configure a client manually, use an installed `uvx` and the pinned v5.0.35 source below. The first `uvx` launch downloads the Python dependencies:
 
 #### Cursor
 Add to `.cursor/mcp.json`:
@@ -120,7 +120,7 @@ Add to `.cursor/mcp.json`:
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git@v5.0.34",
+        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git@v5.0.35",
         "godot-ai"
       ]
     }
@@ -137,7 +137,7 @@ Add to `claude_desktop_config.json` (Windows: `%APPDATA%\Claude\claude_desktop_c
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git@v5.0.34",
+        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git@v5.0.35",
         "godot-ai"
       ]
     }
@@ -154,7 +154,7 @@ In Antigravity or Gemini CLI configuration:
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git@v5.0.34",
+        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git@v5.0.35",
         "godot-ai"
       ]
     }
@@ -171,7 +171,7 @@ Add to Cline MCP settings:
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git@v5.0.34",
+        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git@v5.0.35",
         "godot-ai"
       ]
     }
@@ -188,7 +188,7 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git@v5.0.34",
+        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git@v5.0.35",
         "godot-ai"
       ]
     }
@@ -366,6 +366,31 @@ bound to loopback. Share the URL only with intended clients.
 The MCP gateway advertises its available tools at `/api/v1/tools` and exposes
 the OpenAPI document at `/openapi.json`. The editor and tunnel process must
 both remain online for those tools to be reachable.
+
+Open **Remote Setup** in the Godot MCP dock to see the local connection state,
+hostname configuration, and setup steps. Run `godot-ai tunnel doctor` to check
+the Cloudflare binary, named-tunnel token file, local bearer enforcement, and
+the authenticated public status and tool catalog. The doctor never prints
+the bearer token or Cloudflare token. Use `--local-only` when your hostname has
+not been routed yet.
+
+### Inspect before editing
+
+`project_manage(op="get_map")` provides a small, read-only index of the open
+project's scenes, scripts, assets, resources, autoloads, and input actions.
+`tileset_manage(op="tileset_diagnose", params={"tileset_path": "res://..."})`
+reports atlas and texture problems; pass `check_collision=true` to flag tiles
+without polygons on a selected physics layer. Rotated alternatives alone are
+not considered broken.
+
+`batch_execute(commands=[...], preview=true)` previews up to 30 `create_node`
+or `delete_node` edits in an open scene, shows scene nodes before and after,
+and undoes its changes. Call the same batch with `preview=false` to keep it.
+Preview does not capture screenshots or support file-writing commands.
+
+Published v5 releases attach an add-ons-only ZIP after the release workflow
+verifies its structure and loads it into a fresh Godot project. Extract the ZIP
+at the project root, then enable the plugin in Godot's Project Settings.
 
 ---
 

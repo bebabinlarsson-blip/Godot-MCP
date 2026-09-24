@@ -6,6 +6,22 @@ from godot_ai.handlers._readiness import require_writable_async
 from godot_ai.runtime.direct import DirectRuntime
 
 
+async def tileset_diagnose(
+    runtime: DirectRuntime,
+    tileset_path: str,
+    check_collision: bool = False,
+    physics_layer: int = 0,
+    max_findings: int = 80,
+) -> dict:
+    """Return bounded, read-only atlas and optional collision findings."""
+    return await runtime.send_command("tileset_diagnose", {
+        "tileset_path": tileset_path,
+        "check_collision": check_collision,
+        "physics_layer": physics_layer,
+        "max_findings": max_findings,
+    })
+
+
 async def tileset_get_atlas_tiles(
     runtime: DirectRuntime,
     tileset_path: str,
@@ -146,4 +162,3 @@ async def tileset_scaffold_terrain_bitmasks(
     if tiles is not None:
         params["tiles"] = tiles
     return await runtime.send_command("tileset_scaffold_terrain_bitmasks", params)
-

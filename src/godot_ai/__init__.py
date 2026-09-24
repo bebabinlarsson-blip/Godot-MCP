@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import errno
+import json
 import os
 import socket
 import sys
@@ -214,7 +215,22 @@ def main(argv: Sequence[str] | None = None) -> None:
         return
 
     if effective_argv[:1] == ["tunnel"]:
-        from godot_ai.transport.tunnel import DEFAULT_TUNNEL_PROVIDER, run_tunnel_forever
+        from godot_ai.transport.tunnel import (
+            DEFAULT_TUNNEL_PROVIDER,
+            diagnose_named_tunnel,
+            run_tunnel_forever,
+        )
+
+        if effective_argv[1:2] == ["doctor"]:
+            doctor_parser = argparse.ArgumentParser(prog="godot-ai tunnel doctor")
+            doctor_parser.add_argument("--port", type=int, default=8000)
+            doctor_parser.add_argument("--local-only", action="store_true")
+            doctor_args = doctor_parser.parse_args(effective_argv[2:])
+            report = diagnose_named_tunnel(doctor_args.port, not doctor_args.local_only)
+            print(json.dumps(report, indent=2))
+            if not report["ready"]:
+                raise SystemExit(1)
+            return
 
         tunnel_parser = argparse.ArgumentParser(
             prog="godot-ai tunnel",

@@ -327,6 +327,69 @@ func get_info(params: Dictionary = {}) -> Dictionary:
 	}
 
 
+## A bounded, read-only index of the current project for a newly connected AI.
+## Uses the editor's cached filesystem rather than walking disk or loading
+## every scene; a large project cannot make one MCP call scan indefinitely.
+func get_project_map(params: Dictionary) -> Dictionary:
+	var max_files := clampi(int(params.get("max_files", 180)), 1, 400)
+	var max_dirs := 160
+	var files := {"scenes": [], "scripts": [], "resources": [], "assets": []}
+	var counts := {"scenes": 0, "scripts": 0, "resources": 0, "assets": 0}
+	var filesystem := EditorInterface.get_resource_filesystem()
+	var root: EditorFileSystemDirectory = filesystem.get_filesystem() if filesystem != null else null
+	var pending: Array = [root] if root != null else []
+	var directories_scanned := 0
+	var indexed := 0
+	while not pending.is_empty() and directories_scanned < max_dirs and indexed < max_files:
+		var directory: EditorFileSystemDirectory = pending.pop_front()
+		directories_scanned += 1
+		for i in directory.get_file_count():
+			var path := directory.get_file_path(i)
+			var ext := path.get_extension().to_lower()
+			var category := ""
+			if ext in ["tscn", "scn"]:
+				category = "scenes"
+			elif ext in ["gd", "cs"]:
+				category = "scripts"
+			elif ext in ["tres", "res", "gdshader", "shader"]:
+				category = "resources"
+			elif ext in ["png", "webp", "svg", "jpg", "ogg", "wav", "glb", "gltf"]:
+				category = "assets"
+			if category.is_empty():
+				continue
+			files[category].append(path)
+			counts[category] += 1
+			indexed += 1
+			if indexed >= max_files:
+				break
+		for i in directory.get_subdir_count():
+			pending.append(directory.get_subdir(i))
+	var autoloads: Array[Dictionary] = []
+	var actions: Array[String] = []
+	for prop in ProjectSettings.get_property_list():
+		var key := str(prop.get("name", ""))
+		if key.begins_with("autoload/") and autoloads.size() < 64:
+			autoloads.append({"name": key.trim_prefix("autoload/"), "path": str(ProjectSettings.get_setting(key))})
+		elif key.begins_with("input/") and actions.size() < 64:
+			actions.append(key.trim_prefix("input/"))
+	for category in files:
+		files[category].sort()
+	autoloads.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return str(a["name"]) < str(b["name"]))
+	actions.sort()
+	return {"data": {
+		"project_name": str(ProjectSettings.get_setting("application/config/name", "")),
+		"main_scene": str(ProjectSettings.get_setting(MAIN_SCENE_KEY, "")),
+		"open_scenes": Array(EditorInterface.get_open_scenes()),
+		"files": files,
+		"counts": counts,
+		"autoloads": autoloads,
+		"input_actions": actions,
+		"files_limit": max_files,
+		"truncated": not pending.is_empty() or indexed >= max_files or directories_scanned >= max_dirs,
+		"editor_scan_ready": root != null,
+	}}
+
+
 func run_project(params: Dictionary) -> Dictionary:
 	var mode: String = params.get("mode", "main")
 	var autosave: bool = params.get("autosave", true)
