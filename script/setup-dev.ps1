@@ -58,12 +58,12 @@ if (-not (Test-Path -LiteralPath $addonsDir)) {
 }
 
 $linkPath = Join-Path $addonsDir 'godot_ai'
-$targetPath = Join-Path $repoRoot 'plugin\addons\godot_ai'
+$targetPath = Join-Path $repoRoot 'addons\godot_ai'
 
 # One shared implementation with script/verify-worktree (#935): a verified
 # junction is accepted or repaired (pointer removed with rmdir, never recursed
 # into); a REAL directory at the link path is moved to a timestamped .stale.*
-# sibling instead of deleted, because it may hold uncommitted plugin edits.
+# sibling instead of deleted, because it may hold uncommitted add-on edits.
 & (Join-Path $PSScriptRoot '_plugin_junction.ps1') -LinkPath $linkPath -TargetPath $targetPath
 if ($LASTEXITCODE -ne 0) { throw "could not establish test_project\addons\godot_ai junction (exit $LASTEXITCODE)" }
 

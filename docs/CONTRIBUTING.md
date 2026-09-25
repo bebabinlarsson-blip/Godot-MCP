@@ -25,7 +25,7 @@ cd godot-ai
 ```
 
 > **Plugin link is built locally, not tracked in git.** `test_project/addons/godot_ai`
-> is a symlink (Unix) or directory junction (Windows) into `plugin/addons/godot_ai`,
+> is a symlink (Unix) or directory junction (Windows) into `addons/godot_ai`,
 > created fresh by `setup-dev`. A clone without running `setup-dev` has no link and
 > Godot won't find the plugin. The Windows flavor uses `mklink /J`, which works
 > without admin rights and without Windows Developer Mode.

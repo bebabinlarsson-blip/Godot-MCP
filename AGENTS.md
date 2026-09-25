@@ -162,10 +162,10 @@ pytest -m "not editor"       # iterate: skip the rows that launch a real editor
 ```powershell
 # from repo root or worktree root
 Remove-Item -LiteralPath test_project\addons\godot_ai -Force -ErrorAction SilentlyContinue
-New-Item -ItemType Junction -Path test_project\addons\godot_ai -Target ..\..\plugin\addons\godot_ai
+New-Item -ItemType Junction -Path test_project\addons\godot_ai -Target addons\godot_ai
 ```
 
-Or in cmd: `mklink /J test_project\addons\godot_ai ..\..\plugin\addons\godot_ai`.
+Or in cmd: `mklink /J test_project\addons\godot_ai addons\godot_ai`.
 
 **When troubleshooting any dev-environment / setup / dependency / symlink issue, scan `script/` first** for an existing fixer before doing it by hand. The project ships scripts for a reason — bypassing them re-introduces the bugs they were written to handle.
 

@@ -8,7 +8,7 @@ The registry + strategy system that auto-configures MCP clients.
 ## Client configuration
 
 The plugin auto-configures every registered MCP client via a registry + strategy
-system in `plugin/addons/godot_ai/clients/` —
+system in `addons/godot_ai/clients/` —
 `_registry.gd::_CLIENT_SCRIPT_PATHS` is the authoritative list. Read that directory for the mechanics; two
 rules are not visible in the code:
 

@@ -30,6 +30,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VERIFY_SCRIPT = REPO_ROOT / "script" / "verify-worktree"
+WINDOWS_SETUP_SCRIPT = REPO_ROOT / "script" / "setup-dev.ps1"
 
 pytestmark = pytest.mark.skipif(
     os.name == "nt",
@@ -63,6 +64,12 @@ def _run(root: Path) -> subprocess.CompletedProcess:
         capture_output=True,
         text=True,
     )
+
+
+def test_windows_setup_dev_targets_the_shipped_addon() -> None:
+    """Keep Windows setup aligned with verify-worktree and release sources."""
+    script = WINDOWS_SETUP_SCRIPT.read_text(encoding="utf-8")
+    assert "$targetPath = Join-Path $repoRoot 'addons\\godot_ai'" in script
 
 
 def test_stale_real_dir_is_repaired_to_symlink(tmp_path: Path) -> None:
