@@ -21,7 +21,8 @@ import pytest
 from godot_ai.transport.capability import read_capabilities
 
 ROOT = Path(__file__).resolve().parents[2]
-PLUGIN_ROOT = ROOT / "plugin" / "addons" / "godot_ai"
+# Exercise the canonical release source; plugin/addons is a legacy mirror.
+PLUGIN_ROOT = ROOT / "addons" / "godot_ai"
 SCRIPT = ROOT / "script" / "local-self-update-smoke"
 
 LIVE_HTTP_PORT = 18210
@@ -1427,8 +1428,13 @@ static func _read_capability(port: int) -> Dictionary:
 
 
 static func client_config_has_pin(version: String) -> bool:
-\treturn client_config_text().contains("godot-ai==%s" % version)
-
+\tvar config_text := client_config_text()
+\treturn (
+\t\tconfig_text.contains("godot-ai==%s" % version)
+\t\tor config_text.contains(
+\t\t\t"releases/download/v%s/godot_ai-%s-py3-none-any.whl" % [version, version]
+\t\t)
+\t)
 
 static func client_config_text() -> String:
 \tvar home := OS.get_environment("CODEX_HOME")

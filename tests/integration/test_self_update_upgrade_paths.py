@@ -134,12 +134,14 @@ def test_clean_major_driver_waits_for_automatic_migration(tmp_path: Path) -> Non
         target_version="4.0.0",
     )
     text = (project / "_test_runner_driver.gd").read_text(encoding="utf-8")
+    support_text = (project / "_test_self_update_driver_support.gd").read_text(encoding="utf-8")
 
     assert CLEAN_MAJOR_MARKER_RELATIVE.as_posix() in text
     assert 'plugin.get("_normal_start_released")' in text
     assert "update marker does not record success" in text
     assert "migration completed automatically" in text
     assert "repinned owned Codex command pin=" in text
+    assert "releases/download/v%s/godot_ai-%s-py3-none-any.whl" in support_text
     assert 'lifecycle.get("episode_state", "")) != "READY"' in text
     assert 'lifecycle.get("ready_kind", "")) != "owned"' in text
     assert 'plugin.call("_on_dock_post_update_action_requested", "continue")' not in text
