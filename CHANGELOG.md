@@ -5,6 +5,12 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.39 (2026-09-25)
+
+### Fixed
+
+- Fixed Godot 4.7 GDScript parsing in the TileSet atlas diagnostic by normalizing vector types before atlas-size subtraction.
+
 ## 5.0.38 (2026-09-25)
 
 ### Fixed

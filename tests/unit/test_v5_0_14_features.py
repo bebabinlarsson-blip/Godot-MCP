@@ -112,6 +112,8 @@ def test_tileset_handler_gdscript_has_scaffold_templates():
     assert '"kenney_3x3_minimal":' in source
     assert '"rpgmaker_47":' in source
     assert "set_terrain_peering_bit" in source
+    # Godot 4.7 has Vector2 texture sizes and Vector2i atlas margins.
+    assert "Vector2(texture_size) - Vector2(source.margins) * 2.0" in source
 
     # Check plugin dispatcher registration
     plugin_gd = (ADDONS / "plugin.gd").read_text(encoding="utf-8")
@@ -258,4 +260,8 @@ def test_client_configurator_has_local_repo_discovery():
     assert source == plugin_source
     assert "static func _find_local_repo_root() -> String:" in source
     assert "var repo_root := _find_local_repo_root()" in source
-    assert "if is_dev_checkout() or not repo_root.is_empty():" in source
+    expected_dev_condition = (
+        'if (is_dev_checkout() or not repo_root.is_empty()) and not plugin_version.'
+        'begins_with("5."):'
+    )
+    assert expected_dev_condition in source
