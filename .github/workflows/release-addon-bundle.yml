@@ -115,12 +115,18 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           import os
+          import re
           from pathlib import Path
 
           version = os.environ["RELEASE_VERSION"]
           source = Path("Start-Godot-MCP-Tunnel.bat")
           content = source.read_text(encoding="utf-8")
-          assert f"releases/download/v{version}/godot_ai-{version}-py3-none-any.whl" in content, "launcher must use this release's backend wheel"
+          content, count = re.subn(
+              r"releases/download/v\d+\.\d+\.\d+/godot_ai-\d+\.\d+\.\d+-py3-none-any\.whl",
+              f"releases/download/v{version}/godot_ai-{version}-py3-none-any.whl",
+              content,
+          )
+          assert count == 1, "launcher must contain exactly one pinned backend wheel URL"
           launcher = Path("dist") / f"Start-Godot-MCP-Tunnel-v{version}.bat"
           launcher.write_text(content, encoding="utf-8", newline="")
           PY
