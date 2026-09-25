@@ -16,10 +16,11 @@ import pytest
 from godot_ai.attach.ensure import BackendEnsurer
 from godot_ai.transport.capability import capability_directory, read_capabilities, record_path
 from tests.integration._self_update_fixture import (
-    PLUGIN_ROOT,
     godot_bin_or_skip,
     run_godot_editor,
 )
+
+SHIPPED_PLUGIN_ROOT = Path(__file__).resolve().parents[2] / "addons" / "godot_ai"
 
 ## Needs a real Godot editor (GODOT_BIN); skipped without one and excluded
 ## from the iteration loop by `pytest -m "not editor"`.
@@ -95,7 +96,7 @@ def test_codex_workers_complete_after_two_ordinary_editor_restarts(tmp_path: Pat
     """Preserve activation and complete real configure/status workers on every boot."""
     godot = godot_bin_or_skip()
     project = tmp_path / "ordinary-starts"
-    shutil.copytree(PLUGIN_ROOT, project / "addons/godot_ai")
+    shutil.copytree(SHIPPED_PLUGIN_ROOT, project / "addons/godot_ai")
     probe = project / "addons/startup_probe"
     probe.mkdir()
     (probe / "plugin.cfg").write_text(
