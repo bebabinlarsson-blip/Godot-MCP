@@ -30,19 +30,34 @@ func _ready() -> void:
 func run() -> void:
     var record := {"http": OS.get_environment("PROBE_TOKEN"),
         "instance_nonce": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}
-    var result := Lifecycle._probe_with_capability(
-        int(OS.get_environment("PROBE_PORT")), record, 3000)
+    var port := int(OS.get_environment("PROBE_PORT"))
+    var result: Dictionary
+    if OS.get_environment("PROBE_THREADED") == "true":
+        var worker := Thread.new()
+        worker.start(_probe.bind(port, record))
+        while worker.is_alive():
+            await get_tree().process_frame
+        result = worker.wait_to_finish()
+    else:
+        result = _probe(port, record)
     result["matches_record"] = Lifecycle._authenticated_status_matches_record(result, record)
     var file := FileAccess.open("res://result.json", FileAccess.WRITE)
     file.store_string(JSON.stringify(result))
     file.close()
     get_tree().quit()
+
+func _probe(port: int, record: Dictionary) -> Dictionary:
+    return Lifecycle._probe_with_capability(port, record, 3000)
 '''
 
 
-@pytest.mark.parametrize("authorized", [True, False], ids=["slow-authenticated", "foreign-403"])
+@pytest.mark.parametrize(
+    ("authorized", "threaded"),
+    [(True, False), (False, False), (True, True)],
+    ids=["slow-authenticated", "foreign-403", "slow-authenticated-worker"],
+)
 def test_real_godot_status_probe_preserves_occupied_listener_checks(
-    tmp_path: Path, authorized: bool,
+    tmp_path: Path, authorized: bool, threaded: bool,
 ) -> None:
     godot = godot_bin_or_skip()
     project = tmp_path / "probe"
@@ -93,7 +108,11 @@ def test_real_godot_status_probe_preserves_occupied_listener_checks(
             token = HTTP if authorized else "x" * 32
             log = run_godot_editor(
                 project, godot, allow_headless=False, timeout=60,
-                environment={"PROBE_PORT": str(server.server_port), "PROBE_TOKEN": token},
+                environment={
+                    "PROBE_PORT": str(server.server_port),
+                    "PROBE_TOKEN": token,
+                    "PROBE_THREADED": "true" if threaded else "false",
+                },
             )
         finally:
             server.shutdown()

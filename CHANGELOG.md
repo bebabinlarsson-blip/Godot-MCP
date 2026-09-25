@@ -5,6 +5,12 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.42 (2026-09-26)
+
+### Fixed
+
+- Show the authenticated status probe's safe failure detail during managed server startup proof.
+
 ## 5.0.41 (2026-09-25)
 
 ### Fixed

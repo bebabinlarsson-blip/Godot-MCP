@@ -1049,7 +1049,10 @@ func _effect_prove(payload: Dictionary) -> Dictionary:
 		return {"pending": true, "reason": "capability_pair"}
 	var live := _probe_with_capability(port, capability, int(payload.timeout_ms))
 	if not _authenticated_status_matches_record(live, capability):
-		return {"pending": true, "reason": "authenticated_status"}
+		return {
+			"pending": true,
+			"reason": _authenticated_status_pending_reason(live, capability),
+		}
 	var version := str(live.get("version", ""))
 	var ws_port := int(live.get("ws_port", 0))
 	if not _server_status_compatibility(
@@ -1483,6 +1486,22 @@ static func _authenticated_status_matches_record(live: Dictionary, capability: D
 		and not str(capability.get("instance_nonce", "")).is_empty()
 		and str(live.get("instance_id", "")) == str(capability.get("instance_nonce", ""))
 	)
+
+
+static func _authenticated_status_pending_reason(live: Dictionary, capability: Dictionary) -> String:
+	if not bool(live.get("reachable", false)):
+		var detail := str(live.get("error", "")).strip_edges()
+		if detail.is_empty():
+			detail = "no_response"
+		return "authenticated_status (%s)" % detail
+	if str(live.get("name", "")) != "godot-ai":
+		return "authenticated_status (unexpected_service)"
+	if (
+		str(capability.get("instance_nonce", "")).is_empty()
+		or str(live.get("instance_id", "")) != str(capability.get("instance_nonce", ""))
+	):
+		return "authenticated_status (instance_mismatch)"
+	return "authenticated_status (unknown)"
 
 
 static func _replacement_target_matches(
