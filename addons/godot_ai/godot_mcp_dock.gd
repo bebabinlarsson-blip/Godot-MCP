@@ -60,6 +60,10 @@ var _ok_count: int = 0
 var _err_count: int = 0
 var _is_connected: bool = false
 var _server_state: String = "STOPPED"
+var _server_phase: String = ""
+var _proof_pending_reason: String = ""
+var _proof_deadline_remaining_sec: float = 0.0
+var _transport_status: Dictionary = {}
 var _http_port: int = 8000
 var _ws_port: int = 9500
 var _blocked_message: String = ""
@@ -430,28 +434,15 @@ func _on_restart_pressed() -> void:
 
 
 func _on_test_connection_pressed() -> void:
-	var t0 := Time.get_ticks_msec()
-	var expr := Expression.new()
-	expr.parse("Engine.get_process_frames()")
-	var res = expr.execute()
-	var dt: float = float(Time.get_ticks_msec() - t0)
-
-	var simulated_result: Dictionary = {
-		"status": "ok",
-		"ok": true,
-		"data": {
-			"ping": "pong",
-			"frames": res,
-			"godot_version": Engine.get_version_info().get("string", "4.x")
-		}
-	}
-	McpEventBusScript.record_tool_call("mcp_ping", {"test": true}, simulated_result, dt)
-	if _is_connected:
-		_eval_output.text = "[color=#44ff88]Ping Succeeded:[/color] MCP Bridge connected %.1fms | Engine frames: %s" % [dt, str(res)]
-	else:
-		_eval_output.text = "[color=#ffaa33]Bridge Connecting:[/color] Engine alive | Refreshing server status..."
+	## Refresh both layers before reporting. The old implementation ran a local
+	## Engine expression and logged it as a successful MCP ping, even when the
+	## authenticated server bridge was disconnected.
 	status_snapshot_requested.emit()
 	live_server_probe_requested.emit(_http_port)
+	if _is_connected:
+		_eval_output.text = "[color=#44ff88]Bridge connected:[/color] authenticated WebSocket is ready."
+	else:
+		_eval_output.text = "[color=#ffaa33]Bridge not connected:[/color] %s" % _connection_status_detail()
 
 
 func _show_remote_setup() -> void:
@@ -520,6 +511,8 @@ func _on_eval_pressed() -> void:
 
 func present_transport_snapshot(snapshot: Dictionary) -> void:
 	_is_connected = bool(snapshot.get("connected", false))
+	var status_value: Variant = snapshot.get("status", {})
+	_transport_status = status_value.duplicate(true) if status_value is Dictionary else {}
 	if _is_connected and is_instance_valid(_blocked_box):
 		_blocked_box.visible = false
 		_blocked_message = ""
@@ -528,6 +521,9 @@ func present_transport_snapshot(snapshot: Dictionary) -> void:
 
 func present_lifecycle_snapshot(snapshot: Dictionary) -> void:
 	_server_state = str(snapshot.get("episode_state", "READY"))
+	_server_phase = str(snapshot.get("phase", ""))
+	_proof_pending_reason = str(snapshot.get("proof_pending_reason", ""))
+	_proof_deadline_remaining_sec = maxf(0.0, float(snapshot.get("proof_deadline_remaining_sec", 0.0)))
 	_ws_port = int(snapshot.get("resolved_ws_port", 9500))
 	_blocked_message = str(snapshot.get("message", ""))
 	if not is_instance_valid(_blocked_box):
@@ -565,15 +561,13 @@ func _update_ui_state() -> void:
 		if is_instance_valid(_blocked_box):
 			_blocked_box.visible = false
 			_blocked_message = ""
-		_status_badge.text = "[ACTIVE]"
-		_status_badge.modulate = Color(0.3, 1.0, 0.4)
-		if _status_desc.text.is_empty() or _status_desc.text == "Server stopped":
-			_status_desc.text = "Server Ready"
+		_status_badge.text = "[READY]"
+		_status_badge.modulate = Color(0.65, 0.95, 0.45)
+		_status_desc.text = _connection_status_detail()
 	elif _server_state == "STARTING":
 		_status_badge.text = "[STARTING]"
 		_status_badge.modulate = Color(1.0, 0.75, 0.25)
-		if _status_desc.text != "HTTP server reachable":
-			_status_desc.text = "Server running, connecting WebSocket..."
+		_status_desc.text = _startup_status_detail()
 	else:
 		_status_badge.text = "[STOPPED]"
 		_status_badge.modulate = Color(0.7, 0.7, 0.7)
@@ -581,6 +575,42 @@ func _update_ui_state() -> void:
 
 	if is_instance_valid(_port_label):
 		_port_label.text = "HTTP: %d | WebSocket: %d" % [_http_port, _ws_port]
+
+
+func _startup_status_detail() -> String:
+	match _server_phase:
+		"PROBE":
+			return "Checking the configured server endpoint..."
+		"LAUNCH":
+			return "Launching the managed server..."
+		"PROVE":
+			var detail := "Verifying the managed server"
+			if not _proof_pending_reason.is_empty():
+				detail += " (%s pending)" % _proof_pending_reason
+			if _proof_deadline_remaining_sec > 0.0:
+				detail += " — %.0fs remaining" % _proof_deadline_remaining_sec
+			return detail + "..."
+		_:
+			return "Starting the managed server..."
+
+
+func _connection_status_detail() -> String:
+	var phase := str(_transport_status.get("phase", ""))
+	var attempt := int(_transport_status.get("attempt", 0))
+	var elapsed := maxf(0.0, float(_transport_status.get("state_elapsed_sec", 0.0)))
+	match phase:
+		"connecting":
+			return "WebSocket connecting (attempt %d, %.1fs)." % [attempt, elapsed]
+		"authenticating":
+			return "WebSocket open; authenticating the editor bridge."
+		"retrying":
+			var retry_in := maxf(0.0, float(_transport_status.get("retry_in_sec", 0.0)))
+			var reason := str(_transport_status.get("reason", "connection closed"))
+			return "WebSocket reconnecting in %.0fs (%s)." % [retry_in, reason]
+		"blocked":
+			return "WebSocket blocked: %s" % str(_transport_status.get("reason", "connection blocked"))
+		_:
+			return "Server ready; waiting for an authenticated WebSocket bridge."
 
 
 func present_client_work_snapshot(_snapshot: Dictionary) -> void:

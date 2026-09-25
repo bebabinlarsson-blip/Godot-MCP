@@ -5,6 +5,13 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.41 (2026-09-25)
+
+### Fixed
+
+- Show the actual startup proof phase and pending reason instead of claiming the WebSocket is connecting.
+- Make Test Connection report authenticated bridge state without recording a fabricated successful MCP ping.
+
 ## 5.0.40 (2026-09-25)
 
 ### Fixed

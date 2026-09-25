@@ -546,7 +546,9 @@ func _complete_launch(result: Dictionary) -> void:
 
 func _complete_prove(result: Dictionary) -> void:
 	if bool(result.get("pending", false)):
-		_episode["proof_pending_reason"] = str(result.get("reason", "unknown"))
+		var pending_reason := str(result.get("reason", "unknown"))
+		var pending_reason_changed := str(_episode.get("proof_pending_reason", "")) != pending_reason
+		_episode["proof_pending_reason"] = pending_reason
 		if Time.get_ticks_msec() >= int(_episode.get("prove_deadline_msec", 0)):
 			_block(
 				"proof_timeout",
@@ -555,6 +557,8 @@ func _complete_prove(result: Dictionary) -> void:
 				+ startup_report_summary(str(_plan.get("startup_report", ""))),
 			)
 			return
+		if pending_reason_changed:
+			_publish()
 		_retry_effect_after(PROVE, _prove_payload(), 0.15)
 		return
 	if not bool(result.get("ok", false)):
@@ -1728,10 +1732,18 @@ static func _server_status_compatibility(actual_version: String, expected_versio
 func get_status_dict() -> Dictionary:
 	var state := str(_episode.get("state", DORMANT))
 	var reason := str(_episode.get("reason", ""))
+	var proof_deadline_remaining_sec := 0.0
+	if state == STARTING and str(_episode.get("phase", "")) == PROVE:
+		proof_deadline_remaining_sec = maxf(
+			0.0,
+			(float(_episode.get("prove_deadline_msec", 0)) - Time.get_ticks_msec()) / 1000.0,
+		)
 	return {
 		"episode_id": int(_episode.get("id", 0)),
 		"episode_state": state,
 		"phase": str(_episode.get("phase", "")),
+		"proof_pending_reason": str(_episode.get("proof_pending_reason", "")),
+		"proof_deadline_remaining_sec": proof_deadline_remaining_sec,
 		"ready_kind": str(_episode.get("ready_kind", "")),
 		"state": _dock_state(state, reason),
 		"expected_version": str(_episode.get("expected_version", _plan.get("expected_version", ""))),
