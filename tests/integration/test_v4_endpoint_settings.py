@@ -10,6 +10,7 @@ import pytest
 
 from tests.integration._self_update_fixture import (
     PLUGIN_ROOT,
+    ROOT,
     godot_bin_or_skip,
     run_godot_editor,
 )
@@ -244,7 +245,7 @@ def test_client_port_suite_restores_absent_valid_and_malformed_v4_settings(tmp_p
     project = tmp_path / "client-port-suite"
     shutil.copytree(PLUGIN_ROOT, project / "addons/godot_ai")
     shutil.copyfile(
-        PLUGIN_ROOT.parents[2] / "tests/fixtures/open_world_2d/tests/test_clients.gd",
+        ROOT / "tests/fixtures/open_world_2d/tests/test_clients.gd",
         project / "client_suite.gd",
     )
     (project / "project.godot").write_text(

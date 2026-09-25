@@ -21,7 +21,8 @@ from pathlib import Path
 
 from tests.unit._gdscript_text import get_func_block
 
-PLUGIN_ROOT = Path(__file__).resolve().parents[2] / "plugin" / "addons" / "godot_ai"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+PLUGIN_ROOT = REPO_ROOT / "addons" / "godot_ai"
 
 
 def test_cli_strategy_routes_every_shell_out_through_mcpcliexec() -> None:
@@ -271,7 +272,7 @@ def test_mcp_mutations_share_the_owner_and_have_end_to_end_deferred_headroom() -
     owner_source = (PLUGIN_ROOT / "utils" / "client_job_owner.gd").read_text(encoding="utf-8")
     plugin_source = (PLUGIN_ROOT / "plugin.gd").read_text(encoding="utf-8")
     python_handler = (
-        PLUGIN_ROOT.parents[2] / "src" / "godot_ai" / "handlers" / "client.py"
+        REPO_ROOT / "src" / "godot_ai" / "handlers" / "client.py"
     ).read_text(encoding="utf-8")
     batch_source = (PLUGIN_ROOT / "handlers" / "batch_handler.gd").read_text(encoding="utf-8")
     request = get_func_block(handler_source, "func _request_client_action(")

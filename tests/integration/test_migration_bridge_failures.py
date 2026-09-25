@@ -9,7 +9,12 @@ from pathlib import Path
 
 import pytest
 
-from tests.integration._self_update_fixture import PLUGIN_ROOT, godot_bin_or_skip, run_godot_editor
+from tests.integration._self_update_fixture import (
+    PLUGIN_ROOT,
+    ROOT,
+    godot_bin_or_skip,
+    run_godot_editor,
+)
 
 pytestmark = pytest.mark.editor
 
@@ -211,7 +216,7 @@ def _project(tmp_path: Path, case: str) -> Path:
     (live / "utils").mkdir()
     for name in INSTALLER_SCRIPTS:
         shutil.copy2(PLUGIN_ROOT / "utils" / name, live / "utils" / name)
-    shutil.copy2(PLUGIN_ROOT.parents[2] / "migration_bridge/migration_coordinator.gd", live)
+    shutil.copy2(ROOT / "migration_bridge/migration_coordinator.gd", live)
     (live / "plugin.cfg").write_text(
         '[plugin]\nname="Activation fixture"\nversion="3.2.5"\nscript="plugin.gd"\n',
         encoding="utf-8",
