@@ -61,7 +61,17 @@ static func args() -> Array[String]:
 
 
 static func is_production_command(command: Array) -> bool:
-	if command.is_empty() or not str(command[0]).get_file().begins_with("uvx"):
+	if command.is_empty():
+		return false
+	var executable := str(command[0]).get_file()
+	var is_uvx := executable.begins_with("uvx")
+	var is_uv_tool_run := (
+		(executable == "uv" or executable == "uv.exe")
+		and command.size() >= 3
+		and str(command[1]) == "tool"
+		and str(command[2]) == "run"
+	)
+	if not is_uvx and not is_uv_tool_run:
 		return false
 	return (
 		_option_equals(command, "--index", PUBLIC_INDEX)

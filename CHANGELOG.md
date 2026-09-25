@@ -5,6 +5,13 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.38 (2026-09-25)
+
+### Fixed
+
+- Fixed Windows startup: run a prebuilt, version-matched backend wheel through uv instead of asking the no-build policy to install a Git source.
+- Added the exact backend wheel to each published release and versioned manual client and tunnel examples.
+
 ## 5.0.37 (2026-09-25)
 
 ### Fixed

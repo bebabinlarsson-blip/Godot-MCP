@@ -82,6 +82,31 @@ jobs:
                   assert all(f"addons/{addon}/{name}" in files for name in ("plugin.cfg", "LICENSE", "icon.png"))
           PY
 
+      - name: Build the exact-version backend wheel
+        env:
+          RELEASE_VERSION: ${{ steps.tag.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check build==1.6.0 setuptools==84.0.0
+          python -m build --wheel --no-isolation --outdir dist/backend
+          python - <<'PY'
+          import os
+          import zipfile
+          from pathlib import Path
+
+          version = os.environ["RELEASE_VERSION"]
+          wheel = Path(f"dist/backend/godot_ai-{version}-py3-none-any.whl")
+          assert wheel.is_file(), f"expected release wheel {wheel}"
+          with zipfile.ZipFile(wheel) as archive:
+              assert archive.testzip() is None
+              names = set(archive.namelist())
+              metadata = next(name for name in names if name.endswith(".dist-info/METADATA"))
+              text = archive.read(metadata).decode("utf-8").replace("\r\n", "\n")
+              assert f"Name: godot-ai\nVersion: {version}\n" in text
+              assert "godot_ai/__init__.py" in names
+          PY
+
       - name: Prepare version-pinned Windows tunnel launcher
         env:
           RELEASE_VERSION: ${{ steps.tag.outputs.version }}
@@ -95,7 +120,7 @@ jobs:
           version = os.environ["RELEASE_VERSION"]
           source = Path("Start-Godot-MCP-Tunnel.bat")
           content = source.read_text(encoding="utf-8")
-          assert f"@v{version}" in content, "launcher must be pinned to this release"
+          assert f"releases/download/v{version}/godot_ai-{version}-py3-none-any.whl" in content, "launcher must use this release's backend wheel"
           launcher = Path("dist") / f"Start-Godot-MCP-Tunnel-v{version}.bat"
           launcher.write_text(content, encoding="utf-8", newline="")
           PY
@@ -139,9 +164,10 @@ jobs:
           set -euo pipefail
           archive="dist/godot-mcp-${RELEASE_TAG}.zip"
           launcher="dist/Start-Godot-MCP-Tunnel-${RELEASE_TAG}.bat"
+          wheel="dist/backend/godot_ai-${RELEASE_TAG#v}-py3-none-any.whl"
           assets="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
-          if grep -Fxq "${archive##*/}" <<< "$assets" || grep -Fxq "${launcher##*/}" <<< "$assets"; then
+          if grep -Fxq "${archive##*/}" <<< "$assets" || grep -Fxq "${launcher##*/}" <<< "$assets" || grep -Fxq "${wheel##*/}" <<< "$assets"; then
             echo "A release asset already exists; refusing to replace published files" >&2
             exit 1
           fi
-          gh release upload "$RELEASE_TAG" "$archive" "$launcher" --repo "$GITHUB_REPOSITORY"
+          gh release upload "$RELEASE_TAG" "$archive" "$launcher" "$wheel" --repo "$GITHUB_REPOSITORY"

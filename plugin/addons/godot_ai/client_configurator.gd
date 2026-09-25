@@ -1353,6 +1353,25 @@ static func _pypi_pin_version(version: String) -> String:
 	return v
 
 
+## v5 is published as an add-on ZIP plus a prebuilt backend wheel on this
+## repository's GitHub release. Keep `--no-build` in force: never ask uv to
+## build an unreviewed source checkout during Godot startup.
+static func server_package_source(version: String) -> String:
+	var pinned := _pypi_pin_version(version)
+	var parsed := RegEx.new()
+	if parsed.compile("^([0-9]+)\\.([0-9]+)\\.([0-9]+)$") != OK:
+		return ""
+	var match := parsed.search(pinned)
+	if match == null:
+		return ""
+	if int(match.get_string(1)) >= 5:
+		return (
+			"https://github.com/bebabinlarsson-blip/Godot-MCP/releases/download/v%s/"
+			+ "godot_ai-%s-py3-none-any.whl"
+		) % [pinned, pinned]
+	return "godot-ai==%s" % pinned
+
+
 ## Resolve the client-owned `godot-ai attach` command from a main-thread
 ## LaunchContext. Discovery itself is worker-safe: path/environment lookup is
 ## snapshot-backed and subprocess probes are wall-clock bounded.
@@ -1435,12 +1454,17 @@ static func _resolve_attach_launch_uncached(
 	if not uvx.is_empty():
 		var uvx_args := UvResolution.args()
 		var repo_root := _find_local_repo_root()
-		var from_pkg := "godot-ai==%s" % _pypi_pin_version(plugin_version)
-		if is_dev_checkout() or not repo_root.is_empty():
+		var from_pkg := server_package_source(plugin_version)
+		if (is_dev_checkout() or not repo_root.is_empty()) and not plugin_version.begins_with("5."):
 			if not repo_root.is_empty():
 				from_pkg = repo_root
 			else:
 				from_pkg = "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git"
+		if from_pkg.is_empty():
+			return _attach_discovery_error(
+				"No prebuilt godot-ai server package matches plugin version %s; update from a tagged release."
+				% plugin_version
+			)
 		uvx_args.append_array([
 			"--link-mode", "copy",
 			"--from", from_pkg,
@@ -1711,12 +1735,26 @@ static func get_server_command() -> Array[String]:
 			print("MCP | using dev venv: %s" % venv_python)
 			return [venv_python, "-m", "godot_ai"]
 
+	var package_source := server_package_source(get_plugin_version())
+	if package_source.is_empty():
+		push_warning("MCP | no tagged godot-ai server wheel matches this plugin version")
+		return []
+	## `uvx.exe` is a Windows shim which starts `uv.exe` and exits. The
+	## lifecycle manager must own the process that installs and runs the backend.
+	var uv := find_uv()
 	var uvx := find_uvx()
-	if not uvx.is_empty():
-		print("MCP | using uvx (git+https://github.com/bebabinlarsson-blip/Godot-MCP.git)")
-		var cmd: Array[String] = [uvx]
+	var direct_uv := OS.get_name() == "Windows" and not uv.is_empty()
+	var runner := uv if direct_uv else uvx
+	if runner.is_empty() and not uv.is_empty():
+		runner = uv
+		direct_uv = true
+	if not runner.is_empty():
+		print("MCP | using %s for the tagged backend wheel" % ("uv tool run" if direct_uv else "uvx"))
+		var cmd: Array[String] = [runner]
+		if direct_uv:
+			cmd.append_array(["tool", "run"])
 		cmd.append_array(UvResolution.args())
-		cmd.append_array(["--from", "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git", "godot-ai"])
+		cmd.append_array(["--link-mode", "copy", "--from", package_source, "godot-ai"])
 		return cmd
 
 	var system_cmd := _find_system_install()
@@ -1734,7 +1772,7 @@ static func get_server_command() -> Array[String]:
 static func get_server_launch_mode() -> String:
 	if mode_override() != "user" and not _cached_venv_python().is_empty():
 		return "dev_venv"
-	if not find_uvx().is_empty():
+	if not find_uvx().is_empty() or not find_uv().is_empty():
 		return "uvx"
 	if not _find_system_install().is_empty():
 		return "system"
@@ -1754,6 +1792,10 @@ static func find_uvx() -> String:
 	return CliFinder.find(_uvx_cli_names())
 
 
+static func find_uv() -> String:
+	return CliFinder.find(["uv.exe" if OS.get_name() == "Windows" else "uv"])
+
+
 ## Pure argv builder for the pre-warm spawn, split out so tests can pin the
 ## exact command without spawning a process. Empty array when there is no
 ## version to pin, or when the version carries characters outside the PEP
@@ -1771,8 +1813,11 @@ static func prewarm_server_package_argv(version: String) -> Array[String]:
 	var re := RegEx.new()
 	if re.compile("^[A-Za-z0-9.+!-]+$") != OK or re.search(pinned) == null:
 		return []
+	var source := server_package_source(pinned)
+	if source.is_empty():
+		return []
 	var args := UvResolution.args()
-	args.append_array(["--from", "godot-ai==%s" % pinned, "godot-ai", "--version"])
+	args.append_array(["--link-mode", "copy", "--from", source, "godot-ai", "--version"])
 	return args
 
 

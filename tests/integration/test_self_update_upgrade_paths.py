@@ -332,7 +332,7 @@ def _first_start_after_closed_install(
                 "CLEAN_MAJOR_TEST | authenticated read/write tool probe completed",
             ),
         )
-        assert f"godot-ai=={target_version}" in config_text
+        assert _backend_source(target_version) in config_text
         assert "godot-ai==3.2.4" not in config_text
     marker = json.loads((project / CLEAN_MAJOR_MARKER_RELATIVE).read_text(encoding="utf-8"))
     assert marker["status"] == "success", marker
@@ -349,6 +349,16 @@ def _read_client_toml(path: Path) -> str:
     text = path.read_bytes().decode("utf-8")
     tomllib.loads(text)
     return text
+
+
+def _backend_source(version: str) -> str:
+    major = version.partition(".")[0]
+    if major.isdigit() and int(major) >= 5:
+        return (
+            "https://github.com/bebabinlarsson-blip/Godot-MCP/releases/download/"
+            f"v{version}/godot_ai-{version}-py3-none-any.whl"
+        )
+    return f"godot-ai=={version}"
 
 
 def _selected_endpoint_tool_probe(
@@ -561,7 +571,7 @@ def test_signed_update_loads_matching_live_server_in_same_editor(
     assert (
         "SELF_UPDATE_TEST | ordinary reload restored backend and persisted enablement" in prep_log
     )
-    assert f"godot-ai=={base_version}" in _read_client_toml(codex_home / "config.toml")
+    assert _backend_source(base_version) in _read_client_toml(codex_home / "config.toml")
     remove_configure_client_driver(project)
 
     # An agent stays attached through the whole update, exactly as a user's
@@ -668,8 +678,8 @@ def test_signed_update_loads_matching_live_server_in_same_editor(
     assert (base_addon / "utils" / "self_update_smoke_child.gd").is_file()
     assert (base_addon / "utils" / "self_update_smoke_child.gd.uid").is_file()
     client_config = _read_client_toml(codex_home / "config.toml")
-    assert f"godot-ai=={next_version}" in client_config
-    assert f"godot-ai=={base_version}" not in client_config
+    assert _backend_source(next_version) in client_config
+    assert _backend_source(base_version) not in client_config
     assert (project / "_test_authenticated_tool_probe.txt").read_text(encoding="utf-8") == (
         "signed self-update authenticated write\n"
     )
@@ -938,8 +948,8 @@ func _process(_delta: float) -> void:
         assert (live / shim).read_bytes() == (PLUGIN_ROOT / shim).read_bytes()
     codex_home = smoke.fixture_environment_paths(project)["codex_home"]
     config_text = _read_client_toml(codex_home / "config.toml")
-    assert f"godot-ai=={target_version}" in config_text
-    assert f"godot-ai=={from_version}" not in config_text
+    assert _backend_source(target_version) in config_text
+    assert _backend_source(from_version) not in config_text
     marker, backup = smoke.verify_lean_update_state(project, target_version)
     assert marker["from_version"] == from_version
     assert marker["replace_owned_mismatches"] is True

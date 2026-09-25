@@ -5,7 +5,7 @@
 ### Free and Open-Source Model Context Protocol Automation Plugin for the Godot Engine
 
 [![MCP Protocol](https://img.shields.io/badge/MCP-Model%20Context%20Protocol-8A2BE2?style=flat&labelColor=333A41)](https://modelcontextprotocol.io)
-[![Release](https://img.shields.io/badge/Release-v5.0.37-blue.svg?style=flat&labelColor=333A41)](https://github.com/bebabinlarsson-blip/Godot-MCP/releases)
+[![Release](https://img.shields.io/badge/Release-v5.0.38-blue.svg?style=flat&labelColor=333A41)](https://github.com/bebabinlarsson-blip/Godot-MCP/releases)
 [![Godot](https://img.shields.io/badge/Godot-4.7+-478CBF?style=flat&logo=godotengine&logoColor=white&labelColor=333A41)](https://godotengine.org)
 [![Python](https://img.shields.io/badge/Python-3.11%20|%203.12%20|%203.13%20|%203.14-3776AB?style=flat&logo=python&logoColor=white&labelColor=333A41)](https://www.python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat&labelColor=333A41)](LICENSE)
@@ -32,7 +32,7 @@
 
 ## Overview
 
-Godot MCP is a free, open-source editor add-on and Python server that connect AI coding assistants to the Godot Editor through the Model Context Protocol (MCP). This README describes [v5.0.37](https://github.com/bebabinlarsson-blip/Godot-MCP/releases/tag/v5.0.37).
+Godot MCP is a free, open-source editor add-on and Python server that connect AI coding assistants to the Godot Editor through the Model Context Protocol (MCP). This README describes [v5.0.38](https://github.com/bebabinlarsson-blip/Godot-MCP/releases/tag/v5.0.38).
 
 Unlike other solutions that rely on external websites, cloud subscriptions, device logins, or custom npm CLI wrappers, Godot MCP is designed to be a straightforward in-engine Godot plugin:
 
@@ -96,7 +96,7 @@ You do not need to register on any website or install any npm packages.
 
 ### Step 1: Download and Extract the Plugin
 
-1. Download **godot-mcp-v5.0.37.zip** from the [v5.0.37 release](https://github.com/bebabinlarsson-blip/Godot-MCP/releases/tag/v5.0.37).
+1. Download **godot-mcp-v5.0.38.zip** from the [v5.0.38 release](https://github.com/bebabinlarsson-blip/Godot-MCP/releases/tag/v5.0.38).
 2. Extract it into your Godot project root. The ZIP contains both `godot_ai` and `godot_omni` inside `addons/`:
 
 ```text
@@ -126,7 +126,7 @@ your-godot-project/
 
 ### Step 3: Configure Your AI Client
 
-Install [Python 3.11–3.14](https://www.python.org/downloads/) and [uv (`uvx`)](https://docs.astral.sh/uv/getting-started/installation/) on the computer running Godot. The add-on can configure supported local clients from its dock; if you configure a client manually, use an installed `uvx` and the pinned v5.0.37 source below. The first `uvx` launch downloads the Python dependencies:
+Install [Python 3.11–3.14](https://www.python.org/downloads/) and [uv (`uvx`)](https://docs.astral.sh/uv/getting-started/installation/) on the computer running Godot. The add-on can configure supported local clients from its dock; for manual setup, use the versioned prebuilt backend wheel below. The first `uvx` launch downloads the pinned Python dependencies. Source builds stay disabled.
 
 #### Cursor
 Add to `.cursor/mcp.json`:
@@ -136,8 +136,19 @@ Add to `.cursor/mcp.json`:
     "godot-mcp": {
       "command": "uvx",
       "args": [
+        "--isolated",
+        "--no-config",
+        "--no-env-file",
+        "--no-sources",
+        "--no-build",
+        "--index-strategy", "first-index",
+        "--keyring-provider", "disabled",
+        "--index", "https://pypi.org/simple",
+        "--default-index", "https://pypi.org/simple",
+        "--find-links", "https://pypi.org/simple/godot-ai/",
+        "--link-mode", "copy",
         "--from",
-        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git@v5.0.37",
+        "https://github.com/bebabinlarsson-blip/Godot-MCP/releases/download/v5.0.38/godot_ai-5.0.38-py3-none-any.whl",
         "godot-ai"
       ]
     }
@@ -153,8 +164,19 @@ Add to `claude_desktop_config.json` (Windows: `%APPDATA%\Claude\claude_desktop_c
     "godot-mcp": {
       "command": "uvx",
       "args": [
+        "--isolated",
+        "--no-config",
+        "--no-env-file",
+        "--no-sources",
+        "--no-build",
+        "--index-strategy", "first-index",
+        "--keyring-provider", "disabled",
+        "--index", "https://pypi.org/simple",
+        "--default-index", "https://pypi.org/simple",
+        "--find-links", "https://pypi.org/simple/godot-ai/",
+        "--link-mode", "copy",
         "--from",
-        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git@v5.0.37",
+        "https://github.com/bebabinlarsson-blip/Godot-MCP/releases/download/v5.0.38/godot_ai-5.0.38-py3-none-any.whl",
         "godot-ai"
       ]
     }
@@ -170,8 +192,19 @@ In Antigravity or Gemini CLI configuration:
     "godot-mcp": {
       "command": "uvx",
       "args": [
+        "--isolated",
+        "--no-config",
+        "--no-env-file",
+        "--no-sources",
+        "--no-build",
+        "--index-strategy", "first-index",
+        "--keyring-provider", "disabled",
+        "--index", "https://pypi.org/simple",
+        "--default-index", "https://pypi.org/simple",
+        "--find-links", "https://pypi.org/simple/godot-ai/",
+        "--link-mode", "copy",
         "--from",
-        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git@v5.0.37",
+        "https://github.com/bebabinlarsson-blip/Godot-MCP/releases/download/v5.0.38/godot_ai-5.0.38-py3-none-any.whl",
         "godot-ai"
       ]
     }
@@ -187,8 +220,19 @@ Add to Cline MCP settings:
     "godot-mcp": {
       "command": "uvx",
       "args": [
+        "--isolated",
+        "--no-config",
+        "--no-env-file",
+        "--no-sources",
+        "--no-build",
+        "--index-strategy", "first-index",
+        "--keyring-provider", "disabled",
+        "--index", "https://pypi.org/simple",
+        "--default-index", "https://pypi.org/simple",
+        "--find-links", "https://pypi.org/simple/godot-ai/",
+        "--link-mode", "copy",
         "--from",
-        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git@v5.0.37",
+        "https://github.com/bebabinlarsson-blip/Godot-MCP/releases/download/v5.0.38/godot_ai-5.0.38-py3-none-any.whl",
         "godot-ai"
       ]
     }
@@ -204,8 +248,19 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
     "godot-mcp": {
       "command": "uvx",
       "args": [
+        "--isolated",
+        "--no-config",
+        "--no-env-file",
+        "--no-sources",
+        "--no-build",
+        "--index-strategy", "first-index",
+        "--keyring-provider", "disabled",
+        "--index", "https://pypi.org/simple",
+        "--default-index", "https://pypi.org/simple",
+        "--find-links", "https://pypi.org/simple/godot-ai/",
+        "--link-mode", "copy",
         "--from",
-        "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git@v5.0.37",
+        "https://github.com/bebabinlarsson-blip/Godot-MCP/releases/download/v5.0.38/godot_ai-5.0.38-py3-none-any.whl",
         "godot-ai"
       ]
     }
@@ -393,8 +448,9 @@ an uptime guarantee. Tailscale's Personal plan is free for personal use.
 
 #### Windows one-click Tailscale launcher
 
-The v5.0.37 release includes both the installable add-ons archive
-(`godot-mcp-v5.0.37.zip`) and `Start-Godot-MCP-Tunnel-v5.0.37.bat`.
+The v5.0.38 release includes the installable add-ons archive
+(`godot-mcp-v5.0.38.zip`), exact-version backend wheel, and
+`Start-Godot-MCP-Tunnel-v5.0.38.bat`.
 Install and enable the add-ons first, then set `GODOT_AI_AUTH_TOKEN` in
 Windows Environment Variables **before opening Godot**. With Godot open and
 the plugin connected, double-click the BAT file. It runs the pinned

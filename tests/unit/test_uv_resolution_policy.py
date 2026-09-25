@@ -35,7 +35,7 @@ def test_one_policy_owns_public_index_and_explicit_qualification_escape() -> Non
     assert "if not qualification_authorized():" in args
 
 
-def test_every_uvx_server_attach_and_prewarm_builder_uses_one_policy() -> None:
+def test_every_uv_server_attach_and_prewarm_builder_uses_one_policy() -> None:
     configurator = _source("client_configurator.gd")
     attach = get_func_block(configurator, "static func _resolve_attach_launch_uncached(")
     server = get_func_block(configurator, "static func get_server_command() -> Array[String]:")
@@ -46,6 +46,40 @@ def test_every_uvx_server_attach_and_prewarm_builder_uses_one_policy() -> None:
     assert "UvResolution.args()" in attach
     assert "UvResolution.args()" in server
     assert "UvResolution.args()" in prewarm
+    assert 'var direct_uv := OS.get_name() == "Windows" and not uv.is_empty()' in server
+    assert 'var runner := uv if direct_uv else uvx' in server
+    assert 'var cmd: Array[String] = [runner]' in server
+    assert 'cmd.append_array(["tool", "run"])' in server
+    assert "static func find_uv() -> String:" in configurator
+    assert 'releases/download/v%s/' in configurator
+    assert 'godot_ai-%s-py3-none-any.whl' in configurator
+    assert "server_package_source(plugin_version)" in attach
+
+
+def test_server_prewarms_the_same_release_wheel_used_for_launch() -> None:
+    configurator = _source("client_configurator.gd")
+    server = get_func_block(configurator, "static func get_server_command() -> Array[String]:")
+    prewarm_argv = get_func_block(
+        configurator, "static func prewarm_server_package_argv(version: String) -> Array[String]:"
+    )
+
+    assert "server_package_source(get_plugin_version())" in server
+    assert "server_package_source(pinned)" in prewarm_argv
+    assert '"--no-build"' in _source("utils/uv_resolution_policy.gd")
+
+
+def test_production_uv_detection_covers_uvx_and_direct_uv_tool_run() -> None:
+    policy = _source("utils/uv_resolution_policy.gd")
+    production = get_func_block(
+        policy, "static func is_production_command(command: Array) -> bool:"
+    )
+
+    assert 'var is_uvx := executable.begins_with("uvx")' in production
+    assert 'executable == "uv.exe"' in production
+    assert 'str(command[1]) == "tool"' in production
+    assert 'str(command[2]) == "run"' in production
+    for option in ('"--index"', '"--default-index"', '"--find-links"'):
+        assert option in production
 
 
 def test_godot_owned_server_and_prewarm_spawns_strip_uv_environment() -> None:

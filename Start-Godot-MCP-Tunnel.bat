@@ -41,7 +41,7 @@ echo Starting Tailscale Funnel on local port 8000...
 echo If setup is complete, the stable HTTPS address will appear below.
 echo This window must stay open. Press Ctrl+C to stop the tunnel.
 echo.
-uvx --from "git+https://github.com/bebabinlarsson-blip/Godot-MCP.git@v5.0.37" godot-ai tunnel --provider tailscale-funnel --port 8000
+uvx --isolated --no-config --no-env-file --no-sources --no-build --index-strategy first-index --keyring-provider disabled --index https://pypi.org/simple --default-index https://pypi.org/simple --find-links https://pypi.org/simple/godot-ai/ --link-mode copy --from "https://github.com/bebabinlarsson-blip/Godot-MCP/releases/download/v5.0.38/godot_ai-5.0.38-py3-none-any.whl" godot-ai tunnel --provider tailscale-funnel --port 8000
 set "RESULT=%ERRORLEVEL%"
 
 if not "%RESULT%"=="0" (
