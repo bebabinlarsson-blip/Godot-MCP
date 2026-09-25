@@ -112,7 +112,11 @@ func _build_ui() -> void:
 	header_bar.add_child(title)
 
 	var version_badge := Label.new()
-	version_badge.text = "v5.0.35"
+	var plugin_config := ConfigFile.new()
+	if plugin_config.load("res://addons/godot_ai/plugin.cfg") == OK:
+		version_badge.text = "v" + str(plugin_config.get_value("plugin", "version", "unknown"))
+	else:
+		version_badge.text = "v?"
 
 	version_badge.modulate = Color(0.45, 0.75, 1.0)
 	version_badge.size_flags_horizontal = Control.SIZE_EXPAND_FILL

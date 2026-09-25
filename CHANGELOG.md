@@ -5,6 +5,13 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.40 (2026-09-25)
+
+### Fixed
+
+- Prevented inherited `PYTHONHOME` and `PYTHONPATH` values from breaking the isolated Windows backend with Python runtime import errors.
+- Made both dock version badges read the installed add-on version instead of showing a stale fixed version.
+
 ## 5.0.39 (2026-09-25)
 
 ### Fixed

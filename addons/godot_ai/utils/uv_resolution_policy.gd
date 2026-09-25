@@ -26,6 +26,7 @@ const _BASE_ARGS := [
 ## clear them under the global process-spawn mutex; command-line policy remains
 ## pinned as a second boundary and for client-owned attach launches.
 const _RESOLUTION_ENVIRONMENT := [
+	"PYTHONHOME", "PYTHONPATH",
 	"UV_INDEX", "UV_DEFAULT_INDEX", "UV_INDEX_URL", "UV_EXTRA_INDEX_URL",
 	"UV_FIND_LINKS", "UV_INDEX_STRATEGY", "UV_KEYRING_PROVIDER",
 	"UV_CONFIG_FILE", "UV_CONSTRAINT", "UV_BUILD_CONSTRAINT", "UV_OVERRIDE",

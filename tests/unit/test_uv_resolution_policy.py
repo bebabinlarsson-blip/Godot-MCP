@@ -115,6 +115,33 @@ def test_godot_owned_server_and_prewarm_spawns_strip_uv_environment() -> None:
     )
     assert "UvResolution.isolate_environment() if isolate_uv_resolution else {}" in piped
     assert "UvResolution.is_production_command(command)" in prewarm
+    production_policy = (ROOT / "addons/godot_ai/utils/uv_resolution_policy.gd").read_text(
+        encoding="utf-8"
+    )
+    environment = production_policy.split("const _RESOLUTION_ENVIRONMENT := [", 1)[1]
+    environment = environment.split("]", 1)[0]
+    assert '"PYTHONHOME"' in environment
+    assert '"PYTHONPATH"' in environment
+
+
+def test_isolated_backend_does_not_inherit_python_runtime_overrides() -> None:
+    policy = (ROOT / "addons/godot_ai/utils/uv_resolution_policy.gd").read_text(
+        encoding="utf-8"
+    )
+    environment = policy.split("const _RESOLUTION_ENVIRONMENT := [", 1)[1].split("]", 1)[0]
+    assert '"PYTHONHOME"' in environment
+    assert '"PYTHONPATH"' in environment
+
+
+def test_both_docks_display_the_installed_addon_version() -> None:
+    dock_paths = (
+        (ROOT / "addons/godot_ai/godot_mcp_dock.gd", "res://addons/godot_ai/plugin.cfg"),
+        (ROOT / "addons/godot_omni/omni_dock.gd", "res://addons/godot_omni/plugin.cfg"),
+    )
+    for path, config_path in dock_paths:
+        dock = path.read_text(encoding="utf-8")
+        assert f'plugin_config.load("{config_path}")' in dock
+        assert 'plugin_config.get_value("plugin", "version", "unknown")' in dock
 
 
 def test_qualification_authority_is_process_local_not_release_metadata() -> None:
