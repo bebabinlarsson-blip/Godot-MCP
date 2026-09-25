@@ -112,8 +112,8 @@ def test_tileset_handler_gdscript_has_scaffold_templates():
     assert '"kenney_3x3_minimal":' in source
     assert '"rpgmaker_47":' in source
     assert "set_terrain_peering_bit" in source
-    # Godot 4.7 has Vector2 texture sizes and Vector2i atlas margins.
-    assert "Vector2(texture_size) - Vector2(source.margins) * 2.0" in source
+    # Compute each component explicitly to avoid Vector2/Vector2i parse errors.
+    assert "Vector2(float(texture_size.x) - float(source.margins.x) * 2.0" in source
 
     # Check plugin dispatcher registration
     plugin_gd = (ADDONS / "plugin.gd").read_text(encoding="utf-8")

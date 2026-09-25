@@ -82,7 +82,7 @@ func diagnose(params: Dictionary) -> Dictionary:
 		if stride.x <= 0 or stride.y <= 0:
 			findings.append({"code": "INVALID_ATLAS_SPACING", "source_id": source_id, "hint": "Check atlas separation and region size."})
 			continue
-		var available := Vector2(texture_size) - Vector2(source.margins) * 2.0
+		var available := Vector2(float(texture_size.x) - float(source.margins.x) * 2.0, float(texture_size.y) - float(source.margins.y) * 2.0)
 		if available.x < region.x or available.y < region.y or fmod(available.x + source.separation.x, stride.x) != 0.0 or fmod(available.y + source.separation.y, stride.y) != 0.0:
 			findings.append({"code": "ATLAS_SIZE_MISMATCH", "source_id": source_id, "texture_size": {"x": texture_size.x, "y": texture_size.y}, "region_size": {"x": region.x, "y": region.y}, "hint": "Check texture dimensions, margins, separation and tile size."})
 		if region != ts.tile_size:
