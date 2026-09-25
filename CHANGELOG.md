@@ -5,6 +5,12 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.37 (2026-09-25)
+
+### Fixed
+
+- Corrected Windows development setup and worktree documentation to use the shipped `addons/godot_ai` source, and added a regression check for the setup target.
+
 ## 5.0.36 (2026-09-24)
 
 ### Added
