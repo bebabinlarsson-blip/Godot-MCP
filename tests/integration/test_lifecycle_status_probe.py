@@ -33,6 +33,7 @@ func run() -> void:
         "instance_nonce": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}
     var port := int(OS.get_environment("PROBE_PORT"))
     var loopback_bind_succeeded := PortResolver.can_bind_local_port(port)
+    var port_in_use := PortResolver.is_port_in_use(port)
     var result: Dictionary
     if OS.get_environment("PROBE_THREADED") == "true":
         var worker := Thread.new()
@@ -43,6 +44,7 @@ func run() -> void:
     else:
         result = _probe(port, record)
     result["loopback_bind_succeeded"] = loopback_bind_succeeded
+    result["port_in_use"] = port_in_use
     result["matches_record"] = Lifecycle._authenticated_status_matches_record(result, record)
     var file := FileAccess.open("res://result.json", FileAccess.WRITE)
     file.store_string(JSON.stringify(result))
@@ -137,6 +139,8 @@ def test_real_godot_status_probe_preserves_occupied_listener_checks(
     assert result["status_code"] == (200 if authorized else 403), result
     assert result["matches_record"] is authorized, result
     assert result["reachable"] is authorized, result
+    if bind_host == "0.0.0.0":
+        assert result["port_in_use"] is True, result
     if authorized:
         assert result["name"] == "godot-ai"
         assert result["version"] == "4.0.0"

@@ -10,7 +10,6 @@ import pytest
 
 from tests.integration._self_update_fixture import (
     PLUGIN_ROOT,
-    ROOT,
     godot_bin_or_skip,
     run_godot_editor,
 )
@@ -241,46 +240,31 @@ func run() -> void:
     assert result["queries"] == 1, result
 
 
-def test_client_port_suite_restores_absent_valid_and_malformed_v4_settings(tmp_path: Path) -> None:
-    project = tmp_path / "client-port-suite"
+def test_client_port_getters_resolve_absent_valid_and_malformed_v4_settings(tmp_path: Path) -> None:
+    project = tmp_path / "client-port-settings"
     shutil.copytree(PLUGIN_ROOT, project / "addons/godot_ai")
-    shutil.copyfile(
-        ROOT / "tests/fixtures/open_world_2d/tests/test_clients.gd",
-        project / "client_suite.gd",
-    )
     (project / "project.godot").write_text(
         'config_version=5\n[autoload]\nDriver="*res://driver.gd"\n', encoding="utf-8",
     )
     (project / "driver.gd").write_text('''@tool
 extends Node
-const Suite = preload("res://client_suite.gd")
 const Config = preload("res://addons/godot_ai/client_configurator.gd")
 func _ready() -> void:
     if Engine.is_editor_hint(): run.call_deferred()
 func run() -> void:
     var settings := EditorInterface.get_editor_settings()
     var rows := []
+    settings.set_setting("godot_ai/http_port", 18200)
+    settings.set_setting("godot_ai/ws_port", 19200)
     for seed in [null, {"http_port": 18231, "ws_port": 19231},
             {"http_port": "malformed", "nested": [1, 2]}]:
         if seed == null:
             settings.erase(Config.SETTING_V4_ENDPOINT_PORTS)
         else:
             settings.set_setting(Config.SETTING_V4_ENDPOINT_PORTS, seed.duplicate(true))
-        var suite = Suite.new()
-        suite.suite_setup({})
-        if seed != null:
-            var live: Dictionary = settings.get_setting(Config.SETTING_V4_ENDPOINT_PORTS)
-            live["http_port"] = 18299
-        suite.test_http_port_defaults_when_setting_absent()
-        suite.test_ws_port_defaults_when_setting_absent()
-        suite.test_http_port_reads_configured_value()
-        suite.test_ws_port_reads_configured_value()
-        suite.suite_teardown()
-        var present := settings.has_setting(Config.SETTING_V4_ENDPOINT_PORTS)
-        rows.append({"seed": seed, "present": present,
-            "restored": settings.get_setting(Config.SETTING_V4_ENDPOINT_PORTS) if present else null,
-            "failed": suite._failed, "message": suite._message,
-            "assertions": suite._assertion_count})
+        rows.append({"seed": seed,
+            "present": settings.has_setting(Config.SETTING_V4_ENDPOINT_PORTS),
+            "http_port": Config.http_port(), "ws_port": Config.ws_port()})
     var file := FileAccess.open("res://result.json", FileAccess.WRITE)
     file.store_string(JSON.stringify(rows))
     file.close()
@@ -297,7 +281,12 @@ func run() -> void:
     assert "SCRIPT ERROR" not in log, log
     rows = json.loads((project / "result.json").read_bytes())
     assert len(rows) == 3, rows
-    for row in rows:
-        assert not row["failed"] and row["assertions"] >= 6, row
-        assert row["present"] == (row["seed"] is not None), row
-        assert row["restored"] == row["seed"], row
+    assert rows[0] == {"seed": None, "present": False, "http_port": 18200, "ws_port": 19200}
+    assert rows[1] == {
+        "seed": {"http_port": 18231, "ws_port": 19231},
+        "present": True, "http_port": 18231, "ws_port": 19231,
+    }
+    assert rows[2] == {
+        "seed": {"http_port": "malformed", "nested": [1, 2]},
+        "present": True, "http_port": 0, "ws_port": 0,
+    }

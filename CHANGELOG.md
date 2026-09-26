@@ -5,6 +5,12 @@ this file at the release's exact source commit, and its "What's Changed"
 section lists every merged pull request; this file keeps the part worth
 reading. Release engineering: [docs/releasing.md](docs/releasing.md).
 
+## 5.0.44 (2026-09-26)
+
+### Fixed
+
+- Detect Windows wildcard listeners in shared port checks so occupied ports are not offered or treated as free.
+
 ## 5.0.43 (2026-09-26)
 
 ### Fixed

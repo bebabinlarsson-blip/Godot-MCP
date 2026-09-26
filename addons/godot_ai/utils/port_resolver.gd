@@ -51,18 +51,12 @@ static func can_bind_local_port(port: int) -> bool:
 	return false
 
 
-## True when `port` is bound on 127.0.0.1. Probes via TCPServer first,
-## falls back to OS scraping. Callers that want per-scraper trace
-## counters should call `is_port_in_use_via_scrape` with a trace hook
-## after their own `can_bind_local_port` probe.
+## True when `port` has a TCP listener. A successful loopback bind alone
+## cannot prove the port is free: wildcard listeners can coexist with it on
+## Windows and with IPv6 listeners on POSIX. Scrape the OS listener table so
+## every caller uses the same complete check. Callers that want per-scraper
+## trace counters can pass a hook to `is_port_in_use_via_scrape` directly.
 static func is_port_in_use(port: int) -> bool:
-	if can_bind_local_port(port):
-		## On POSIX, an IPv6 wildcard listener can coexist with a
-		## successful 127.0.0.1 bind probe. Confirm with lsof so startup
-		## sees the same listener set that shutdown/recovery would see.
-		if OS.get_name() != "Windows":
-			return is_port_in_use_via_scrape(port)
-		return false
 	return is_port_in_use_via_scrape(port)
 
 
