@@ -352,6 +352,20 @@ func _dispatch(cmd: Dictionary) -> Dictionary:
 const _MALFORMED_ARGS_MAX := 400
 
 
+static func _normalize_handler_result(raw_result: Variant) -> Dictionary:
+	if not raw_result is Dictionary:
+		return {}
+	if raw_result.has("data") or raw_result.has("_deferred"):
+		return raw_result
+	var error_value: Variant = raw_result.get("error")
+	if typeof(error_value) == TYPE_STRING:
+		var error_code := str(raw_result.get("code", ErrorCodes.INTERNAL_ERROR))
+		return ErrorCodes.make(error_code, str(error_value))
+	if typeof(raw_result.get("success")) == TYPE_BOOL:
+		return {"data": raw_result}
+	return raw_result
+
+
 func _call_handler(command: String, params: Dictionary) -> Dictionary:
 	if not _handlers.has(command):
 		var materialize_error := _materialize_lazy_command(command)
@@ -364,7 +378,8 @@ func _call_handler(command: String, params: Dictionary) -> Dictionary:
 	## Restore balance at this boundary: the depth a handler leaves behind
 	## must equal the depth it started with.
 	var pause_depth_before: int = pause_target.pause_depth() if pause_target != null else 0
-	var result: Dictionary = _handlers[command].call(params)
+	var raw_result: Variant = _handlers[command].call(params)
+	var result: Dictionary = _normalize_handler_result(raw_result)
 	if pause_target != null and pause_target.pause_depth() > pause_depth_before:
 		var leaked: int = pause_target.pause_depth() - pause_depth_before
 		while pause_target.pause_depth() > pause_depth_before:

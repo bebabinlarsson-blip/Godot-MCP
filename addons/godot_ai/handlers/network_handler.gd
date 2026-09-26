@@ -116,7 +116,10 @@ func scaffold_udp_peer(params: Dictionary) -> Dictionary:
 
 
 func get_network_interfaces(params: Dictionary) -> Dictionary:
-	var addresses: Array = IP.get_local_addresses()
+	# IP.get_local_addresses() returns PackedStringArray in Godot 4. Assigning
+	# it to Array raises a runtime type error and leaves the MCP dispatcher with
+	# a malformed result instead of the interface list.
+	var addresses: PackedStringArray = IP.get_local_addresses()
 	var interfaces: Array = IP.get_local_interfaces()
 	return {
 		"success": true,
