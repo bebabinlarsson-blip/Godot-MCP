@@ -78,7 +78,7 @@ dev = [
     # xdist because integration fixtures allocate free ports per test.
     "pytest-xdist>=3.5",
     "hypothesis>=6.0",
-    "ruff>=0.8",
+    "ruff>=0.16.8",
     # Used by script/ci-game-capture-smoke to decode PNG frames from the
     # running game and assert the expected colored quadrants are present.
     "pillow>=10.0",
