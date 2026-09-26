@@ -22,6 +22,7 @@ INSTANCE = "b" * 32
 DRIVER = '''@tool
 extends Node
 const Lifecycle := preload("res://addons/godot_ai/utils/server_lifecycle.gd")
+const PortResolver := preload("res://addons/godot_ai/utils/port_resolver.gd")
 
 func _ready() -> void:
     if Engine.is_editor_hint():
@@ -31,6 +32,7 @@ func run() -> void:
     var record := {"http": OS.get_environment("PROBE_TOKEN"),
         "instance_nonce": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}
     var port := int(OS.get_environment("PROBE_PORT"))
+    var loopback_bind_succeeded := PortResolver.can_bind_local_port(port)
     var result: Dictionary
     if OS.get_environment("PROBE_THREADED") == "true":
         var worker := Thread.new()
@@ -40,6 +42,7 @@ func run() -> void:
         result = worker.wait_to_finish()
     else:
         result = _probe(port, record)
+    result["loopback_bind_succeeded"] = loopback_bind_succeeded
     result["matches_record"] = Lifecycle._authenticated_status_matches_record(result, record)
     var file := FileAccess.open("res://result.json", FileAccess.WRITE)
     file.store_string(JSON.stringify(result))
@@ -52,12 +55,22 @@ func _probe(port: int, record: Dictionary) -> Dictionary:
 
 
 @pytest.mark.parametrize(
-    ("authorized", "threaded"),
-    [(True, False), (False, False), (True, True)],
-    ids=["slow-authenticated", "foreign-403", "slow-authenticated-worker"],
+    ("authorized", "threaded", "bind_host"),
+    [
+        (True, False, "127.0.0.1"),
+        (False, False, "127.0.0.1"),
+        (True, True, "127.0.0.1"),
+        (True, False, "0.0.0.0"),
+    ],
+    ids=[
+        "slow-authenticated",
+        "foreign-403",
+        "slow-authenticated-worker",
+        "wildcard-listener-authenticated",
+    ],
 )
 def test_real_godot_status_probe_preserves_occupied_listener_checks(
-    tmp_path: Path, authorized: bool, threaded: bool,
+    tmp_path: Path, authorized: bool, threaded: bool, bind_host: str,
 ) -> None:
     godot = godot_bin_or_skip()
     project = tmp_path / "probe"
@@ -101,7 +114,7 @@ def test_real_godot_status_probe_preserves_occupied_listener_checks(
         def log_message(self, _format: str, *args: object) -> None:
             pass
 
-    with HTTPServer(("127.0.0.1", 0), Handler) as server:
+    with HTTPServer((bind_host, 0), Handler) as server:
         worker = threading.Thread(target=server.serve_forever, daemon=True)
         worker.start()
         try:

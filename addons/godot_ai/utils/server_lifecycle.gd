@@ -1403,8 +1403,13 @@ static func _probe_with_capability(port: int, capability: Dictionary, timeout_ms
 	## loopback port. This is only an unreachable probe; callers still check
 	## occupancy and prove any later listener before using it.
 	if OS.get_name() == "Windows" and PortResolver.can_bind_local_port(port):
-		result.error = "port_unbound"
-		return result
+		## A wildcard listener may already own this port even when Windows lets
+		## a second loopback-only TCPServer bind succeed (SO_REUSEADDR). Confirm
+		## the full listener table before calling it unbound; godot-ai binds
+		## 0.0.0.0 when remote access is enabled.
+		if not PortResolver.is_port_in_use_via_scrape(port):
+			result.error = "port_unbound"
+			return result
 	var client := HTTPClient.new()
 	var error := client.connect_to_host("127.0.0.1", port)
 	if error != OK:
