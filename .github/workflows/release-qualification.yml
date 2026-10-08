@@ -240,7 +240,7 @@ jobs:
         with:
           name: v4-row-python-${{ matrix.os }}-${{ matrix.python }}
           path: python-row
-      - uses: chickensoft-games/setup-godot@f166999204a4f2722c6fe042fbaa3b3ea0d9c789 # v2
+      - uses: chickensoft-games/setup-godot@ac93246ea68518a384c1c280a496e5989341f2f6 # v2
         with:
           version: ${{ matrix.godot }}
           use-dotnet: false
